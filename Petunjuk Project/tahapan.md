@@ -18,7 +18,7 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 ## Fase 0: Setup Arsitektur & Fondasi Proyek
 
 ### Backend (BE)
-- [ ] Inisialisasi proyek Laravel (PHP 8.3+) dengan struktur folder modular/service-oriented.
+- [x] Inisialisasi proyek Laravel (PHP 8.3+) dengan struktur folder modular/service-oriented.
 - [ ] Konfigurasi database MySQL 8 (`utf8mb4`, zona waktu DB: UTC).
 - [ ] Setup Redis untuk Cache, Session, dan Queue (Laravel Horizon).
 - [ ] Setup Laravel Sanctum untuk SPA Authentication.
