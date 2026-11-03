@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+
+class AutosaveJawabanRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return $this->user()?->role === 'siswa';
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.soal_id' => ['required', 'integer', 'distinct', 'exists:bank_soal,id'],
+            'items.*.jawaban' => ['present', 'nullable'],
+            'items.*.client_seq' => ['required', 'integer', 'min:1'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.required' => 'Jawaban yang disimpan wajib diisi.',
+            'items.*.soal_id.required' => 'ID soal wajib diisi.',
+            'items.*.jawaban.present' => 'Jawaban wajib dikirim, meskipun nilainya kosong.',
+            'items.*.client_seq.required' => 'Nomor urutan jawaban wajib diisi.',
+        ];
+    }
+}

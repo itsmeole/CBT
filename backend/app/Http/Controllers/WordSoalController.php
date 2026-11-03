@@ -22,17 +22,19 @@ class WordSoalController extends Controller
     public function template(): BinaryFileResponse
     {
         $filePath = $this->wordSoalService->generateTemplate();
+
         return response()->download($filePath, 'template_soal.docx')->deleteFileAfterSend(true);
     }
 
     public function preview(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:20480', // maks 20MB
+            'file' => 'required|file|mimes:docx|max:20480',
         ]);
 
         try {
             $result = $this->wordSoalService->preview($request->file('file'));
+
             return response()->json([
                 'data' => $result,
                 'message' => 'File Word berhasil diurai.',
@@ -52,16 +54,18 @@ class WordSoalController extends Controller
 
         if ($user->role === 'guru') {
             $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (!$mapelIds->contains($validated['mapel_id'])) {
+            if (! $mapelIds->contains($validated['mapel_id'])) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak diizinkan menambahkan soal untuk mapel ini.']], 403);
             }
             $guruId = $user->guru->id;
         } else {
-            $guruId = $request->input('guru_id', $user->guru?->id ?? 1);
+            $request->validate(['guru_id' => 'required|exists:guru,id']);
+            $guruId = (int) $request->input('guru_id');
         }
 
         try {
             $count = $this->wordSoalService->commit($guruId, $validated['mapel_id'], $validated['items']);
+
             return response()->json([
                 'message' => "Berhasil mengimpor {$count} butir soal ke bank soal.",
                 'imported_count' => $count,
@@ -91,7 +95,7 @@ class WordSoalController extends Controller
         }
 
         $filePath = $this->wordSoalService->exportToWord($soalList);
+
         return response()->download($filePath, 'bank_soal_export.docx')->deleteFileAfterSend(true);
     }
 }
-

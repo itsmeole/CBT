@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BankSoal;
 use App\Models\BobotTipe;
 use App\Models\GuruMapel;
 use App\Models\JadwalUjian;
@@ -16,7 +17,6 @@ use App\Models\TokenUjian;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class JadwalController extends Controller
 {
@@ -66,17 +66,27 @@ class JadwalController extends Controller
             'nama' => 'required|string|max:100',
             'deskripsi' => 'nullable|string',
             'soal_ids' => 'required|array|min:1',
-            'soal_ids.*' => 'exists:bank_soal,id',
+            'soal_ids.*' => 'required|distinct|exists:bank_soal,id',
         ]);
+
+        $soalMapelIds = BankSoal::query()
+            ->whereIn('id', $validated['soal_ids'])
+            ->pluck('mapel_id')
+            ->unique();
+
+        if ($soalMapelIds->count() !== 1 || (int) $soalMapelIds->first() !== (int) $validated['mapel_id']) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Semua soal dalam paket harus berasal dari mapel yang dipilih.']], 422);
+        }
 
         if ($user->role === 'guru') {
             $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (!$mapelIds->contains($validated['mapel_id'])) {
+            if (! $mapelIds->contains($validated['mapel_id'])) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke mapel ini.']], 403);
             }
             $guruId = $user->guru->id;
         } else {
-            $guruId = $request->input('guru_id', $user->guru?->id ?? 1);
+            $request->validate(['guru_id' => 'required|exists:guru,id']);
+            $guruId = (int) $request->input('guru_id');
         }
 
         return DB::transaction(function () use ($validated, $guruId) {
@@ -106,11 +116,16 @@ class JadwalController extends Controller
     {
         $paket = PaketSoal::findOrFail($id);
 
+        if ($request->user()->role === 'guru' && $paket->guru_id !== $request->user()->guru?->id) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke paket soal ini.']], 403);
+        }
+
         if ($paket->jadwalUjian()->exists()) {
             return response()->json(['error' => ['code' => 'IN_USE', 'message' => 'Paket soal sudah digunakan di jadwal ujian dan tidak dapat dihapus.']], 422);
         }
 
         $paket->delete();
+
         return response()->json(['message' => 'Paket soal berhasil dihapus.']);
     }
 
@@ -120,7 +135,7 @@ class JadwalController extends Controller
     public function getJadwal(): JsonResponse
     {
         return response()->json([
-            'data' => JadwalUjian::with(['mapel', 'paketSoal.items', 'tahunAjaran', 'sesiRuang.ruang', 'sesiRuang.tokenUjian'])->latest()->get()
+            'data' => JadwalUjian::with(['mapel', 'paketSoal.items', 'tahunAjaran', 'sesiRuang.ruang', 'sesiRuang.tokenUjian'])->latest()->get(),
         ]);
     }
 
@@ -135,13 +150,23 @@ class JadwalController extends Controller
             'durasi_menit' => 'required|integer|min:1',
         ]);
 
+        $paket = PaketSoal::with('items.bankSoal')->findOrFail($validated['paket_soal_id']);
+        if ((int) $paket->mapel_id !== (int) $validated['mapel_id'] || $paket->items->isEmpty()) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal harus berisi soal dan berasal dari mapel yang dipilih.']], 422);
+        }
+
+        if ($paket->items->contains(fn ($item) => (int) $item->bankSoal->mapel_id !== (int) $validated['mapel_id'])) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal dari mapel lain.']], 422);
+        }
+
         $taId = $validated['tahun_ajaran_id'] ?? TahunAjaran::where('aktif', true)->value('id');
-        if (!$taId) {
+        if (! $taId) {
             return response()->json(['error' => ['code' => 'NO_ACTIVE_ACADEMIC_YEAR', 'message' => 'Tidak ada tahun ajaran yang aktif.']], 422);
         }
 
         // FR-BE-42: Snapshot bobot saat jadwal dibuat!
         $bobotMap = BobotTipe::all()->pluck('bobot', 'tipe')->toArray();
+        $soalSnapshot = $paket->items->pluck('bank_soal_id')->map(fn ($id) => (int) $id)->all();
 
         $jadwal = JadwalUjian::create([
             'mapel_id' => $validated['mapel_id'],
@@ -151,6 +176,7 @@ class JadwalController extends Controller
             'tanggal' => $validated['tanggal'],
             'durasi_menit' => $validated['durasi_menit'],
             'bobot_snapshot' => $bobotMap,
+            'soal_snapshot' => $soalSnapshot,
             'status' => 'aktif',
         ]);
 
@@ -172,9 +198,18 @@ class JadwalController extends Controller
             'jam_mulai' => 'required',
             'jam_akhir' => 'required',
             'jenis' => 'nullable|in:reguler,susulan',
-            'siswa_ids' => 'nullable|array',
-            'siswa_ids.*' => 'exists:siswa,id',
+            'siswa_ids' => 'required|array|min:1',
+            'siswa_ids.*' => 'required|distinct|exists:siswa,id',
         ]);
+
+        $jadwal = JadwalUjian::findOrFail($validated['jadwal_ujian_id']);
+        $jumlahSiswaValid = Siswa::whereIn('id', $validated['siswa_ids'])
+            ->whereHas('kelas', fn ($query) => $query->where('tahun_ajaran_id', $jadwal->tahun_ajaran_id))
+            ->count();
+
+        if ($jumlahSiswaValid !== count($validated['siswa_ids'])) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Semua peserta harus berasal dari tahun ajaran jadwal ujian.']], 422);
+        }
 
         return DB::transaction(function () use ($validated, $request) {
             $sesi = SesiRuang::create([
@@ -195,7 +230,7 @@ class JadwalController extends Controller
             ]);
 
             // Petakan siswa ke peserta_ujian jika diberikan
-            if (!empty($validated['siswa_ids'])) {
+            if (! empty($validated['siswa_ids'])) {
                 foreach ($validated['siswa_ids'] as $siswaId) {
                     PesertaUjian::updateOrCreate(
                         ['siswa_id' => $siswaId, 'sesi_ruang_id' => $sesi->id],
@@ -267,4 +302,3 @@ class JadwalController extends Controller
         return $token;
     }
 }
-

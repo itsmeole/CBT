@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ManageUserRequest;
 use App\Models\Guru;
 use App\Models\GuruMapel;
 use App\Models\Kelas;
@@ -12,10 +13,83 @@ use App\Models\TahunAjaran;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class MasterDataController extends Controller
 {
+    public function indexUsers(): JsonResponse
+    {
+        return response()->json(['data' => User::with(['siswa.kelas', 'guru'])->orderBy('id')->get()]);
+    }
+
+    public function storeUser(ManageUserRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $user = DB::transaction(function () use ($validated): User {
+            $user = User::create([
+                'username' => $validated['username'],
+                'name' => $validated['name'],
+                'password' => $validated['password'],
+                'role' => $validated['role'],
+                'aktif' => $validated['aktif'] ?? true,
+            ]);
+
+            if ($user->role === 'siswa') {
+                $user->siswa()->create([
+                    'nis' => $validated['nis'],
+                    'kelas_id' => $validated['kelas_id'],
+                ]);
+            } elseif ($user->role === 'guru') {
+                $user->guru()->create(['nip' => $validated['nip'] ?? null]);
+            }
+
+            return $user;
+        });
+
+        return response()->json([
+            'data' => $user->load(['siswa.kelas', 'guru']),
+            'message' => 'Akun berhasil dibuat.',
+        ], 201);
+    }
+
+    public function updateUser(ManageUserRequest $request, int $id): JsonResponse
+    {
+        $user = User::with(['siswa', 'guru'])->findOrFail($id);
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($user, $validated): void {
+            $userFields = array_intersect_key($validated, array_flip(['username', 'name', 'aktif', 'password']));
+            if (empty($userFields['password'])) {
+                unset($userFields['password']);
+            }
+            $user->update($userFields);
+
+            if ($user->role === 'siswa' && $user->siswa) {
+                $user->siswa->update(array_intersect_key($validated, array_flip(['nis', 'kelas_id'])));
+            } elseif ($user->role === 'guru' && $user->guru && array_key_exists('nip', $validated)) {
+                $user->guru->update(['nip' => $validated['nip']]);
+            }
+        });
+
+        return response()->json([
+            'data' => $user->fresh()->load(['siswa.kelas', 'guru']),
+            'message' => 'Akun berhasil diperbarui.',
+        ]);
+    }
+
+    public function destroyUser(Request $request, int $id): JsonResponse
+    {
+        $user = User::findOrFail($id);
+        if ($user->is($request->user())) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Akun yang sedang digunakan tidak dapat dinonaktifkan.']], 422);
+        }
+
+        $this->nonaktifkanAkun($user);
+
+        return response()->json(['message' => 'Akun berhasil dinonaktifkan.']);
+    }
+
     // ==========================================
     // TAHUN AJARAN
     // ==========================================
@@ -32,11 +106,12 @@ class MasterDataController extends Controller
             'aktif' => 'boolean',
         ]);
 
-        if (!empty($validated['aktif'])) {
+        if (! empty($validated['aktif'])) {
             TahunAjaran::query()->update(['aktif' => false]);
         }
 
         $ta = TahunAjaran::create($validated);
+
         return response()->json(['data' => $ta, 'message' => 'Tahun ajaran berhasil ditambahkan.'], 201);
     }
 
@@ -49,11 +124,12 @@ class MasterDataController extends Controller
             'aktif' => 'boolean',
         ]);
 
-        if (!empty($validated['aktif'])) {
+        if (! empty($validated['aktif'])) {
             TahunAjaran::where('id', '!=', $id)->update(['aktif' => false]);
         }
 
         $ta->update($validated);
+
         return response()->json(['data' => $ta, 'message' => 'Tahun ajaran berhasil diperbarui.']);
     }
 
@@ -61,6 +137,7 @@ class MasterDataController extends Controller
     {
         $ta = TahunAjaran::findOrFail($id);
         $ta->delete();
+
         return response()->json(['message' => 'Tahun ajaran berhasil dihapus.']);
     }
 
@@ -81,6 +158,7 @@ class MasterDataController extends Controller
         ]);
 
         $kelas = Kelas::create($validated);
+
         return response()->json(['data' => $kelas->load('tahunAjaran'), 'message' => 'Kelas berhasil ditambahkan.'], 201);
     }
 
@@ -94,6 +172,7 @@ class MasterDataController extends Controller
         ]);
 
         $kelas->update($validated);
+
         return response()->json(['data' => $kelas->load('tahunAjaran'), 'message' => 'Kelas berhasil diperbarui.']);
     }
 
@@ -101,6 +180,7 @@ class MasterDataController extends Controller
     {
         $kelas = Kelas::findOrFail($id);
         $kelas->delete();
+
         return response()->json(['message' => 'Kelas berhasil dihapus.']);
     }
 
@@ -122,19 +202,23 @@ class MasterDataController extends Controller
             'kelas_id' => 'required|exists:kelas,id',
         ]);
 
-        $user = User::create([
-            'username' => $validated['username'],
-            'name' => $validated['name'],
-            'password' => Hash::make($validated['password']),
-            'role' => 'siswa',
-            'aktif' => true,
-        ]);
+        $siswa = DB::transaction(function () use ($validated): Siswa {
+            $user = User::create([
+                'username' => $validated['username'],
+                'name' => $validated['name'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'siswa',
+                'aktif' => true,
+            ]);
 
-        $siswa = Siswa::create([
-            'user_id' => $user->id,
-            'nis' => $validated['nis'],
-            'kelas_id' => $validated['kelas_id'],
-        ]);
+            $siswa = Siswa::create([
+                'user_id' => $user->id,
+                'nis' => $validated['nis'],
+                'kelas_id' => $validated['kelas_id'],
+            ]);
+
+            return $siswa;
+        });
 
         return response()->json(['data' => $siswa->load(['user', 'kelas']), 'message' => 'Siswa berhasil ditambahkan.'], 201);
     }
@@ -145,19 +229,20 @@ class MasterDataController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'password' => 'nullable|string|min:6',
-            'nis' => 'sometimes|required|string|max:30|unique:siswa,nis,' . $siswa->id,
+            'nis' => 'sometimes|required|string|max:30|unique:siswa,nis,'.$siswa->id,
             'kelas_id' => 'sometimes|required|exists:kelas,id',
         ]);
 
         if (isset($validated['name'])) {
             $siswa->user->name = $validated['name'];
         }
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $siswa->user->password = Hash::make($validated['password']);
         }
         $siswa->user->save();
 
         $siswa->update($validated);
+
         return response()->json(['data' => $siswa->load(['user', 'kelas']), 'message' => 'Siswa berhasil diperbarui.']);
     }
 
@@ -165,9 +250,14 @@ class MasterDataController extends Controller
     {
         $siswa = Siswa::findOrFail($id);
         $user = $siswa->user;
-        $siswa->delete();
-        if ($user) $user->delete();
-        return response()->json(['message' => 'Siswa berhasil dihapus.']);
+        DB::transaction(function () use ($siswa, $user): void {
+            $siswa->delete();
+            if ($user) {
+                $this->nonaktifkanAkun($user);
+            }
+        });
+
+        return response()->json(['message' => 'Siswa berhasil dinonaktifkan.']);
     }
 
     // ==========================================
@@ -187,18 +277,22 @@ class MasterDataController extends Controller
             'nip' => 'nullable|string|max:50|unique:guru,nip',
         ]);
 
-        $user = User::create([
-            'username' => $validated['username'],
-            'name' => $validated['name'],
-            'password' => Hash::make($validated['password']),
-            'role' => 'guru',
-            'aktif' => true,
-        ]);
+        $guru = DB::transaction(function () use ($validated): Guru {
+            $user = User::create([
+                'username' => $validated['username'],
+                'name' => $validated['name'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'guru',
+                'aktif' => true,
+            ]);
 
-        $guru = Guru::create([
-            'user_id' => $user->id,
-            'nip' => $validated['nip'] ?? null,
-        ]);
+            $guru = Guru::create([
+                'user_id' => $user->id,
+                'nip' => $validated['nip'] ?? null,
+            ]);
+
+            return $guru;
+        });
 
         return response()->json(['data' => $guru->load('user'), 'message' => 'Guru berhasil ditambahkan.'], 201);
     }
@@ -209,18 +303,19 @@ class MasterDataController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'password' => 'nullable|string|min:6',
-            'nip' => 'nullable|string|max:50|unique:guru,nip,' . $guru->id,
+            'nip' => 'nullable|string|max:50|unique:guru,nip,'.$guru->id,
         ]);
 
         if (isset($validated['name'])) {
             $guru->user->name = $validated['name'];
         }
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $guru->user->password = Hash::make($validated['password']);
         }
         $guru->user->save();
 
         $guru->update($validated);
+
         return response()->json(['data' => $guru->load('user'), 'message' => 'Guru berhasil diperbarui.']);
     }
 
@@ -228,9 +323,14 @@ class MasterDataController extends Controller
     {
         $guru = Guru::findOrFail($id);
         $user = $guru->user;
-        $guru->delete();
-        if ($user) $user->delete();
-        return response()->json(['message' => 'Guru berhasil dihapus.']);
+        DB::transaction(function () use ($guru, $user): void {
+            $guru->delete();
+            if ($user) {
+                $this->nonaktifkanAkun($user);
+            }
+        });
+
+        return response()->json(['message' => 'Guru berhasil dinonaktifkan.']);
     }
 
     // ==========================================
@@ -249,6 +349,7 @@ class MasterDataController extends Controller
         ]);
 
         $mapel = Mapel::create($validated);
+
         return response()->json(['data' => $mapel, 'message' => 'Mata pelajaran berhasil ditambahkan.'], 201);
     }
 
@@ -256,11 +357,12 @@ class MasterDataController extends Controller
     {
         $mapel = Mapel::findOrFail($id);
         $validated = $request->validate([
-            'kode' => 'sometimes|required|string|max:30|unique:mapel,kode,' . $mapel->id,
+            'kode' => 'sometimes|required|string|max:30|unique:mapel,kode,'.$mapel->id,
             'nama' => 'sometimes|required|string|max:100',
         ]);
 
         $mapel->update($validated);
+
         return response()->json(['data' => $mapel, 'message' => 'Mata pelajaran berhasil diperbarui.']);
     }
 
@@ -268,6 +370,7 @@ class MasterDataController extends Controller
     {
         $mapel = Mapel::findOrFail($id);
         $mapel->delete();
+
         return response()->json(['message' => 'Mata pelajaran berhasil dihapus.']);
     }
 
@@ -277,7 +380,7 @@ class MasterDataController extends Controller
     public function getGuruMapel(): JsonResponse
     {
         return response()->json([
-            'data' => GuruMapel::with(['guru.user', 'mapel', 'kelas', 'tahunAjaran'])->get()
+            'data' => GuruMapel::with(['guru.user', 'mapel', 'kelas', 'tahunAjaran'])->get(),
         ]);
     }
 
@@ -291,9 +394,10 @@ class MasterDataController extends Controller
         ]);
 
         $gm = GuruMapel::updateOrCreate($validated, $validated);
+
         return response()->json([
             'data' => $gm->load(['guru.user', 'mapel', 'kelas', 'tahunAjaran']),
-            'message' => 'Pengampu mapel berhasil diatur.'
+            'message' => 'Pengampu mapel berhasil diatur.',
         ], 201);
     }
 
@@ -301,6 +405,7 @@ class MasterDataController extends Controller
     {
         $gm = GuruMapel::findOrFail($id);
         $gm->delete();
+
         return response()->json(['message' => 'Pengampu mapel berhasil dihapus.']);
     }
 
@@ -320,6 +425,7 @@ class MasterDataController extends Controller
         ]);
 
         $ruang = Ruang::create($validated);
+
         return response()->json(['data' => $ruang, 'message' => 'Ruang ujian berhasil ditambahkan.'], 201);
     }
 
@@ -332,6 +438,7 @@ class MasterDataController extends Controller
         ]);
 
         $ruang->update($validated);
+
         return response()->json(['data' => $ruang, 'message' => 'Ruang ujian berhasil diperbarui.']);
     }
 
@@ -339,7 +446,16 @@ class MasterDataController extends Controller
     {
         $ruang = Ruang::findOrFail($id);
         $ruang->delete();
+
         return response()->json(['message' => 'Ruang ujian berhasil dihapus.']);
     }
-}
 
+    private function nonaktifkanAkun(User $user): void
+    {
+        DB::transaction(function () use ($user): void {
+            $user->update(['aktif' => false]);
+            $user->tokens()->delete();
+            $user->deviceSessions()->where('aktif', true)->update(['aktif' => false]);
+        });
+    }
+}

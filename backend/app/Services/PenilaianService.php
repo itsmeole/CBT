@@ -2,56 +2,42 @@
 
 namespace App\Services;
 
-use App\Models\JawabanSiswa;
+use App\Models\BankSoal;
 use App\Models\Nilai;
 use App\Models\PesertaUjian;
 
 class PenilaianService
 {
-    /**
-     * Hitung skor per butir soal secara murni dan deterministik.
-     *
-     * @param string $tipe
-     * @param mixed $jawaban
-     * @param mixed $kunci
-     * @param float $bobot
-     * @return float
-     */
-    public function hitungSkorSoal(string $tipe, mixed $jawaban, mixed $kunci, float $bobot): float
+    public function hitungSkorSoal(string $tipe, mixed $jawaban, mixed $kunci, string|int|float $bobot): string
     {
-        if ($bobot <= 0) {
-            return 0.00;
+        $bobotSatuan = $this->keSatuanDesimal($bobot);
+        if ($bobotSatuan <= 0) {
+            return '0.00';
         }
 
         switch ($tipe) {
             case 'pg':
-                // Kunci: string (opsi_id / teks), Jawaban: string
-                if (empty($jawaban) || empty($kunci)) {
-                    return 0.00;
+                if ($jawaban === null || $jawaban === '' || $kunci === null || $kunci === '') {
+                    return '0.00';
                 }
-                return (string) $jawaban === (string) $kunci ? $bobot : 0.00;
+
+                return (string) $jawaban === (string) $kunci ? $this->dariSatuanDesimal($bobotSatuan) : '0.00';
 
             case 'pg_kompleks':
-                // All-or-nothing: himpunan pilihan harus persis sama
-                if (!is_array($jawaban) || !is_array($kunci) || empty($jawaban) || empty($kunci)) {
-                    return 0.00;
+                if (! is_array($jawaban) || ! is_array($kunci) || $jawaban === [] || $kunci === []) {
+                    return '0.00';
                 }
+
                 $jawabanSorted = array_values(array_unique(array_map('strval', $jawaban)));
                 $kunciSorted = array_values(array_unique(array_map('strval', $kunci)));
                 sort($jawabanSorted);
                 sort($kunciSorted);
 
-                return $jawabanSorted === $kunciSorted ? $bobot : 0.00;
+                return $jawabanSorted === $kunciSorted ? $this->dariSatuanDesimal($bobotSatuan) : '0.00';
 
             case 'benar_salah':
-                // Kunci: associative array ['1' => 'B', '2' => 'S']
-                // Jawaban: associative array ['1' => 'B', '2' => 'B']
-                if (!is_array($jawaban) || !is_array($kunci) || empty($kunci)) {
-                    return 0.00;
-                }
-                $totalPernyataan = count($kunci);
-                if ($totalPernyataan === 0) {
-                    return 0.00;
+                if (! is_array($jawaban) || ! is_array($kunci) || $kunci === []) {
+                    return '0.00';
                 }
 
                 $benar = 0;
@@ -61,17 +47,11 @@ class PenilaianService
                     }
                 }
 
-                return round(($benar / $totalPernyataan) * $bobot, 2);
+                return $this->dariSatuanDesimal($this->hitungBagian($bobotSatuan, $benar, count($kunci)));
 
             case 'menjodohkan':
-                // Kunci: associative array premis => respons ['1' => 'a', '2' => 'b']
-                // Jawaban: associative array premis => respons ['1' => 'a', '2' => 'c']
-                if (!is_array($jawaban) || !is_array($kunci) || empty($kunci)) {
-                    return 0.00;
-                }
-                $totalPremis = count($kunci);
-                if ($totalPremis === 0) {
-                    return 0.00;
+                if (! is_array($jawaban) || ! is_array($kunci) || $kunci === []) {
+                    return '0.00';
                 }
 
                 $pasanganBenar = 0;
@@ -81,67 +61,55 @@ class PenilaianService
                     }
                 }
 
-                return round(($pasanganBenar / $totalPremis) * $bobot, 2);
+                return $this->dariSatuanDesimal($this->hitungBagian($bobotSatuan, $pasanganBenar, count($kunci)));
 
             case 'essay':
-                // Essay dinilai manual oleh guru (rentang 0 s/d bobot)
-                $nilaiManual = is_numeric($jawaban) ? (float) $jawaban : 0.00;
-                return min($bobot, max(0.00, $nilaiManual));
+                $nilaiManual = is_numeric($jawaban) ? $this->keSatuanDesimal($jawaban) : 0;
+
+                return $this->dariSatuanDesimal(min($bobotSatuan, max(0, $nilaiManual)));
 
             default:
-                return 0.00;
+                return '0.00';
         }
     }
 
-    /**
-     * Hitung nilai akhir untuk peserta ujian berdasarkan snapshot bobot jadwal.
-     */
     public function nilaiPeserta(PesertaUjian $peserta): Nilai
     {
         $jadwal = $peserta->sesiRuang->jadwalUjian;
         $bobotSnapshot = $jadwal->bobot_snapshot ?? [];
-
-        $soalList = $jadwal->paketSoal->items()->with('bankSoal')->get()->pluck('bankSoal');
-
-        $skorPerTipe = [
-            'pg' => 0.00,
-            'pg_kompleks' => 0.00,
-            'benar_salah' => 0.00,
-            'menjodohkan' => 0.00,
-            'essay' => 0.00,
-        ];
-
-        $maksimalPerTipe = [
-            'pg' => 0.00,
-            'pg_kompleks' => 0.00,
-            'benar_salah' => 0.00,
-            'menjodohkan' => 0.00,
-            'essay' => 0.00,
-        ];
-
+        $soalIds = $jadwal->soal_snapshot
+            ?? $jadwal->paketSoal->items()->pluck('bank_soal_id')->all();
+        $soalList = BankSoal::whereIn('id', $soalIds)->get();
+        $tipeSoal = ['pg', 'pg_kompleks', 'benar_salah', 'menjodohkan', 'essay'];
+        $skorPerTipe = array_fill_keys($tipeSoal, 0);
+        $maksimalPerTipe = $skorPerTipe;
         $adaEssayBelumKoreksi = false;
-
         $jawabanMap = $peserta->jawaban()->get()->keyBy('bank_soal_id');
 
         foreach ($soalList as $soal) {
             $tipe = $soal->tipe;
-            $bobotSoal = isset($bobotSnapshot[$tipe]) ? (float) $bobotSnapshot[$tipe] : 1.00;
-            $maksimalPerTipe[$tipe] += $bobotSoal;
-
+            $bobot = $bobotSnapshot[$tipe] ?? '1.00';
+            $bobotSatuan = $this->keSatuanDesimal($bobot);
+            $maksimalPerTipe[$tipe] += $bobotSatuan;
             $jawabanRecord = $jawabanMap->get($soal->id);
-            $jawabanData = $jawabanRecord ? $jawabanRecord->jawaban : null;
 
             if ($tipe === 'essay') {
                 if ($jawabanRecord && $jawabanRecord->dikoreksi_oleh !== null) {
-                    $skor = (float) $jawabanRecord->skor;
+                    $skor = $this->keSatuanDesimal($jawabanRecord->skor);
                 } else {
-                    $skor = 0.00;
+                    $skor = 0;
                     $adaEssayBelumKoreksi = true;
                 }
             } else {
-                $skor = $this->hitungSkorSoal($tipe, $jawabanData, $soal->kunci, $bobotSoal);
+                $skor = $this->keSatuanDesimal($this->hitungSkorSoal(
+                    $tipe,
+                    $jawabanRecord?->jawaban,
+                    $soal->kunci,
+                    $bobot
+                ));
+
                 if ($jawabanRecord) {
-                    $jawabanRecord->skor = $skor;
+                    $jawabanRecord->skor = $this->dariSatuanDesimal($skor);
                     $jawabanRecord->save();
                 }
             }
@@ -151,20 +119,59 @@ class PenilaianService
 
         $totalSkor = array_sum($skorPerTipe);
         $totalMaksimal = array_sum($maksimalPerTipe);
-
-        $nilaiAkhir = $totalMaksimal > 0 ? round(($totalSkor / $totalMaksimal) * 100, 2) : 0.00;
-        $status = $adaEssayBelumKoreksi ? 'menunggu_koreksi' : 'final';
+        $nilaiAkhir = $totalMaksimal > 0
+            ? $this->dariSatuanDesimal($this->hitungBagian($totalSkor * 10000, 1, $totalMaksimal))
+            : '0.00';
+        $skorPerTipeDesimal = array_map(fn (int $skor): string => $this->dariSatuanDesimal($skor), $skorPerTipe);
 
         return Nilai::updateOrCreate(
             ['peserta_ujian_id' => $peserta->id],
             [
-                'skor_per_tipe' => $skorPerTipe,
-                'total' => $totalSkor,
-                'maksimal' => $totalMaksimal,
+                'skor_per_tipe' => $skorPerTipeDesimal,
+                'total' => $this->dariSatuanDesimal($totalSkor),
+                'maksimal' => $this->dariSatuanDesimal($totalMaksimal),
                 'nilai_akhir' => $nilaiAkhir,
-                'status' => $status,
+                'status' => $adaEssayBelumKoreksi ? 'menunggu_koreksi' : 'final',
             ]
         );
     }
-}
 
+    private function keSatuanDesimal(string|int|float $nilai): int
+    {
+        $nilai = trim((string) $nilai);
+        if (! preg_match('/^(-?)(\d+)(?:\.(\d+))?$/', $nilai, $bagian)) {
+            return 0;
+        }
+
+        $desimal = str_pad(substr($bagian[3] ?? '', 0, 2), 2, '0');
+        $satuan = ((int) $bagian[2] * 100) + (int) $desimal;
+        if (isset($bagian[3][2]) && (int) $bagian[3][2] >= 5) {
+            $satuan++;
+        }
+
+        return ($bagian[1] ?? '') === '-' ? -$satuan : $satuan;
+    }
+
+    private function dariSatuanDesimal(int $satuan): string
+    {
+        $tanda = $satuan < 0 ? '-' : '';
+        $satuan = abs($satuan);
+
+        return sprintf('%s%d.%02d', $tanda, intdiv($satuan, 100), $satuan % 100);
+    }
+
+    private function hitungBagian(int $jumlahSatuan, int $pembilang, int $penyebut): int
+    {
+        if ($penyebut <= 0 || $pembilang <= 0) {
+            return 0;
+        }
+
+        $hasil = $jumlahSatuan * $pembilang;
+        $satuan = intdiv($hasil, $penyebut);
+        if (($hasil % $penyebut) * 2 >= $penyebut) {
+            $satuan++;
+        }
+
+        return $satuan;
+    }
+}

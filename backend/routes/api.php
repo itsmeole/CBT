@@ -6,6 +6,7 @@ use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\JadwalController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\OperatorKontrolController;
+use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\UjianController;
 use App\Http\Controllers\WordSoalController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,15 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+
+        Route::middleware('role:superadmin')->group(function () {
+            Route::get('settings', [PengaturanController::class, 'show']);
+            Route::put('settings', [PengaturanController::class, 'update']);
+            Route::get('users', [MasterDataController::class, 'indexUsers']);
+            Route::post('users', [MasterDataController::class, 'storeUser']);
+            Route::put('users/{id}', [MasterDataController::class, 'updateUser']);
+            Route::delete('users/{id}', [MasterDataController::class, 'destroyUser']);
+        });
 
         // ========================================================
         // 1. MASTER DATA (Superadmin & Operator)

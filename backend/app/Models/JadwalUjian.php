@@ -20,6 +20,7 @@ class JadwalUjian extends Model
         'tanggal',
         'durasi_menit',
         'bobot_snapshot',
+        'soal_snapshot',
         'status',
     ];
 
@@ -29,6 +30,7 @@ class JadwalUjian extends Model
             'tanggal' => 'date',
             'durasi_menit' => 'integer',
             'bobot_snapshot' => 'array',
+            'soal_snapshot' => 'array',
         ];
     }
 
@@ -52,4 +54,3 @@ class JadwalUjian extends Model
         return $this->hasMany(SesiRuang::class);
     }
 }
-

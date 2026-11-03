@@ -92,6 +92,7 @@ Penomoran `FR-BE-xx` dipakai sebagai referensi di task dan test.
 ### 4.2 Master Data dan Impor/Ekspor Excel
 
 - **FR-BE-10** CRUD: tahun ajaran (dan semester aktif), user, kelas/rombel, siswa, guru, mapel, guru_mapel, ruang.
+- **FR-BE-10a** Superadmin dapat mengatur kebijakan satu perangkat siswa (`tolak` atau `kick`); kebijakan disimpan persisten.
 - **FR-BE-11** Impor Excel untuk siswa, guru, kelas, guru_mapel. Alur 2 langkah:
   1. Unggah, lalu validasi semua baris, kembalikan **pratinjau** + **daftar error per baris** (nomor baris, kolom, pesan). Belum ada data yang disimpan.
   2. Konfirmasi, lalu simpan dalam satu transaksi (semua atau tidak sama sekali), dijalankan lewat queue untuk file besar.
@@ -287,7 +288,7 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 | `bobot_tipe` | tipe, bobot (pengaturan global operator) |
 | `paket_soal` | id, mapel_id, guru_id, nama |
 | `paket_soal_item` | paket_id, soal_id, urutan |
-| `jadwal_ujian` | id, mapel_id, paket_id, tanggal, durasi_menit, bobot_snapshot (JSON), tahun_ajaran_id |
+| `jadwal_ujian` | id, mapel_id, paket_id, tanggal, durasi_menit, bobot_snapshot (JSON), soal_snapshot (JSON), tahun_ajaran_id |
 | `sesi_ruang` | id, jadwal_id, ruang_id, sesi_ke, jam_mulai, jam_akhir, jenis (reguler/susulan) |
 | `pengawas_sesi` | sesi_ruang_id, guru_id |
 | `token` | id, jadwal_id / sesi_ruang_id, kode, aktif, dibuat_oleh |
@@ -326,14 +327,15 @@ Format respons error seragam:
 { "error": { "code": "SESSION_LOCKED", "message": "Ujian terkunci, hubungi pengawas." } }
 ```
 
-Kode error minimal: `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `ACCOUNT_IN_USE`, `TOKEN_INVALID`, `NOT_STARTED`, `SESSION_LOCKED`, `TIME_UP`, `ALREADY_SUBMITTED`, `RATE_LIMITED`.
+Kode error minimal: `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `ACCOUNT_IN_USE`, `TOKEN_INVALID`, `NOT_STARTED`, `SESSION_LOCKED`, `TIME_UP`, `ALREADY_SUBMITTED`, `RATE_LIMITED`. Kode tambahan yang digunakan endpoint meliputi `INVALID_MIME`, `MEDIA_PROCESSING_UNAVAILABLE`, `MEDIA_PROCESSING_FAILED`, `MEDIA_STORAGE_FAILED`, `IN_USE`, `EMPTY_EXAM`, `INVALID_STATE`, `NO_ACTIVE_ACADEMIC_YEAR`, `PARSE_ERROR`, `COMMIT_FAILED`, `IMPORT_ERROR`, `IMPORT_COMMIT_FAILED`, `BAD_REQUEST`, dan `NOT_FOUND`.
 
 | Method | Endpoint | Role |
 |---|---|---|
 | POST | `/auth/login`, `/auth/logout` | Semua |
 | GET | `/me`, `/time` | Semua |
 | POST | `/auth/reset-login/{userId}` | Operator, Superadmin, Pengawas (sesinya) |
-| CRUD | `/tahun-ajaran`, `/users`, `/settings` | Superadmin |
+| CRUD | `/tahun-ajaran`, `/users` | Superadmin |
+| GET, PUT | `/settings` (kebijakan login siswa) | Superadmin |
 | CRUD | `/kelas`, `/siswa`, `/guru`, `/mapel`, `/guru-mapel`, `/ruang` | Superadmin, Operator |
 | POST | `/import/excel/{jenis}/preview`, `/import/excel/{jenis}/commit` | Superadmin, Operator |
 | GET | `/export/excel/{jenis}`, `/templates/excel/{jenis}` | Superadmin, Operator |
@@ -412,4 +414,3 @@ Kode error minimal: `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `ACCOUNT
 | **1. MVP** | Auth 4 role, master data + impor Excel, bank soal 5 tipe + impor Word, paket soal, bobot + snapshot, jadwal/sesi/token, join, Mulai oleh operator, autosave, timer server, submit/auto-submit, penilaian otomatis |
 | **2. Pengawasan dan penilaian** | Kunci sesi + lock_event, realtime monitoring, plotting pengawas, unlock dengan alasan, reset login, koreksi essay, rekap nilai |
 | **3. Penyempurnaan** | Log aktivitas lengkap, berita acara, ekspor Excel/Word, cetak PDF, analisis butir, ujian susulan, dukungan SEB/wrapper, load test |
-
