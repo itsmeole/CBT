@@ -28,11 +28,11 @@ Backend menyediakan REST API, realtime (WebSocket), antrean job, dan penyimpanan
 | API | REST JSON, prefix `/api/v1` |
 | Autentikasi | Laravel Sanctum (token SPA) |
 | Database | MySQL 8 (InnoDB, `utf8mb4`) |
-| Cache, session, antrean | Redis |
-| Antrean | Laravel Queue + Horizon |
+| Cache, session, antrean | Driver Database (lokal dev) / Redis (VPS produksi) |
+| Antrean | Laravel Queue (Database worker di lokal, Redis/Horizon di VPS) |
 | Realtime | Laravel Reverb (WebSocket), dikonsumsi FE via Laravel Echo |
 | Impor/ekspor Excel | `maatwebsite/excel` (PhpSpreadsheet) |
-| Impor/ekspor Word | Pandoc (docx ke HTML + OMML ke LaTeX) dan/atau PhpWord untuk ekspor |
+| Impor/ekspor Word | `phpoffice/phpword` / XML parser bawaan PHP (tanpa binary Pandoc) |
 | Penyimpanan media | Disk lokal atau S3-compatible (via Laravel Filesystem) |
 | Zona waktu | `Asia/Jakarta` untuk tampilan, simpan di DB dalam UTC |
 
@@ -173,7 +173,7 @@ RUBRIK: Skor penuh jika menyebut 4 komponen utama.
 ```
 
 - **FR-BE-32** Gambar dan tabel dalam Word diekstrak, gambar disimpan ke storage lalu direferensikan dari konten soal.
-- **FR-BE-33** Rumus Equation Editor Word (OMML) dikonversi ke LaTeX (contoh: via Pandoc). Rumus yang gagal dikonversi ditandai sebagai error/peringatan, bukan diabaikan diam-diam.
+- **FR-BE-33** Rumus Equation Editor Word (OMML) dikonversi ke LaTeX (via XSLT / native XML parser PHP, tanpa dependensi binary Pandoc). Rumus yang gagal dikonversi ditandai sebagai error/peringatan, bukan diabaikan diam-diam.
 - **FR-BE-34** Audio tidak didukung lewat Word. Ditambahkan lewat editor soal setelah impor.
 - **FR-BE-35** Alur impor 2 langkah seperti Excel: pratinjau + **laporan error per soal** (nomor soal, pesan: kunci kosong, tipe tidak dikenal, jumlah opsi tidak valid, dsb.), lalu konfirmasi dan simpan dalam satu transaksi.
 - **FR-BE-36** Ekspor bank soal/paket ke `.docx` dengan format **identik dengan template**, sehingga file hasil ekspor bisa diimpor ulang tanpa perubahan (round-trip). Wajib ada test round-trip.

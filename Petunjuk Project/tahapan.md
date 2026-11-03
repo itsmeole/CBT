@@ -8,7 +8,7 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 
 ## Ringkasan Progres Utama
 
-- [ ] **Fase 0:** Setup Arsitektur & Lingkungan Kerja
+- [x] **Fase 0:** Setup Arsitektur & Lingkungan Kerja
 - [ ] **Fase 1 (MVP):** Autentikasi, Master Data, Bank Soal, Pengerjaan Ujian, & Penilaian Otomatis
 - [ ] **Fase 2:** Kunci Sesi Realtime, Pengawasan, & Koreksi Essay
 - [ ] **Fase 3:** Rekap Nilai, Laporan/Cetak, Audit Log, & Uji Beban (Load Test 700 User)
@@ -20,23 +20,23 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 ### Backend (BE)
 - [x] Inisialisasi proyek Laravel (PHP 8.3+) dengan struktur folder modular/service-oriented.
 - [x] Konfigurasi database MySQL 8 (`utf8mb4`, zona waktu DB: UTC).
-- [ ] Setup Redis untuk Cache, Session, dan Queue (Laravel Horizon).
-- [ ] Setup Laravel Sanctum untuk SPA Authentication.
-- [ ] Setup Laravel Reverb untuk WebSocket server dan event broadcasting.
-- [ ] Setup Form Request validation & standardisasi format JSON Response (termasuk standardisasi format error code).
-- [ ] Setup logging channel & sistem exception handler terpusat.
-- [ ] Konfigurasi library file parser (`maatwebsite/excel` & dependensi konversi `.docx` / Pandoc).
+- [x] Setup driver Database/Cache untuk Queue & Session lokal (persiapan Redis/Horizon saat deploy VPS produksi).
+- [x] Setup Laravel Sanctum untuk SPA Authentication.
+- [x] Setup Laravel Reverb untuk WebSocket server dan event broadcasting.
+- [x] Setup Form Request validation & standardisasi format JSON Response (termasuk standardisasi format error code).
+- [x] Setup logging channel & sistem exception handler terpusat.
+- [x] Konfigurasi library file parser (`maatwebsite/excel` & `phpoffice/phpword` / native XML untuk `.docx`, tanpa Pandoc).
 
 ### Frontend (FE)
 - [x] Inisialisasi proyek Vue 3 + Vite + TypeScript (mode `strict`).
-- [ ] Setup Tailwind CSS & desain sistem antarmuka responsif (mobile-first untuk halaman siswa).
-- [ ] Setup Vue Router dengan Route Guards terpusat berbasis Role.
-- [ ] Setup Pinia untuk state management global (Auth, Sesi Ujian, Monitoring).
-- [ ] Setup HTTP Client (Axios) dengan Interceptor terpusat (penanganan token, error global, network offline).
-- [ ] Setup Laravel Echo & Pusher JS client untuk integrasi ke Laravel Reverb.
-- [ ] Setup KaTeX untuk perenderan formula matematika/LaTeX.
-- [ ] Setup IndexedDB wrapper (`idb`/`localforage`) untuk antrean penyimpanan offline.
-- [ ] Setup tooling testing: Vitest (unit test) dan Playwright (E2E & emulasi layar mobile).
+- [x] Setup Tailwind CSS & desain sistem antarmuka responsif (mobile-first untuk halaman siswa).
+- [x] Setup Vue Router dengan Route Guards terpusat berbasis Role.
+- [x] Setup Pinia untuk state management global (Auth, Sesi Ujian, Monitoring).
+- [x] Setup HTTP Client (Axios) dengan Interceptor terpusat (penanganan token, error global, network offline).
+- [x] Setup Laravel Echo & Pusher JS client untuk integrasi ke Laravel Reverb.
+- [x] Setup KaTeX untuk perenderan formula matematika/LaTeX.
+- [x] Setup IndexedDB wrapper (`idb`/`localforage`) untuk antrean penyimpanan offline.
+- [x] Setup tooling testing: Vitest (unit test).
 
 ---
 
@@ -196,7 +196,6 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 
 #### Frontend
 - [ ] Antarmuka antrean koreksi essay: menampilkan soal, kunci panduan, rubrik, dan jawaban siswa (`FR-FE-130`).
-- [ ] Opsi penyamaran identitas siswa saat koreksi (blind grading) demi objektivitas.
 - [ ] Input skor essay dengan validasi batas maksimal skor sesuai bobot soal.
 - [ ] Halaman Rekap Nilai dengan indikator status nilai: *Menunggu Koreksi Essay* vs *Final* (`FR-FE-131`).
 

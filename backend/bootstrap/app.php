@@ -8,12 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -32,8 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ? $error('UNAUTHENTICATED', 'Silakan login terlebih dahulu.', 401) : null);
         $exceptions->render(fn (AccessDeniedHttpException $e, Request $r) => $r->is('api/*')
             ? $error('FORBIDDEN', 'Anda tidak memiliki akses.', 403) : null);
+        $exceptions->render(fn (NotFoundHttpException $e, Request $r) => $r->is('api/*')
+            ? $error('NOT_FOUND', 'Data atau endpoint tidak ditemukan.', 404) : null);
         $exceptions->render(fn (ValidationException $e, Request $r) => $r->is('api/*')
-            ? $error('VALIDATION_ERROR', 'Data tidak valid.', 422, ['fields' => $e->errors()]) : null);
+            ? $error('VALIDATION_ERROR', 'Data tidak valid.', 422, ['fields' => $e->errors(), 'details' => $e->errors()]) : null);
         $exceptions->render(fn (ThrottleRequestsException $e, Request $r) => $r->is('api/*')
             ? $error('RATE_LIMITED', 'Terlalu banyak percobaan, coba lagi sebentar.', 429) : null);
     })->create();

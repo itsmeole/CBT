@@ -51,7 +51,13 @@ class AuthController extends Controller
 
     private function userData(User $user): array
     {
-        return $user->only(['id', 'username', 'name', 'role']);
+        return [
+            'id' => $user->id,
+            'username' => $user->username,
+            'name' => $user->name,
+            'nama' => $user->name,
+            'role' => $user->role,
+        ];
     }
 
     private function error(string $code, string $message, int $status): JsonResponse
