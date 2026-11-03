@@ -38,10 +38,30 @@ class AuthTest extends TestCase
     public function test_second_device_rejected_under_tolak_policy(): void
     {
         config(['cbt.login_policy' => 'tolak']);
-        User::factory()->create(['username' => 'siswa1']);
+        User::factory()->create(['username' => 'siswa1', 'role' => 'siswa']);
 
         $this->login()->assertOk();
         $this->login()->assertStatus(409)->assertJsonPath('error.code', 'ACCOUNT_IN_USE');
+    }
+
+    public function test_non_siswa_roles_allow_multiple_active_sessions(): void
+    {
+        config(['cbt.login_policy' => 'tolak']);
+        User::factory()->create(['username' => 'operator1', 'role' => 'operator']);
+        User::factory()->create(['username' => 'guru1', 'role' => 'guru']);
+        User::factory()->create(['username' => 'admin1', 'role' => 'superadmin']);
+
+        // Operator can login multiple times
+        $this->login('operator1')->assertOk();
+        $this->login('operator1')->assertOk();
+
+        // Guru can login multiple times
+        $this->login('guru1')->assertOk();
+        $this->login('guru1')->assertOk();
+
+        // Superadmin can login multiple times
+        $this->login('admin1')->assertOk();
+        $this->login('admin1')->assertOk();
     }
 
     public function test_second_device_revokes_first_under_kick_policy(): void

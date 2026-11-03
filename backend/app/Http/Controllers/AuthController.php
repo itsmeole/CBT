@@ -13,7 +13,9 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request): JsonResponse
     {
-        $user = User::where('username', $request->username)->first();
+        $user = User::where('username', $request->username)
+            ->orWhere('email', $request->username)
+            ->first();
 
         if (! $user || ! $user->aktif || ! Hash::check($request->password, $user->password)) {
             return $this->error('UNAUTHENTICATED', 'Username atau password salah.', 401);
@@ -23,11 +25,12 @@ class AuthController extends Controller
         return DB::transaction(function () use ($user) {
             User::whereKey($user->id)->lockForUpdate()->first();
 
-            if ($user->tokens()->exists()) {
+            // Single active session HANYA berlaku untuk role siswa (Superadmin, Operator, Guru bebas multi-perangkat)
+            if ($user->role === 'siswa' && $user->tokens()->exists()) {
                 if (config('cbt.login_policy') !== 'kick') {
                     return $this->error('ACCOUNT_IN_USE', 'Akun sedang aktif di perangkat lain, hubungi operator/pengawas.', 409);
                 }
-                $user->tokens()->delete(); // ponytail: event ForceLogout menyusul bersama Reverb (Fase 2)
+                $user->tokens()->delete(); // Jika 'kick', sesi lama dicabut
             }
 
             return response()->json([

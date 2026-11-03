@@ -22,3 +22,20 @@ export function renderLatex(latex: string, displayMode = false): string {
   return html
 }
 
+/**
+ * Render semua rumus math inline ($...$) dan display ($$...$$) di dalam string HTML/teks.
+ */
+export function renderMathInHtml(content: string): string {
+  if (!content) return ''
+  // 1. Display math: $$...$$
+  let result = content.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    return renderLatex(math.trim(), true)
+  })
+  // 2. Inline math: $...$
+  result = result.replace(/(^|[^\\])\$([^\$]+?)\$/g, (_, prefix, math) => {
+    return `${prefix}${renderLatex(math.trim(), false)}`
+  })
+  return result
+}
+
+

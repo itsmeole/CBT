@@ -28,6 +28,7 @@ export const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
       meta: { public: true }
     },
+    // Siswa Routes
     {
       path: '/ujian',
       name: 'siswa-beranda',
@@ -35,10 +36,53 @@ export const router = createRouter({
       meta: { roles: ['siswa'] }
     },
     {
+      path: '/ujian/tunggu',
+      name: 'siswa-tunggu',
+      component: () => import('@/views/siswa/RuangTungguView.vue'),
+      meta: { roles: ['siswa'] }
+    },
+    {
+      path: '/ujian/kerjakan',
+      name: 'siswa-kerjakan',
+      component: () => import('@/views/siswa/PengerjaanUjianView.vue'),
+      meta: { roles: ['siswa'] }
+    },
+    {
+      path: '/ujian/selesai',
+      name: 'siswa-selesai',
+      component: () => import('@/views/siswa/UjianSelesaiView.vue'),
+      meta: { roles: ['siswa'] }
+    },
+    // Staf Routes
+    {
       path: '/staf',
       name: 'staf-beranda',
       component: () => import('@/views/staf/BerandaStafView.vue'),
       meta: { roles: ['superadmin', 'operator', 'guru'] }
+    },
+    {
+      path: '/staf/master',
+      name: 'staf-master',
+      component: () => import('@/views/staf/MasterDataView.vue'),
+      meta: { roles: ['superadmin', 'operator'] }
+    },
+    {
+      path: '/staf/bank-soal',
+      name: 'staf-bank-soal',
+      component: () => import('@/views/staf/BankSoalView.vue'),
+      meta: { roles: ['superadmin', 'guru'] }
+    },
+    {
+      path: '/staf/jadwal',
+      name: 'staf-jadwal',
+      component: () => import('@/views/staf/JadwalView.vue'),
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
+    },
+    {
+      path: '/staf/kontrol-sesi',
+      name: 'staf-kontrol-sesi',
+      component: () => import('@/views/staf/KontrolSesiOperatorView.vue'),
+      meta: { roles: ['superadmin', 'operator'] }
     },
     {
       path: '/403',
@@ -60,4 +104,3 @@ router.beforeEach(async (to) => {
   if (!auth.initialized) await auth.fetchMe()
   return resolveGuard(to.meta, auth.role, to.name)
 })
-

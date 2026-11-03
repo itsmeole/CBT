@@ -44,104 +44,104 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 
 ### 1.1 Autentikasi & Manajemen Pengguna
 #### Backend
-- [ ] Migration tabel `users`, `roles`, `tahun_ajaran`, `device_session`.
-- [ ] Implementasi login username + password dengan hashing aman (`FR-BE-01`).
-- [ ] Rate limiting login (maks. 5 percobaan/menit per user + IP) (`FR-BE-02`).
-- [ ] Implementasi single active session / satu akun satu perangkat (`FR-BE-03`).
-- [ ] Endpoint `GET /api/v1/time` untuk sinkronisasi waktu server (`FR-BE-06`).
-- [ ] Policy & Middleware otorisasi untuk 4 role (Superadmin, Operator, Guru, Siswa).
+- [x] Migration tabel `users`, `roles`, `tahun_ajaran`, `device_session`.
+- [x] Implementasi login username + password dengan hashing aman (`FR-BE-01`).
+- [x] Rate limiting login (maks. 5 percobaan/menit per user + IP) (`FR-BE-02`).
+- [x] Implementasi single active session / satu akun satu perangkat (khusus role `siswa`) (`FR-BE-03`).
+- [x] Endpoint `GET /api/v1/time` untuk sinkronisasi waktu server (`FR-BE-06`).
+- [x] Policy & Middleware otorisasi untuk 4 role (Superadmin, Operator, Guru, Siswa).
 
 #### Frontend
-- [ ] Halaman login responsif dengan pesan error berbahasa Indonesia (`FR-FE-01`).
-- [ ] Penanganan state autentikasi di Pinia & penyimpanan session aman (tanpa token di `localStorage`).
-- [ ] Layout terpisah: Layout Siswa (minimalis/mobile) vs Layout Staf/Admin (desktop-first).
+- [x] Halaman login responsif dengan pesan error berbahasa Indonesia (`FR-FE-01`).
+- [x] Penanganan state autentikasi di Pinia & penyimpanan session aman (tanpa token di `localStorage`).
+- [x] Layout terpisah: Layout Siswa (minimalis/mobile) vs Layout Staf/Admin (desktop-first).
 
 ---
 
 ### 1.2 Master Data & Impor Excel
 #### Backend
-- [ ] Migration tabel `kelas`, `siswa`, `guru`, `mapel`, `guru_mapel`, `ruang`.
-- [ ] CRUD Master data untuk Operator & Superadmin (`FR-BE-10`).
-- [ ] Endpoint unduh template Excel resmi untuk siswa, guru, kelas, guru_mapel (`FR-BE-12`).
-- [ ] Impor Excel tahap 1: Unggah & validasi baris, return pratinjau + laporan error per baris (`FR-BE-11`).
-- [ ] Impor Excel tahap 2: Commit data via database transaction dalam antrean queue (`FR-BE-11`).
-- [ ] Proteksi ketat: larang impor/ekspor soal lewat Excel (`FR-BE-14`).
+- [x] Migration tabel `kelas`, `siswa`, `guru`, `mapel`, `guru_mapel`, `ruang`.
+- [x] CRUD Master data untuk Operator & Superadmin (`FR-BE-10`).
+- [x] Endpoint unduh template Excel resmi untuk siswa, guru, kelas, guru_mapel (`FR-BE-12`).
+- [x] Impor Excel tahap 1: Unggah & validasi baris, return pratinjau + laporan error per baris (`FR-BE-11`).
+- [x] Impor Excel tahap 2: Commit data via database transaction dalam antrean queue (`FR-BE-11`).
+- [x] Proteksi ketat: larang impor/ekspor soal lewat Excel (`FR-BE-14`).
 
 #### Frontend
-- [ ] UI CRUD Master data untuk Operator (tabel, pencarian, filter, paginasi).
-- [ ] Wizard Impor Excel 2 langkah (Upload -> Pratinjau Error per Baris -> Konfirmasi Simpan) (`FR-FE-121`).
-- [ ] Tombol unduh template Excel resmi di masing-masing master data.
+- [x] UI CRUD Master data untuk Operator (tabel, pencarian, filter, paginasi).
+- [x] Wizard Impor Excel 2 langkah (Upload -> Pratinjau Error per Baris -> Konfirmasi Simpan) (`FR-FE-121`).
+- [x] Tombol unduh template Excel resmi di masing-masing master data.
 
 ---
 
 ### 1.3 Bank Soal, Unggah Media, & Impor Word (.docx)
 #### Backend
-- [ ] Migration tabel `bank_soal`, `opsi_soal`, `media`.
-- [ ] Logika isolasi scope guru mapel: hanya mengelola bank soal untuk mapel miliknya.
-- [ ] CRUD Bank Soal 5 tipe (`pg`, `pg_kompleks`, `benar_salah`, `menjodohkan`, `essay`) (`FR-BE-20`, `FR-BE-21`).
-- [ ] Sanitasi HTML konten soal (whitelist tag aman) (`FR-BE-23`).
-- [ ] Endpoint unggah media (gambar webp/jpg/png maks 2MB auto-resize, audio maks 10MB) (`FR-BE-24`).
-- [ ] Parser dokumen Word (`.docx`) berdasarkan format baku `[SOAL] ... [/SOAL]` (`FR-BE-31`).
-- [ ] Ekstraksi gambar embedded dan konversi rumus Word OMML ke LaTeX KaTeX (`FR-BE-32`, `FR-BE-33`).
-- [ ] Endpoint pratinjau impor Word + validasi error per butir soal (`FR-BE-35`).
-- [ ] Endpoint commit hasil impor Word ke database (single transaction) (`FR-BE-35`).
-- [ ] Ekspor bank soal ke `.docx` dengan format template identik (mendukung *round-trip*) (`FR-BE-36`).
+- [x] Migration tabel `bank_soal`, `opsi_soal`, `media`.
+- [x] Logika isolasi scope guru mapel: hanya mengelola bank soal untuk mapel miliknya.
+- [x] CRUD Bank Soal 5 tipe (`pg`, `pg_kompleks`, `benar_salah`, `menjodohkan`, `essay`) (`FR-BE-20`, `FR-BE-21`).
+- [x] Sanitasi HTML konten soal (whitelist tag aman) (`FR-BE-23`).
+- [x] Endpoint unggah media (gambar webp/jpg/png maks 2MB auto-resize, audio maks 10MB) (`FR-BE-24`).
+- [x] Parser dokumen Word (`.docx`) berdasarkan format baku `[SOAL] ... [/SOAL]` (`FR-BE-31`).
+- [x] Ekstraksi gambar embedded dan konversi rumus Word OMML ke LaTeX KaTeX (`FR-BE-32`, `FR-BE-33`).
+- [x] Endpoint pratinjau impor Word + validasi error per butir soal (`FR-BE-35`).
+- [x] Endpoint commit hasil impor Word ke database (single transaction) (`FR-BE-35`).
+- [x] Ekspor bank soal ke `.docx` dengan format template identik (mendukung *round-trip*) (`FR-BE-36`).
 
 #### Frontend
-- [ ] Tampilan daftar bank soal dengan filter mapel, tipe soal, dan pencarian kata kunci.
-- [ ] Integrasi Rich Text Editor (TipTap) dengan dukungan gambar, tabel, dan input formula LaTeX/KaTeX (`FR-FE-101`).
-- [ ] Form dinamis pembuatan soal sesuai 5 tipe (`FR-FE-101`).
-- [ ] Wizard Impor Soal dari Word (`.docx`): Upload -> Pratinjau Soal & Laporan Error -> Konfirmasi (`FR-FE-111`).
-- [ ] Validasi form client-side: blokir commit jika masih ada soal berstatus error (`FR-FE-111`).
-- [ ] Tombol ekspor bank soal ke format Word (`FR-FE-113`).
+- [x] Tampilan daftar bank soal dengan filter mapel, tipe soal, dan pencarian kata kunci.
+- [x] Integrasi Rich Text Editor dengan dukungan gambar, tabel, dan input formula LaTeX/KaTeX (`FR-FE-101`).
+- [x] Form dinamis pembuatan soal sesuai 5 tipe (`FR-FE-101`).
+- [x] Wizard Impor Soal dari Word (`.docx`): Upload -> Pratinjau Soal & Laporan Error -> Konfirmasi (`FR-FE-111`).
+- [x] Validasi form client-side: blokir commit jika masih ada soal berstatus error (`FR-FE-111`).
+- [x] Tombol ekspor bank soal ke format Word (`FR-FE-113`).
 
 ---
 
 ### 1.4 Paket Soal, Bobot, Jadwal, & Kontrol Operator
 #### Backend
-- [ ] Migration tabel `bobot_tipe`, `paket_soal`, `paket_soal_item`, `jadwal_ujian`, `sesi_ruang`, `token`.
-- [ ] Manajemen paket soal oleh guru mapel (`FR-BE-40`).
-- [ ] Konfigurasi bobot per tipe soal oleh Operator (`FR-BE-41`).
-- [ ] Logika **Snapshot Bobot**: duplikasi bobot ke jadwal saat jadwal diterbitkan (`FR-BE-42`).
-- [ ] Manajemen jadwal, sesi, ruang, dan pemetaan rombel/peserta (`FR-BE-50`, `FR-BE-51`).
-- [ ] Generator Token Ujian 6 karakter alfanumerik huruf besar tanpa karakter ambigu (`FR-BE-53`).
-- [ ] Endpoint presensi/verifikasi kehadiran siswa oleh **Operator/Superadmin saja** (`FR-BE-61`).
-- [ ] Endpoint aksi **Mulai Ujian** oleh **Operator/Superadmin saja** (return 403 Forbidden untuk Guru) (`FR-BE-61`).
+- [x] Migration tabel `bobot_tipe`, `paket_soal`, `paket_soal_item`, `jadwal_ujian`, `sesi_ruang`, `token`.
+- [x] Manajemen paket soal oleh guru mapel (`FR-BE-40`).
+- [x] Konfigurasi bobot per tipe soal oleh Operator (`FR-BE-41`).
+- [x] Logika **Snapshot Bobot**: duplikasi bobot ke jadwal saat jadwal diterbitkan (`FR-BE-42`).
+- [x] Manajemen jadwal, sesi, ruang, dan pemetaan rombel/peserta (`FR-BE-50`, `FR-BE-51`).
+- [x] Generator Token Ujian 6 karakter alfanumerik huruf besar tanpa karakter ambigu (`FR-BE-53`).
+- [x] Endpoint presensi/verifikasi kehadiran siswa oleh **Operator/Superadmin saja** (`FR-BE-61`).
+- [x] Endpoint aksi **Mulai Ujian** oleh **Operator/Superadmin saja** (return 403 Forbidden untuk Guru) (`FR-BE-61`).
 
 #### Frontend
-- [ ] Halaman kelola paket soal oleh guru mapel (`FR-FE-104`).
-- [ ] Halaman konfigurasi bobot tipe soal oleh Operator.
-- [ ] Halaman manajemen jadwal, sesi, ruang, dan generate token oleh Operator.
-- [ ] Panel Kontrol Sesi Operator: daftar presensi siswa per ruang & tombol verifikasi kehadiran (`FR-FE-80`, `FR-FE-81`).
-- [ ] Tombol **Mulai Ujian** (per sesi atau per siswa) dengan dialog konfirmasi (`FR-FE-82`).
-- [ ] Pastikan menu dan tombol kontrol mulai ujian disembunyikan total dari role Guru (`FR-FE-83`).
+- [x] Halaman kelola paket soal oleh guru mapel (`FR-FE-104`).
+- [x] Halaman konfigurasi bobot tipe soal oleh Operator.
+- [x] Halaman manajemen jadwal, sesi, ruang, dan generate token oleh Operator.
+- [x] Panel Kontrol Sesi Operator: daftar presensi siswa per ruang & tombol verifikasi kehadiran (`FR-FE-80`, `FR-FE-81`).
+- [x] Tombol **Mulai Ujian** (per sesi atau per siswa) dengan dialog konfirmasi (`FR-FE-82`).
+- [x] Pastikan menu dan tombol kontrol mulai ujian disembunyikan total dari role Guru (`FR-FE-83`).
 
 ---
 
 ### 1.5 Pengerjaan Ujian Siswa (Mobile-First) & Penilaian Otomatis
 #### Backend
-- [ ] Migration tabel `peserta_ujian`, `jawaban_siswa`, `nilai`.
-- [ ] Endpoint validasi token & join ujian -> status beralih ke `menunggu` (`FR-BE-60`).
-- [ ] Pengacakan urutan soal dan opsi saat sesi dimulai, simpan deterministik di DB (`FR-BE-62`).
-- [ ] Endpoint payload soal siswa: **strip total** kunci jawaban, skor, dan rubrik (`FR-BE-63`).
-- [ ] Endpoint autosave jawaban: hanya simpan delta perubahan, proteksi `client_seq`, cek batas waktu (`FR-BE-64`).
-- [ ] Penegakan timer di server berdasarkan `waktu_selesai` absolut (`FR-BE-65`).
-- [ ] Endpoint submit manual siswa (`FR-BE-66`).
-- [ ] Background job scheduler auto-submit saat waktu habis (termasuk status terkunci) (`FR-BE-67`).
-- [ ] Engine kalkulasi nilai otomatis untuk PG, PG Kompleks (*all-or-nothing*), B/S, dan Menjodohkan (`FR-BE-81`, `FR-BE-82`).
-- [ ] Proteksi ketat: jangan kirim nilai ke siswa setelah selesai (`FR-BE-69`, `FR-BE-92`).
+- [x] Migration tabel `peserta_ujian`, `jawaban_siswa`, `nilai`.
+- [x] Endpoint validasi token & join ujian -> status beralih ke `menunggu` (`FR-BE-60`).
+- [x] Pengacakan urutan soal dan opsi saat sesi dimulai, simpan deterministik di DB (`FR-BE-62`).
+- [x] Endpoint payload soal siswa: **strip total** kunci jawaban, skor, dan rubrik (`FR-BE-63`).
+- [x] Endpoint autosave jawaban: hanya simpan delta perubahan, proteksi `client_seq`, cek batas waktu (`FR-BE-64`).
+- [x] Penegakan timer di server berdasarkan `waktu_selesai` absolut (`FR-BE-65`).
+- [x] Endpoint submit manual siswa (`FR-BE-66`).
+- [x] Background job scheduler auto-submit saat waktu habis (termasuk status terkunci) (`FR-BE-67`).
+- [x] Engine kalkulasi nilai otomatis untuk PG, PG Kompleks (*all-or-nothing*), B/S, dan Menjodohkan (`FR-BE-81`, `FR-BE-82`).
+- [x] Proteksi ketat: jangan kirim nilai ke siswa setelah selesai (`FR-BE-69`, `FR-BE-92`).
 
 #### Frontend
-- [ ] Form input token ujian siswa dengan checklist persiapan perangkat HP (`FR-FE-02`, `FR-FE-03`).
-- [ ] Halaman Ruang Tunggu siswa: polling/mendengarkan sinyal mulai dari Operator (`FR-FE-10`, `FR-FE-11`).
-- [ ] Halaman pengerjaan ujian mobile-first: layout ringkas, nomor grid, touch target minimal 44x44px (`FR-FE-20`, `FR-FE-21`).
-- [ ] Komponen input khusus untuk 5 tipe soal (khusus Menjodohkan gunakan dropdown/bottom-sheet, bukan drag-and-drop) (`FR-FE-22`).
-- [ ] Engine autosave lokal dengan antrean IndexedDB dan penanganan retry/offline otomatis (`FR-FE-30`, `FR-FE-32`).
-- [ ] Indikator status koneksi/sinkronisasi: *Tersimpan / Menyimpan... / Offline* (`FR-FE-33`).
-- [ ] Display timer sinkron dengan server + peringatan visual sisa 10 & 5 menit (`FR-FE-41`, `FR-FE-42`).
-- [ ] Blokir interaksi browser terlarang: klik kanan, copy, cut, paste, text select (`FR-FE-60`).
-- [ ] Modal konfirmasi submit buatan sendiri (menampilkan rekap status terjawab) (`FR-FE-70`).
-- [ ] Halaman selesai sederhana ("Ujian selesai") **tanpa skor/nilai** (`FR-FE-72`).
+- [x] Form input token ujian siswa dengan checklist persiapan perangkat HP (`FR-FE-02`, `FR-FE-03`).
+- [x] Halaman Ruang Tunggu siswa: polling/mendengarkan sinyal mulai dari Operator (`FR-FE-10`, `FR-FE-11`).
+- [x] Halaman pengerjaan ujian mobile-first: layout ringkas, nomor grid, touch target minimal 44x44px (`FR-FE-20`, `FR-FE-21`).
+- [x] Komponen input khusus untuk 5 tipe soal (khusus Menjodohkan gunakan dropdown/bottom-sheet, bukan drag-and-drop) (`FR-FE-22`).
+- [x] Engine autosave lokal dengan antrean IndexedDB dan penanganan retry/offline otomatis (`FR-FE-30`, `FR-FE-32`).
+- [x] Indikator status koneksi/sinkronisasi: *Tersimpan / Menyimpan... / Offline* (`FR-FE-33`).
+- [x] Display timer sinkron dengan server + peringatan visual sisa 10 & 5 menit (`FR-FE-41`, `FR-FE-42`).
+- [x] Blokir interaksi browser terlarang: klik kanan, copy, cut, paste, text select (`FR-FE-60`).
+- [x] Modal konfirmasi submit buatan sendiri (menampilkan rekap status terjawab) (`FR-FE-70`).
+- [x] Halaman selesai sederhana ("Ujian selesai") **tanpa skor/nilai** (`FR-FE-72`).
 
 ---
 

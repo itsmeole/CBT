@@ -33,4 +33,19 @@ class User extends Authenticatable
             'aktif' => 'boolean',
         ];
     }
+
+    public function siswa()
+    {
+        return $this->hasOne(Siswa::class);
+    }
+
+    public function guru()
+    {
+        return $this->hasOne(Guru::class);
+    }
+
+    public function deviceSessions()
+    {
+        return $this->hasMany(DeviceSession::class);
+    }
 }
