@@ -19,7 +19,7 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 
 ### Backend (BE)
 - [x] Inisialisasi proyek Laravel (PHP 8.3+) dengan struktur folder modular/service-oriented.
-- [ ] Konfigurasi database MySQL 8 (`utf8mb4`, zona waktu DB: UTC).
+- [x] Konfigurasi database MySQL 8 (`utf8mb4`, zona waktu DB: UTC).
 - [ ] Setup Redis untuk Cache, Session, dan Queue (Laravel Horizon).
 - [ ] Setup Laravel Sanctum untuk SPA Authentication.
 - [ ] Setup Laravel Reverb untuk WebSocket server dan event broadcasting.
@@ -28,7 +28,7 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [ ] Konfigurasi library file parser (`maatwebsite/excel` & dependensi konversi `.docx` / Pandoc).
 
 ### Frontend (FE)
-- [ ] Inisialisasi proyek Vue 3 + Vite + TypeScript (mode `strict`).
+- [x] Inisialisasi proyek Vue 3 + Vite + TypeScript (mode `strict`).
 - [ ] Setup Tailwind CSS & desain sistem antarmuka responsif (mobile-first untuk halaman siswa).
 - [ ] Setup Vue Router dengan Route Guards terpusat berbasis Role.
 - [ ] Setup Pinia untuk state management global (Auth, Sesi Ujian, Monitoring).
