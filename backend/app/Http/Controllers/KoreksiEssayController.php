@@ -8,6 +8,7 @@ use App\Models\GuruMapel;
 use App\Models\JadwalUjian;
 use App\Models\JawabanSiswa;
 use App\Models\PesertaUjian;
+use App\Services\AuditLogService;
 use App\Services\OtorisasiCbtService;
 use App\Services\PenilaianService;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ class KoreksiEssayController extends Controller
     public function __construct(
         private readonly OtorisasiCbtService $otorisasi,
         private readonly PenilaianService $penilaian,
+        private readonly AuditLogService $auditLog,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -137,7 +139,17 @@ class KoreksiEssayController extends Controller
 
             $peserta->load('sesiRuang.jadwalUjian');
 
-            return $this->penilaian->nilaiPeserta($peserta);
+            $nilai = $this->penilaian->nilaiPeserta($peserta);
+            $this->auditLog->record(
+                $request->user(),
+                'essay.dikoreksi',
+                'jawaban_siswa',
+                $jawabanId,
+                ['skor' => $skor, 'nilai_status' => $nilai->status],
+                $request,
+            );
+
+            return $nilai;
         });
 
         return response()->json([

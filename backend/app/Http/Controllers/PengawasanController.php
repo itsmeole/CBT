@@ -16,6 +16,7 @@ use App\Models\Pengaturan;
 use App\Models\PesertaUjian;
 use App\Models\SesiRuang;
 use App\Models\User;
+use App\Services\AuditLogService;
 use App\Services\OtorisasiCbtService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,10 @@ use Illuminate\Support\Facades\DB;
 
 class PengawasanController extends Controller
 {
-    public function __construct(private readonly OtorisasiCbtService $otorisasi) {}
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly OtorisasiCbtService $otorisasi,
+    ) {}
 
     public function lock(KunciUjianRequest $request): JsonResponse
     {
@@ -62,6 +66,14 @@ class PengawasanController extends Controller
                 'waktu_kunci' => $waktuKunci,
                 'user_agent' => mb_substr((string) $request->userAgent(), 0, 1000),
             ]);
+            $this->auditLog->record(
+                $request->user(),
+                'ujian.lock',
+                'peserta_ujian',
+                $terkunci->id,
+                ['pemicu' => $request->validated('pemicu'), 'jumlah_kunci' => $jumlahKunci],
+                $request,
+            );
 
             return ['baru' => true, 'peserta' => $terkunci->fresh()];
         });
@@ -120,6 +132,14 @@ class PengawasanController extends Controller
                 'alasan' => $request->validated('alasan'),
             ]);
             $peserta->update(['status' => 'mengerjakan']);
+            $this->auditLog->record(
+                $request->user(),
+                'ujian.unlock',
+                'peserta_ujian',
+                $peserta->id,
+                ['alasan' => $request->validated('alasan')],
+                $request,
+            );
 
             return ['peserta' => $peserta->fresh(), 'waktu_selesai' => $peserta->waktu_selesai];
         });
@@ -191,7 +211,7 @@ class PengawasanController extends Controller
             return $this->error('FORBIDDEN', 'Anda tidak berwenang mereset login siswa ini.', 403);
         }
 
-        $pesertaIds = DB::transaction(function () use ($user): array {
+        $pesertaIds = DB::transaction(function () use ($user, $request): array {
             $pesertaIds = PesertaUjian::query()
                 ->where('siswa_id', $user->siswa->id)
                 ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
@@ -200,6 +220,14 @@ class PengawasanController extends Controller
                 ->all();
             $user->tokens()->delete();
             $user->deviceSessions()->where('aktif', true)->update(['aktif' => false]);
+            $this->auditLog->record(
+                $request->user(),
+                'auth.reset_login',
+                'user',
+                $user->id,
+                ['peserta_ids' => $pesertaIds],
+                $request,
+            );
 
             return $pesertaIds;
         });
@@ -220,7 +248,17 @@ class PengawasanController extends Controller
     public function updateAmbangKunci(UpdateAmbangKunciRequest $request): JsonResponse
     {
         $ambang = $request->validated('ambang_kunci');
-        Pengaturan::query()->updateOrCreate(['key' => 'ambang_kunci'], ['value' => (string) $ambang]);
+        DB::transaction(function () use ($request, $ambang): void {
+            Pengaturan::query()->updateOrCreate(['key' => 'ambang_kunci'], ['value' => (string) $ambang]);
+            $this->auditLog->record(
+                $request->user(),
+                'lock_threshold.updated',
+                'pengaturan',
+                null,
+                ['ambang_kunci' => $ambang],
+                $request,
+            );
+        });
 
         return response()->json(['data' => ['ambang_kunci' => $ambang]]);
     }

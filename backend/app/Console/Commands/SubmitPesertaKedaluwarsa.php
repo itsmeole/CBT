@@ -7,6 +7,7 @@ use App\Events\PesertaSubmitted;
 use App\Events\WaktuHabis;
 use App\Jobs\ProsesPenilaianPeserta;
 use App\Models\PesertaUjian;
+use App\Services\AuditLogService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 #[Description('Submit peserta ujian yang waktu servernya telah habis.')]
 class SubmitPesertaKedaluwarsa extends Command
 {
-    public function handle(): int
+    public function handle(AuditLogService $auditLog): int
     {
         $pesertaIds = PesertaUjian::query()
             ->whereIn('status', ['mengerjakan', 'terkunci'])
@@ -25,7 +26,7 @@ class SubmitPesertaKedaluwarsa extends Command
             ->pluck('id');
 
         foreach ($pesertaIds as $pesertaId) {
-            $sesiRuangId = DB::transaction(function () use ($pesertaId): ?int {
+            $sesiRuangId = DB::transaction(function () use ($pesertaId, $auditLog): ?int {
                 $peserta = PesertaUjian::query()
                     ->whereKey($pesertaId)
                     ->lockForUpdate()
@@ -36,6 +37,13 @@ class SubmitPesertaKedaluwarsa extends Command
                 }
 
                 $peserta->update(['status' => 'selesai']);
+                $auditLog->record(
+                    null,
+                    'ujian.dikirim_otomatis',
+                    'peserta_ujian',
+                    (int) $pesertaId,
+                    ['alasan' => 'waktu_habis'],
+                );
 
                 return $peserta->sesi_ruang_id;
             });

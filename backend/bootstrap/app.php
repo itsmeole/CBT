@@ -27,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:submit-peserta-kedaluwarsa')
             ->everyThirtySeconds()
             ->withoutOverlapping();
+        $schedule->command('app:backup-database')
+            ->dailyAt('02:00')
+            ->timezone('Asia/Jakarta')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/backup.log'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['role' => EnsureRole::class]);

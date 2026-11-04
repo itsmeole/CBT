@@ -12,6 +12,7 @@ use App\Models\BankSoal;
 use App\Models\JawabanSiswa;
 use App\Models\PesertaUjian;
 use App\Models\TokenUjian;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 
 class UjianController extends Controller
 {
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     /**
      * Siswa memasukkan token untuk bergabung ke sesi ujian (FR-BE-60).
      * Status beralih ke 'menunggu' (menunggu Operator menekan Mulai).
@@ -122,7 +125,7 @@ class UjianController extends Controller
         // Auto-submit jika waktu habis
         if ($peserta->status === 'mengerjakan' || $peserta->status === 'terkunci') {
             if ($peserta->waktu_selesai && Carbon::now()->greaterThanOrEqualTo($peserta->waktu_selesai)) {
-                $this->prosesSubmit($peserta, true);
+                $this->prosesSubmit($peserta, true, $request);
 
                 return response()->json(['data' => ['status' => 'selesai']]);
             }
@@ -179,7 +182,7 @@ class UjianController extends Controller
 
         // Cek batas waktu
         if ($peserta->waktu_selesai && Carbon::now()->greaterThanOrEqualTo($peserta->waktu_selesai)) {
-            $this->prosesSubmit($peserta, true);
+            $this->prosesSubmit($peserta, true, $request);
 
             return response()->json(['error' => ['code' => 'TIME_UP', 'message' => 'Waktu ujian telah habis.']], 423);
         }
@@ -282,7 +285,7 @@ class UjianController extends Controller
 
         $soalMap = BankSoal::whereIn('id', $submittedSoalIds)->get()->keyBy('id');
         $timeUp = false;
-        DB::transaction(function () use ($peserta, $validated, $soalMap, &$timeUp) {
+        DB::transaction(function () use ($peserta, $validated, $soalMap, &$timeUp, $request) {
             $peserta = PesertaUjian::query()->whereKey($peserta->id)->lockForUpdate()->firstOrFail();
 
             if ($peserta->status === 'terkunci') {
@@ -300,6 +303,14 @@ class UjianController extends Controller
             if ($peserta->waktu_selesai && Carbon::now()->greaterThanOrEqualTo($peserta->waktu_selesai)) {
                 $peserta->update(['status' => 'selesai']);
                 $timeUp = true;
+                $this->auditLog->record(
+                    $request->user(),
+                    'ujian.dikirim_otomatis',
+                    'peserta_ujian',
+                    $peserta->id,
+                    ['alasan' => 'waktu_habis'],
+                    $request,
+                );
 
                 return;
             }
@@ -461,7 +472,7 @@ class UjianController extends Controller
             return response()->json(['error' => ['code' => 'ALREADY_SUBMITTED', 'message' => 'Ujian sudah diselesaikan.']], 422);
         }
 
-        $this->prosesSubmit($peserta);
+        $this->prosesSubmit($peserta, false, $request);
 
         // Siswa HANYA menerima pesan selesai tanpa nilai / skor / pembahasan (FR-BE-69)
         return response()->json([
@@ -473,9 +484,9 @@ class UjianController extends Controller
     /**
      * Logika internal submit dan hitung nilai otomatis.
      */
-    private function prosesSubmit(PesertaUjian $peserta, bool $waktuHabis = false): void
+    private function prosesSubmit(PesertaUjian $peserta, bool $waktuHabis = false, ?Request $request = null): void
     {
-        $sesiRuangId = DB::transaction(function () use ($peserta): ?int {
+        $sesiRuangId = DB::transaction(function () use ($peserta, $waktuHabis, $request): ?int {
             $peserta = PesertaUjian::query()->whereKey($peserta->id)->lockForUpdate()->first();
 
             if (! $peserta || $peserta->status === 'selesai') {
@@ -487,6 +498,14 @@ class UjianController extends Controller
             }
 
             $peserta->update(['status' => 'selesai']);
+            $this->auditLog->record(
+                $request?->user(),
+                $waktuHabis ? 'ujian.dikirim_otomatis' : 'ujian.disubmit',
+                'peserta_ujian',
+                $peserta->id,
+                $waktuHabis ? ['alasan' => 'waktu_habis'] : [],
+                $request,
+            );
 
             return $peserta->sesi_ruang_id;
         });

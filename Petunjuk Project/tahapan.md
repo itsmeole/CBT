@@ -214,12 +214,12 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 
 ### 3.1 Berita Acara, Cetak Dokumen, & Audit Log
 #### Backend
-- [ ] Migration tabel `berita_acara`, `log_aktivitas`.
-- [ ] CRUD Berita Acara pelaksanaan ujian per sesi-ruang (`FR-BE-102`).
-- [ ] Logging append-only aktivitas kritikal: login, lock, unlock, submit, ubah nilai essay, dll. (`FR-BE-101`).
-- [ ] Generator dokumen PDF: Kartu Peserta Ujian, Daftar Hadir, Berita Acara, Rekap Nilai (`FR-BE-55`, `FR-BE-91`).
-- [ ] Endpoint analisis butir soal: kalkulasi tingkat kesukaran ($p$) dan daya pembeda ($D$) (`FR-BE-86`).
-- [ ] Skrip backup database otomatis terjadwal (`FR-BE-103`).
+- [x] Migration tabel `berita_acara`, `log_aktivitas`, dan status job PDF.
+- [x] Baca/tulis Berita Acara per sesi; jumlah hadir/absen dihitung dari server (`FR-BE-102`).
+- [x] Logging append-only aktivitas kritikal, termasuk login, lock/unlock, submit, mulai ujian, reset login, dan koreksi essay (`FR-BE-101`).
+- [x] Generator PDF antrean untuk Kartu Peserta, Daftar Hadir, Berita Acara, dan Rekap Nilai (`FR-BE-55`, `FR-BE-91`).
+- [x] Endpoint analisis butir soal: indeks kesukaran ($p$) dan daya pembeda ($D$), scoped per guru (`FR-BE-86`).
+- [x] Perintah backup MySQL/MariaDB harian terjadwal, dengan destination/dump binary dapat dikonfigurasi (`FR-BE-103`).
 
 #### Frontend
 - [ ] Form pengisian Berita Acara oleh pengawas ruangan sebelum menutup sesi.
@@ -231,15 +231,11 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 
 ### 3.2 Uji Beban (Load Test 700 User) & Hardening Produksi
 #### Backend & Infrastruktur
-- [ ] Setup script load test k6 / JMeter dengan skenario riil 700 user (`NFR-BE-05`):
-  - [ ] 700 login serentak.
-  - [ ] 700 join token serempak.
-  - [ ] Autosave berulang tiap 5–15 detik dengan payload delta.
-  - [ ] 10–20% random lock & unlock events.
-  - [ ] Submit massal di akhir waktu.
+- [x] Setup script k6 hingga 700 VU: login, join, state, ambil soal, autosave 5–15 detik, lock/unlock acak 15%, dan submit (`NFR-BE-05`).
+- [ ] Jalankan load test 700 VU pada environment khusus dan simpan hasil thresholds/latensi/error sebelum hari ujian.
 - [ ] Profiling query database: pastikan tidak ada query N+1 pada endpoint ujian & monitoring (`NFR-BE-03`).
 - [ ] Benchmark latensi endpoint kritis p95 < 300 ms (`NFR-BE-02`).
-- [ ] Konfigurasi workers queue Redis untuk pemrosesan penilaian dan auto-submit massal.
+- [x] Konfigurasi antrean Redis, after-commit dispatch, dan worker terpisah untuk job PDF (`reports`) (`NFR-BE-04`).
 - [ ] Pengujian skenario pemulihan server (restart service saat ujian berjalan, verifikasi keutuhan data).
 
 #### Frontend
@@ -248,3 +244,5 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [ ] Uji performa halaman ujian pada perangkat HP low-end (emulasi CPU throttling & memori terbatas) (`NFR-FE-03`).
 - [ ] Uji responsivitas offline di jaringan tidak stabil / 3G lambat.
 - [ ] Uji kompatibilitas browser: Safari iOS, Chrome Android, Samsung Internet (`NFR-FE-10`).
+
+> Status implementasi backend Fase 3: endpoint Berita Acara, audit log, PDF antrean, analisis butir, backup terjadwal, konfigurasi queue/worker, dan skrip load test sudah tersedia. Otomasi fitur dicakup tes backend; uji kapasitas 700 VU, profiling, benchmark, serta recovery/restore drill belum dijalankan karena membutuhkan environment dan dataset uji khusus. Frontend Fase 3 belum dikerjakan.
