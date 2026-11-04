@@ -234,6 +234,8 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 - **FR-BE-75** Hitung jumlah kunci per peserta. Jika mencapai ambang (default 3, diatur Operator), kirim peringatan ke dashboard pengawas.
 - **FR-BE-76** Setiap kunci dan buka kunci di-broadcast realtime (lihat bagian 6).
 
+Implementasi pengawasan menyediakan pengaturan `ambang_kunci` (default `3`) melalui `GET/PUT /api/v1/lock-threshold` untuk Operator/Superadmin. Endpoint lock dibatasi hingga 60 request per menit per akun.
+
 ### 4.9 Penilaian
 
 - **FR-BE-80** Penilaian otomatis dijalankan di queue setelah submit (manual/otomatis), memakai **bobot snapshot**.
@@ -293,11 +295,12 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 | `pengawas_sesi` | sesi_ruang_id, guru_id |
 | `token` | id, jadwal_id / sesi_ruang_id, kode, aktif, dibuat_oleh |
 | `peserta_ujian` | id, siswa_id, sesi_ruang_id, status, hadir, waktu_mulai, waktu_selesai, urutan_soal (JSON), urutan_opsi (JSON), jumlah_kunci, last_client_seq |
-| `jawaban_siswa` | peserta_id, soal_id, jawaban (JSON), client_seq, skor, dikoreksi_oleh, updated_at |
+| `jawaban_siswa` | peserta_id, soal_id, jawaban (JSON), client_seq, skor, dikoreksi_oleh, catatan_koreksi, updated_at |
 | `nilai` | peserta_id, skor_per_tipe (JSON), total, maksimal, nilai_akhir, status (`menunggu_koreksi`/`final`) |
 | `lock_event` | id, peserta_id, pemicu, waktu_kunci, waktu_buka, dibuka_oleh, alasan |
 | `log_aktivitas` | id, user_id, aksi, target_type, target_id, ip, user_agent, data (JSON), created_at |
 | `berita_acara` | sesi_ruang_id, pengawas_id, isi, jumlah_hadir, jumlah_absen |
+| `laporan_pdf` | diminta_oleh, jenis, jadwal_ujian_id / sesi_ruang_id, kelas_id, status, file_path |
 | `device_session` | user_id, token_id, device_info, aktif |
 
 **Catatan**
@@ -316,6 +319,7 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 - Otorisasi channel wajib memakai aturan scope yang sama dengan API (bagian 3.3).
 - Payload event untuk pengawas **tidak** berisi konten soal, jawaban, atau nilai.
 - Realtime hanya untuk notifikasi. Keputusan status tetap dibaca dari DB lewat API (FE harus bisa jalan dengan polling fallback).
+- `/broadcasting/auth` memakai Sanctum; guru hanya dapat berlangganan sesi yang ditugaskan, dan channel peserta hanya dapat diakses siswa pemilik.
 
 ---
 
@@ -348,19 +352,30 @@ Kode error minimal: `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `ACCOUNT
 | POST | `/sesi-ruang/{id}/token/generate` | Operator, Superadmin |
 | POST | `/sesi-ruang/{id}/kehadiran` | **Operator, Superadmin** |
 | POST | `/sesi-ruang/{id}/mulai`, `/peserta/{id}/mulai` | **Operator, Superadmin** |
-| GET | `/sesi-ruang/{id}/monitoring` | Operator, Superadmin, Pengawas (sesinya) |
+| GET | `/sesi-ruang/{id}/monitoring` | Operator, Superadmin, Pengawas (sesinya); hanya ringkasan aman |
 | POST | `/peserta/{id}/unlock` | Operator, Superadmin, Pengawas (sesinya) |
+| GET, PUT | `/lock-threshold` | Operator, Superadmin |
 | CRUD | `/sesi-ruang/{id}/berita-acara` | Pengawas (sesinya), Operator, Superadmin |
 | POST | `/ujian/join` (token) | Siswa |
 | GET | `/ujian/state` | Siswa |
 | GET | `/ujian/soal` | Siswa (status `mengerjakan`) |
 | PUT | `/ujian/jawaban` (batch) | Siswa |
-| POST | `/ujian/lock` | Siswa |
+| POST | `/ujian/lock` (body `pemicu`) | Siswa |
 | POST | `/ujian/submit` | Siswa |
 | GET | `/koreksi/essay`, PUT `/koreksi/essay/{jawabanId}` | Guru (scope), Superadmin |
-| GET | `/nilai`, `/nilai/export`, `/analisis-butir/{jadwalId}` | Guru (scope), Operator, Superadmin |
+| GET | `/nilai`, `/analisis-butir/{jadwalId}` | Guru (scope), Operator, Superadmin |
+| GET, POST, PUT | `/sesi-ruang/{id}/berita-acara` | Pengawas (sesinya), Operator, Superadmin |
 | GET | `/log-aktivitas` | Superadmin |
-| POST | `/backup` | Superadmin |
+| POST | `/laporan-pdf/{jenis}` (kartu-peserta, daftar-hadir, berita-acara, rekap-nilai) | Operator/Superadmin; Guru sesuai scope |
+| GET | `/laporan-pdf/{laporanId}` (status / unduh privat) | Peminta laporan |
+
+Berita Acara menyimpan catatan pengawas; jumlah hadir/tidak hadir dihitung server dari roster, bukan dipercaya dari body. Log aktivitas bersifat append-only melalui API (tidak ada endpoint ubah/hapus), dipaginasi, dan dapat difilter Superadmin menggunakan `user_id`, `aksi`, `target_type`, `mulai`, `sampai`, `per_page`. Event penting yang dicatat meliputi login/logout, mulai ujian, presensi, lock/unlock, reset login, submit, koreksi essay, perubahan ambang, penyimpanan Berita Acara, dan permintaan PDF.
+
+Permintaan PDF mengembalikan HTTP 202 dan ID laporan; file dikerjakan pada queue `reports`, disimpan di disk privat, lalu dapat diunduh peminta melalui endpoint status/unduh. Analisis butir hanya memakai peserta yang sudah selesai dan nilainya final. Indeks kesukaran `p` adalah rata-rata skor butir dibagi skor maksimal (0–1); daya pembeda `D` adalah selisih rata-rata proporsi skor kelompok atas dan bawah (masing-masing 27%), dan bernilai `null` bila peserta final kurang dari 3.
+
+Perintah `php artisan app:backup-database` membuat dump konsisten MySQL/MariaDB dan dijadwalkan harian pukul 02:00 WIB. Pengaturan worker Redis, konfigurasi backup, prosedur load test dan recovery drill dijelaskan di [`backend/docs/operasional-produksi.md`](../../backend/docs/operasional-produksi.md). Hasil load/restore drill harus dijalankan dan dicatat pada environment uji sebelum menyatakan kapasitas produksi tervalidasi.
+
+Koreksi essay menerima skor desimal dari `0` sampai bobot snapshot soal dan `catatan` opsional. `GET /koreksi/essay` wajib menerima `jadwal_id` dan dapat difilter dengan `kelas_id`; akses guru dibatasi pada mapel, tahun ajaran, dan kelas yang diampu. `GET /nilai` juga wajib menerima `jadwal_id` dan membatasi guru pada kelas/mapel yang diajarkan.
 
 ---
 

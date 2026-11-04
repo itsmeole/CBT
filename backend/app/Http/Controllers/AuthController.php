@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Models\Pengaturan;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     public function login(LoginRequest $request): JsonResponse
     {
         $identifier = $request->username;
@@ -28,7 +31,7 @@ class AuthController extends Controller
         }
 
         // Kunci baris user supaya dua login bersamaan tidak sama-sama lolos.
-        return DB::transaction(function () use ($user) {
+        return DB::transaction(function () use ($user, $request) {
             User::whereKey($user->id)->lockForUpdate()->first();
 
             // Single active session HANYA berlaku untuk role siswa (Superadmin, Operator, Guru bebas multi-perangkat)
@@ -40,8 +43,11 @@ class AuthController extends Controller
                 $user->tokens()->delete(); // Jika 'kick', sesi lama dicabut
             }
 
+            $token = $user->createToken('cbt')->plainTextToken;
+            $this->auditLog->record($user, 'auth.login', 'user', $user->id, [], $request);
+
             return response()->json([
-                'token' => $user->createToken('cbt')->plainTextToken,
+                'token' => $token,
                 'user' => $this->userData($user),
             ]);
         });
@@ -49,7 +55,10 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        DB::transaction(function () use ($request): void {
+            $this->auditLog->record($request->user(), 'auth.logout', 'user', $request->user()->id, [], $request);
+            $request->user()->currentAccessToken()->delete();
+        });
 
         return response()->json(['message' => 'Berhasil keluar.']);
     }

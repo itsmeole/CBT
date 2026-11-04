@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PesertaStatusChanged;
+use App\Events\UjianDimulai;
 use App\Models\BankSoal;
 use App\Models\PesertaUjian;
 use App\Models\SesiRuang;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +16,8 @@ use Illuminate\Support\Str;
 
 class OperatorKontrolController extends Controller
 {
+    public function __construct(private readonly AuditLogService $auditLog) {}
+
     /**
      * Ambil data sesi ruang beserta daftar peserta dan statusnya.
      */
@@ -53,12 +58,20 @@ class OperatorKontrolController extends Controller
             return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Daftar kehadiran memuat peserta dari sesi lain.']], 422);
         }
 
-        DB::transaction(function () use ($validated, $sesiRuangId): void {
+        DB::transaction(function () use ($validated, $sesiRuangId, $request, $pesertaIds): void {
             foreach ($validated['kehadiran'] as $item) {
                 PesertaUjian::where('id', $item['peserta_id'])
                     ->where('sesi_ruang_id', $sesiRuangId)
                     ->update(['hadir' => $item['hadir']]);
             }
+            $this->auditLog->record(
+                $request->user(),
+                'sesi.kehadiran_diperbarui',
+                'sesi_ruang',
+                $sesiRuangId,
+                ['peserta_diperbarui' => $pesertaIds->count()],
+                $request,
+            );
         });
 
         return response()->json(['message' => 'Status kehadiran peserta berhasil diperbarui.']);
@@ -86,8 +99,9 @@ class OperatorKontrolController extends Controller
         }
 
         $startedCount = 0;
+        $startedPeserta = [];
 
-        DB::transaction(function () use ($sesi, $soalCollection, $now, $waktuSelesai, &$startedCount) {
+        DB::transaction(function () use ($sesi, $soalCollection, $now, $waktuSelesai, &$startedCount, &$startedPeserta, $request): void {
             $pesertaList = PesertaUjian::query()
                 ->where('sesi_ruang_id', $sesi->id)
                 ->where('status', 'menunggu')
@@ -98,8 +112,30 @@ class OperatorKontrolController extends Controller
             foreach ($pesertaList as $peserta) {
                 $this->inisialisasiPengerjaanPeserta($peserta, $soalCollection, $now, $waktuSelesai);
                 $startedCount++;
+                $startedPeserta[] = [
+                    'id' => $peserta->id,
+                    'waktu_selesai' => $peserta->waktu_selesai?->toIso8601String(),
+                ];
+            }
+            if ($startedCount > 0) {
+                $this->auditLog->record(
+                    $request->user(),
+                    'ujian.mulai_sesi',
+                    'sesi_ruang',
+                    $sesi->id,
+                    ['peserta_dimulai' => $startedCount],
+                    $request,
+                );
             }
         });
+
+        foreach ($startedPeserta as $item) {
+            $pesertaId = $item['id'];
+            event(new PesertaStatusChanged($pesertaId, $sesi->id, 'mengerjakan'));
+            if ($item['waktu_selesai']) {
+                event(new UjianDimulai($pesertaId, $item['waktu_selesai']));
+            }
+        }
 
         return response()->json([
             'message' => "Ujian berhasil dimulai untuk {$startedCount} peserta.",
@@ -131,7 +167,7 @@ class OperatorKontrolController extends Controller
             return response()->json(['error' => ['code' => 'TIME_UP', 'message' => 'Batas waktu sesi ujian telah lewat.']], 422);
         }
 
-        DB::transaction(function () use ($pesertaId, $soalCollection, $now, $waktuSelesai): void {
+        DB::transaction(function () use ($pesertaId, $soalCollection, $now, $waktuSelesai, $request): void {
             $peserta = PesertaUjian::query()->whereKey($pesertaId)->lockForUpdate()->firstOrFail();
             if ($peserta->status !== 'menunggu' || ! $peserta->hadir) {
                 abort(response()->json([
@@ -140,7 +176,21 @@ class OperatorKontrolController extends Controller
             }
 
             $this->inisialisasiPengerjaanPeserta($peserta, $soalCollection, $now, $waktuSelesai);
+            $this->auditLog->record(
+                $request->user(),
+                'ujian.mulai_peserta',
+                'peserta_ujian',
+                $peserta->id,
+                [],
+                $request,
+            );
         });
+
+        $startedPeserta = $peserta->fresh();
+        event(new PesertaStatusChanged($peserta->id, $sesi->id, 'mengerjakan'));
+        if ($startedPeserta?->waktu_selesai) {
+            event(new UjianDimulai($peserta->id, $startedPeserta->waktu_selesai->toIso8601String()));
+        }
 
         return response()->json([
             'message' => 'Ujian berhasil dimulai untuk peserta ini.',
