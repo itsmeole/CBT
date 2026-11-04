@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import StafNav from '@/components/StafNav.vue'
+import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
 
 type TabType = 'bobot' | 'paket' | 'jadwal'
@@ -238,58 +238,77 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-800">
-    <StafNav />
-
-    <main class="mx-auto max-w-7xl p-4 sm:p-6">
-      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+  <StafLayout>
+    <div class="space-y-6">
+      <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">Jadwal Ujian, Paket Soal, & Bobot</h1>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Jadwal Ujian, Paket Soal, & Bobot</h1>
           <p class="text-sm text-slate-500">
             Atur bobot tipe soal, susun paket soal guru, dan terbitkan jadwal ujian dengan token sesi.
           </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button v-if="activeTab === 'paket'" @click="openCreatePaket" class="btn-primary !min-h-0 !py-2 text-xs">
-            + Buat Paket Soal Baru
+          <button v-if="activeTab === 'paket'" @click="openCreatePaket" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Buat Paket Soal Baru</span>
           </button>
-          <button v-if="activeTab === 'jadwal'" @click="openCreateJadwal" class="btn-primary !min-h-0 !py-2 text-xs">
-            + Terbitkan Jadwal Ujian
+          <button v-if="activeTab === 'jadwal'" @click="openCreateJadwal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Terbitkan Jadwal Ujian</span>
           </button>
         </div>
       </div>
 
       <!-- Feedback Banner -->
-      <div v-if="feedbackMessage" class="mb-4 rounded-lg bg-green-50 p-3 text-sm font-medium text-status-ok border border-green-200">
-        ✓ {{ feedbackMessage }}
+      <div v-if="feedbackMessage" class="rounded-xl bg-green-50 p-3.5 text-sm font-medium text-status-ok border border-green-200 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0 text-emerald-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span>{{ feedbackMessage }}</span>
       </div>
-      <div v-if="errorMessage" class="mb-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-status-danger border border-red-200">
-        ⚠ {{ errorMessage }}
+      <div v-if="errorMessage" class="rounded-xl bg-red-50 p-3.5 text-sm font-medium text-status-danger border border-red-200 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0 text-red-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+        </svg>
+        <span>{{ errorMessage }}</span>
       </div>
 
       <!-- Navigation Tabs -->
-      <div class="flex border-b border-slate-200 bg-white px-4 pt-2 rounded-t-xl overflow-x-auto gap-4">
+      <div class="flex border-b border-slate-200 bg-white px-4 pt-2 rounded-t-2xl overflow-x-auto gap-4 shadow-xs">
         <button
           @click="activeTab = 'jadwal'"
-          class="border-b-2 py-3 px-2 text-sm font-medium transition-colors"
+          class="flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition-colors"
           :class="activeTab === 'jadwal' ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
         >
-          📅 Jadwal Ujian & Sesi Ruang
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+          </svg>
+          <span>Jadwal Ujian & Sesi Ruang</span>
         </button>
         <button
           @click="activeTab = 'paket'"
-          class="border-b-2 py-3 px-2 text-sm font-medium transition-colors"
+          class="flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition-colors"
           :class="activeTab === 'paket' ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
         >
-          📦 Paket Soal
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+          </svg>
+          <span>Paket Soal</span>
         </button>
         <button
           @click="activeTab = 'bobot'"
-          class="border-b-2 py-3 px-2 text-sm font-medium transition-colors"
+          class="flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition-colors"
           :class="activeTab === 'bobot' ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
         >
-          ⚖️ Konfigurasi Bobot Tipe Soal
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+          </svg>
+          <span>Konfigurasi Bobot Tipe Soal</span>
         </button>
       </div>
 
@@ -351,9 +370,12 @@ onMounted(() => {
                     </span>
                     <button
                       @click="generateToken(sesi.id)"
-                      class="text-xs font-semibold text-brand-600 hover:underline"
+                      class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1"
                     >
-                      🔄 Rilis Token Baru
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                      <span>Rilis Token Baru</span>
                     </button>
                   </div>
                 </div>
@@ -437,14 +459,17 @@ onMounted(() => {
           </form>
         </div>
       </div>
-    </main>
 
     <!-- Create Paket Soal Modal -->
     <div v-if="showCreatePaketModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div class="card w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
         <div class="mb-4 flex items-center justify-between border-b pb-3">
           <h2 class="text-base font-bold text-slate-800">Buat Paket Soal Baru</h2>
-          <button @click="showCreatePaketModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+          <button @click="showCreatePaketModal = false" class="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <form @submit.prevent="savePaketSoal" class="space-y-4">
@@ -501,7 +526,11 @@ onMounted(() => {
       <div class="card w-full max-w-md bg-white">
         <div class="mb-4 flex items-center justify-between border-b pb-3">
           <h2 class="text-base font-bold text-slate-800">Terbitkan Jadwal Ujian</h2>
-          <button @click="showCreateJadwalModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+          <button @click="showCreateJadwalModal = false" class="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <form @submit.prevent="saveJadwal" class="space-y-3">
@@ -545,7 +574,11 @@ onMounted(() => {
       <div class="card w-full max-w-lg bg-white max-h-[90vh] overflow-y-auto">
         <div class="mb-4 flex items-center justify-between border-b pb-3">
           <h2 class="text-base font-bold text-slate-800">Tambah Sesi Ruang Ujian</h2>
-          <button @click="showCreateSesiModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+          <button @click="showCreateSesiModal = false" class="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <form @submit.prevent="saveSesi" class="space-y-3">
@@ -595,6 +628,7 @@ onMounted(() => {
         </form>
       </div>
     </div>
-  </div>
+    </div>
+  </StafLayout>
 </template>
 

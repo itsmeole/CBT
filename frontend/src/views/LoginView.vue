@@ -65,13 +65,13 @@ async function submit() {
             <!-- Email / Username Input -->
             <div class="space-y-1.5">
               <label for="username" class="block text-sm font-medium text-slate-700">
-                Email :
+                Username :
               </label>
               <input
                 id="username"
                 v-model="username"
                 type="text"
-                placeholder="Email, NIS, atau Username"
+                placeholder="Masukan Username"
                 autocomplete="username"
                 required
                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 text-sm placeholder-slate-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
@@ -146,7 +146,9 @@ async function submit() {
               role="alert"
               class="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs font-semibold text-status-danger flex items-center gap-2"
             >
-              <span>⚠</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-red-600">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
               <span>{{ errorMessage }}</span>
             </div>
 
@@ -219,13 +221,13 @@ async function submit() {
               <!-- Email / Username -->
               <div class="space-y-1">
                 <label for="username-mobile" class="block text-xs font-semibold text-slate-700">
-                  Email :
+                  Username :
                 </label>
                 <input
                   id="username-mobile"
                   v-model="username"
                   type="text"
-                  placeholder="Email, NIS, atau Username"
+                  placeholder="Masukkan Username"
                   autocomplete="username"
                   required
                   class="w-full min-h-touch rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-800 text-base placeholder-slate-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -300,7 +302,9 @@ async function submit() {
                 role="alert"
                 class="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-status-danger flex items-center gap-2"
               >
-                <span>⚠</span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-red-600">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                </svg>
                 <span>{{ errorMessage }}</span>
               </div>
 

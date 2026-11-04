@@ -16,6 +16,77 @@ use Illuminate\Support\Facades\DB;
 class UjianController extends Controller
 {
     /**
+     * Mengambil daftar jadwal mata pelajaran ujian yang tersedia untuk siswa.
+     */
+    public function getSesiTersedia(Request $request): JsonResponse
+    {
+        $siswa = $request->user()->siswa;
+        if (! $siswa) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Hanya akun siswa yang dapat mengakses jadwal ujian.']], 403);
+        }
+
+        // Ambil sesi berdasarkan peserta_ujian yang terdaftar untuk siswa ini
+        $pesertaList = PesertaUjian::with([
+            'sesiRuang.jadwalUjian.mapel',
+            'sesiRuang.ruang',
+        ])
+        ->where('siswa_id', $siswa->id)
+        ->get();
+
+        $items = $pesertaList->map(function ($p) {
+            $sesi = $p->sesiRuang;
+            $jadwal = $sesi?->jadwalUjian;
+
+            return [
+                'peserta_id' => $p->id,
+                'sesi_ruang_id' => $sesi?->id,
+                'status' => $p->status,
+                'mapel_id' => $jadwal?->mapel_id,
+                'nama_mapel' => $jadwal?->mapel?->nama ?? 'Ujian CBT',
+                'kode_mapel' => $jadwal?->mapel?->kode ?? '',
+                'nama_ujian' => $jadwal?->nama ?? 'Ujian Sekolah',
+                'tanggal' => $jadwal?->tanggal?->format('Y-m-d'),
+                'jam_mulai' => $sesi?->jam_mulai,
+                'jam_akhir' => $sesi?->jam_akhir,
+                'durasi_menit' => $jadwal?->durasi_menit ?? 90,
+                'ruang' => $sesi?->ruang?->nama ?? 'Ruang Ujian',
+                'sesi_ke' => $sesi?->sesi_ke ?? 1,
+            ];
+        });
+
+        // Fallback jika belum di-plot spesifik di peserta_ujian tapi ada jadwal sesi aktif
+        if ($items->isEmpty()) {
+            $today = Carbon::now('Asia/Jakarta')->format('Y-m-d');
+            $sesiUmum = \App\Models\SesiRuang::with(['jadwalUjian.mapel', 'ruang'])
+                ->whereHas('jadwalUjian', fn ($q) => $q->whereDate('tanggal', $today))
+                ->get()
+                ->map(function ($sesi) {
+                    $jadwal = $sesi->jadwalUjian;
+
+                    return [
+                        'peserta_id' => null,
+                        'sesi_ruang_id' => $sesi->id,
+                        'status' => 'belum_login',
+                        'mapel_id' => $jadwal?->mapel_id,
+                        'nama_mapel' => $jadwal?->mapel?->nama ?? 'Ujian CBT',
+                        'kode_mapel' => $jadwal?->mapel?->kode ?? '',
+                        'nama_ujian' => $jadwal?->nama ?? 'Ujian Sekolah',
+                        'tanggal' => $jadwal?->tanggal?->format('Y-m-d'),
+                        'jam_mulai' => $sesi->jam_mulai,
+                        'jam_akhir' => $sesi->jam_akhir,
+                        'durasi_menit' => $jadwal?->durasi_menit ?? 90,
+                        'ruang' => $sesi->ruang?->nama ?? 'Ruang Ujian',
+                        'sesi_ke' => $sesi->sesi_ke,
+                    ];
+                });
+
+            return response()->json(['data' => $sesiUmum]);
+        }
+
+        return response()->json(['data' => $items]);
+    }
+
+    /**
      * Siswa memasukkan token untuk bergabung ke sesi ujian (FR-BE-60).
      * Status beralih ke 'menunggu' (menunggu Operator menekan Mulai).
      */
@@ -23,6 +94,7 @@ class UjianController extends Controller
     {
         $validated = $request->validate([
             'token' => 'required|string|size:6',
+            'sesi_ruang_id' => 'nullable|integer',
         ]);
 
         $tokenInput = strtoupper(trim($validated['token']));
@@ -30,6 +102,10 @@ class UjianController extends Controller
 
         if (! $token) {
             return response()->json(['error' => ['code' => 'TOKEN_INVALID', 'message' => 'Token ujian tidak valid atau sudah kadaluarsa.']], 422);
+        }
+
+        if (! empty($validated['sesi_ruang_id']) && $token->sesi_ruang_id != $validated['sesi_ruang_id']) {
+            return response()->json(['error' => ['code' => 'TOKEN_MISMATCH', 'message' => 'Token tidak sesuai dengan mata pelajaran yang dipilih.']], 422);
         }
 
         $sesi = $token->sesiRuang;

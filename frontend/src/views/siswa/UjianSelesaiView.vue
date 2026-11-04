@@ -1,13 +1,28 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import ConfirmLogoutModal from '@/components/ConfirmLogoutModal.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 
-async function handleLogout() {
-  await auth.logout()
-  router.replace({ name: 'login' })
+const showLogoutConfirm = ref(false)
+const isLoggingOut = ref(false)
+
+function requestLogout() {
+  showLogoutConfirm.value = true
+}
+
+async function handleConfirmedLogout() {
+  isLoggingOut.value = true
+  try {
+    await auth.logout()
+    showLogoutConfirm.value = false
+    router.replace({ name: 'login' })
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 
 function handleKembali() {
@@ -26,8 +41,10 @@ function handleKembali() {
     <!-- Main Card -->
     <div class="my-auto space-y-6 py-6">
       <div class="card bg-white p-6 shadow-sm border border-slate-200 space-y-4">
-        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-600">
-          ✓
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-xs">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-8 w-8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
         </div>
 
         <div>
@@ -46,7 +63,7 @@ function handleKembali() {
           <button @click="handleKembali" class="btn-primary w-full text-xs font-bold">
             Kembali ke Beranda Siswa
           </button>
-          <button @click="handleLogout" class="btn-secondary w-full text-xs">
+          <button @click="requestLogout" class="btn-secondary w-full text-xs">
             Keluar Akun
           </button>
         </div>
@@ -57,6 +74,14 @@ function handleKembali() {
     <footer class="py-2 text-xs text-slate-400">
       CBT Sekolah Terstandar • Nilai Dilindungi & Terjamin
     </footer>
+
+    <!-- Confirm Logout Dialog -->
+    <ConfirmLogoutModal
+      v-model="showLogoutConfirm"
+      :loading="isLoggingOut"
+      message="Apakah Anda yakin ingin keluar dari akun ujian?"
+      @confirm="handleConfirmedLogout"
+    />
   </main>
 </template>
 

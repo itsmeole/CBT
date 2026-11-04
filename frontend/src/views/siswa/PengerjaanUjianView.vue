@@ -283,10 +283,12 @@ onUnmounted(() => {
       <!-- Question Number & Drawer Trigger -->
       <button
         @click="showNavDrawer = true"
-        class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-800 min-h-touch min-w-touch"
+        class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-800 min-h-touch min-w-touch"
       >
         <span>No. {{ currentIndex + 1 }} / {{ soalList.length }}</span>
-        <span class="text-slate-400">☰</span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 text-slate-500">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
       </button>
 
       <!-- Sync Status Indicator (FR-FE-33) -->
@@ -296,21 +298,27 @@ onUnmounted(() => {
           Menyimpan...
         </span>
         <span v-else-if="syncStatus === 'saved'" class="flex items-center gap-1 text-status-ok font-semibold">
-          <span>✓</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5 text-emerald-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
           Tersimpan
         </span>
         <span v-else class="flex items-center gap-1 text-status-danger font-semibold">
-          <span>⚠</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-red-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+          </svg>
           Offline (Tersimpan Lokal)
         </span>
       </div>
 
       <!-- Synchronized Server Timer (FR-FE-41, FR-FE-42) -->
       <div
-        class="flex items-center gap-1 rounded-lg px-2.5 py-1 font-mono text-xs font-bold tracking-wider transition-colors min-h-touch items-center"
+        class="flex items-center gap-1.5 rounded-xl px-2.5 py-1 font-mono text-xs font-bold tracking-wider transition-colors min-h-touch"
         :class="timerWarningClass"
       >
-        <span>⏱</span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
         <span>{{ formattedTimer }}</span>
       </div>
     </header>
@@ -495,9 +503,12 @@ onUnmounted(() => {
         <button
           v-else
           @click="showSubmitModal = true"
-          class="btn-primary flex-1 !min-h-touch text-xs font-bold bg-emerald-600 hover:bg-emerald-700"
+          class="btn-primary flex-1 !min-h-touch text-xs font-bold bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5"
         >
-          ✓ Selesai Ujian
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+          <span>Selesai Ujian</span>
         </button>
       </div>
     </footer>
@@ -507,7 +518,11 @@ onUnmounted(() => {
       <div class="card w-full max-w-md bg-white p-4 max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
         <div class="mb-3 flex items-center justify-between border-b pb-2">
           <h3 class="text-sm font-bold text-slate-800">Daftar Nomor Soal</h3>
-          <button @click="showNavDrawer = false" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+          <button @click="showNavDrawer = false" class="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <!-- Legend -->
@@ -572,11 +587,19 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div v-if="belumTerjawabCount > 0 || raguCount > 0" class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 text-left">
-          ⚠️ Masih terdapat <strong>{{ belumTerjawabCount }} butir soal belum dijawab</strong> dan <strong>{{ raguCount }} butir soal ragu-ragu</strong>. Apakah Anda yakin ingin menyelesaikan ujian?
+        <div v-if="belumTerjawabCount > 0 || raguCount > 0" class="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 text-left flex items-start gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-amber-600 mt-0.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+          <div>
+            Masih terdapat <strong>{{ belumTerjawabCount }} butir soal belum dijawab</strong> dan <strong>{{ raguCount }} butir soal ragu-ragu</strong>. Apakah Anda yakin ingin menyelesaikan ujian?
+          </div>
         </div>
-        <div v-else class="rounded-lg bg-green-50 border border-green-200 p-3 text-xs text-green-800">
-          ✓ Hebat! Seluruh butir soal telah berhasil Anda jawab.
+        <div v-else class="rounded-xl bg-green-50 border border-green-200 p-3.5 text-xs text-green-800 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 text-emerald-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+          <span>Hebat! Seluruh butir soal telah berhasil Anda jawab.</span>
         </div>
 
         <div class="flex gap-2 pt-2">

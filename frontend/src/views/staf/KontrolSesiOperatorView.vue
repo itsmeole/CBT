@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import StafNav from '@/components/StafNav.vue'
+import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
@@ -178,38 +178,53 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-800">
-    <StafNav />
-
-    <main class="mx-auto max-w-7xl p-4 sm:p-6">
-      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+  <StafLayout>
+    <div class="space-y-6">
+      <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">⚡ Panel Kontrol Sesi & Presensi Operator</h1>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6 text-brand-600">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+            </svg>
+            <span>Panel Kontrol Sesi & Presensi Operator</span>
+          </h1>
           <p class="text-sm text-slate-500">
             Verifikasi kehadiran siswa, monitoring status realtime, dan mulai ujian serentak.
           </p>
         </div>
 
         <div class="flex items-center gap-2">
-          <button @click="fetchSesiDetail" class="btn-secondary !min-h-0 !py-2 text-xs" :disabled="loading">
-            🔄 Segarkan Data
+          <button @click="fetchSesiDetail" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" :disabled="loading">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span>Segarkan Data</span>
           </button>
           <button
             @click="showMulaiModal = true"
             :disabled="!selectedSesiId || actionLoading"
-            class="btn-primary !min-h-0 !py-2 text-xs bg-emerald-600 hover:bg-emerald-700"
+            class="btn-primary !min-h-0 !py-2 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1.5"
           >
-            ▶ Mulai Ujian Sesi Ini
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
+              <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
+            </svg>
+            <span>Mulai Ujian Sesi Ini</span>
           </button>
         </div>
       </div>
 
       <!-- Feedback Banner -->
-      <div v-if="feedbackMessage" class="mb-4 rounded-lg bg-green-50 p-3 text-sm font-medium text-status-ok border border-green-200">
-        ✓ {{ feedbackMessage }}
+      <div v-if="feedbackMessage" class="rounded-xl bg-green-50 p-3.5 text-sm font-medium text-status-ok border border-green-200 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0 text-emerald-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span>{{ feedbackMessage }}</span>
       </div>
-      <div v-if="errorMessage" class="mb-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-status-danger border border-red-200">
-        ⚠ {{ errorMessage }}
+      <div v-if="errorMessage" class="rounded-xl bg-red-50 p-3.5 text-sm font-medium text-status-danger border border-red-200 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0 text-red-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+        </svg>
+        <span>{{ errorMessage }}</span>
       </div>
 
       <!-- Sesi Selector Bar -->
@@ -264,9 +279,12 @@ onUnmounted(() => {
             <button
               @click="saveKehadiran"
               :disabled="actionLoading"
-              class="btn-secondary !min-h-0 !py-1 text-xs"
+              class="btn-secondary !min-h-0 !py-1.5 text-xs flex items-center gap-1.5"
             >
-              {{ actionLoading ? 'Menyimpan...' : '💾 Simpan Status Presensi' }}
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+              </svg>
+              <span>{{ actionLoading ? 'Menyimpan...' : 'Simpan Status Presensi' }}</span>
             </button>
           </div>
 
@@ -327,7 +345,6 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-    </main>
 
     <!-- Confirmation Modal: Mulai Ujian -->
     <div v-if="showMulaiModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -336,8 +353,11 @@ onUnmounted(() => {
         <p class="text-sm text-slate-600 mb-4">
           Apakah Anda yakin ingin memulai ujian untuk seluruh siswa yang berada di ruang tunggu pada sesi ini?
         </p>
-        <div class="rounded bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 mb-4">
-          ⚠️ Durasi timer akan langsung berjalan serentak bagi semua siswa yang statusnya sudah terverifikasi.
+        <div class="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-amber-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+          <span>Durasi timer akan langsung berjalan serentak bagi semua siswa yang statusnya sudah terverifikasi.</span>
         </div>
         <div class="flex justify-end gap-2">
           <button @click="showMulaiModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
@@ -351,6 +371,7 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </StafLayout>
 </template>
 

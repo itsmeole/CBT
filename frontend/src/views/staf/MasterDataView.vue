@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import StafNav from '@/components/StafNav.vue'
+import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
 
 type TabType = 'siswa' | 'guru' | 'kelas' | 'mapel' | 'ruang' | 'tahun_ajaran'
@@ -104,6 +104,11 @@ const filteredMapel = computed(() => {
 const filteredRuang = computed(() => {
   const q = searchQuery.value.toLowerCase()
   return ruangList.value.filter(r => r.nama?.toLowerCase().includes(q) || r.kode?.toLowerCase().includes(q))
+})
+
+const filteredTahunAjaran = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  return tahunAjaranList.value.filter(ta => ta.nama?.toLowerCase().includes(q))
 })
 
 // Create / Edit Entity
@@ -237,54 +242,74 @@ async function commitExcel() {
 onMounted(() => {
   fetchData()
 })
+
+const currentListCount = computed(() => {
+  switch (activeTab.value) {
+    case 'siswa': return filteredSiswa.value.length
+    case 'guru': return filteredGuru.value.length
+    case 'kelas': return filteredKelas.value.length
+    case 'mapel': return filteredMapel.value.length
+    case 'ruang': return filteredRuang.value.length
+    case 'tahun_ajaran': return filteredTahunAjaran.value.length
+    default: return 0
+  }
+})
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-800">
-    <StafNav />
-
-    <main class="mx-auto max-w-7xl p-4 sm:p-6">
-      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+  <StafLayout>
+    <div class="space-y-6">
+      <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">Master Data & Impor Excel</h1>
-          <p class="text-sm text-slate-500">Kelola master data sekolah dan impor data via template resmi Microsoft Excel.</p>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Master Data</h1>
+          <p class="text-sm text-slate-500">Kelola data siswa, guru, kelas, mata pelajaran, dan ruang ujian sekolah.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
           <button
             v-if="['siswa', 'guru', 'kelas'].includes(activeTab)"
             @click="downloadTemplate(activeTab)"
-            class="btn-secondary !min-h-0 !py-2 text-xs"
+            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
           >
-            📥 Unduh Template Excel
+            <!-- Download SVG -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            <span>Unduh Template</span>
           </button>
           <button
             v-if="['siswa', 'guru', 'kelas'].includes(activeTab)"
             @click="openImport(activeTab)"
-            class="btn-secondary !min-h-0 !py-2 text-xs"
+            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
           >
-            📤 Impor Excel
+            <!-- Upload SVG -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+            </svg>
+            <span>Impor Data</span>
           </button>
-          <button @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs">
-            + Tambah Data
+          <button @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+            <!-- Plus SVG -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Tambah Data</span>
           </button>
         </div>
       </div>
 
       <!-- Feedback Banner -->
-      <div v-if="feedbackMessage" class="mb-4 rounded-lg bg-green-50 p-3 text-sm font-medium text-status-ok border border-green-200">
-        ✓ {{ feedbackMessage }}
+      <div v-if="feedbackMessage" class="rounded-xl bg-green-50 p-3.5 text-sm font-medium text-status-ok border border-green-200 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0 text-emerald-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span>{{ feedbackMessage }}</span>
       </div>
-      <div v-if="errorMessage" class="mb-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-status-danger border border-red-200">
-        ⚠ {{ errorMessage }}
-      </div>
-
-      <!-- Strict Excel Rule Notice -->
-      <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex items-center gap-2">
-        <span>ℹ️</span>
-        <span>
-          <strong>Perhatian (FR-BE-14):</strong> Format Excel hanya digunakan untuk Master Data (Siswa, Guru, Kelas). Soal ujian wajib dibuat langsung atau diimpor via dokumen Word (.docx).
-        </span>
+      <div v-if="errorMessage" class="rounded-xl bg-red-50 p-3.5 text-sm font-medium text-status-danger border border-red-200 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0 text-red-600">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+        </svg>
+        <span>{{ errorMessage }}</span>
       </div>
 
       <!-- Tabs Navigation -->
@@ -308,15 +333,28 @@ onMounted(() => {
       </div>
 
       <!-- Content Area -->
-      <div class="rounded-b-xl border border-t-0 border-slate-200 bg-white p-4 shadow-sm">
+      <div class="rounded-b-2xl border border-t-0 border-slate-200 bg-white p-5 shadow-xs">
         <div class="mb-4 flex items-center justify-between gap-4">
-          <input
-            v-model="searchQuery"
-            type="search"
-            placeholder="Cari data..."
-            class="input max-w-xs !min-h-0 !py-1.5 text-sm"
-          />
-          <span class="text-xs text-slate-500">Memuat {{ loading ? '...' : 'Selesai' }}</span>
+          <div class="relative w-full max-w-xs">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+            </div>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Cari data..."
+              class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-all"
+            />
+          </div>
+          <span v-if="loading" class="text-xs text-slate-400 flex items-center gap-1.5">
+            <span class="inline-block h-2 w-2 animate-ping rounded-full bg-brand-600"></span>
+            Memuat data...
+          </span>
+          <span v-else class="text-xs font-bold text-slate-400 font-mono">
+            {{ currentListCount }} Data
+          </span>
         </div>
 
         <!-- 1. Siswa Table -->
@@ -471,7 +509,7 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in tahunAjaranList" :key="item.id" class="hover:bg-slate-50">
+              <tr v-for="item in filteredTahunAjaran" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
                 <td class="p-3">Semester {{ item.semester }}</td>
                 <td class="p-3">
@@ -483,11 +521,13 @@ onMounted(() => {
                   <button @click="deleteEntity(item.id)" class="text-status-danger hover:underline text-xs">Hapus</button>
                 </td>
               </tr>
+              <tr v-if="filteredTahunAjaran.length === 0">
+                <td colspan="4" class="p-6 text-center text-slate-400">Belum ada data tahun ajaran.</td>
+              </tr>
             </tbody>
           </table>
         </div>
       </div>
-    </main>
 
     <!-- Create / Edit Modal -->
     <div v-if="showFormModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -628,7 +668,11 @@ onMounted(() => {
           <h2 class="text-lg font-bold text-slate-800">
             Impor Data Excel: {{ importJenis.toUpperCase() }} (Langkah {{ importStep }} dari 2)
           </h2>
-          <button @click="showImportModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+          <button @click="showImportModal = false" class="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <!-- Step 1: Upload File -->
@@ -637,14 +681,18 @@ onMounted(() => {
             Unggah berkas Microsoft Excel (.xlsx / .xls) sesuai template resmi. Sistem akan memvalidasi kelengkapan data per baris.
           </p>
 
-          <div class="rounded-lg border-2 border-dashed border-slate-300 p-6 text-center">
+          <div class="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-colors">
             <input type="file" accept=".xlsx,.xls" @change="onFileSelected" class="hidden" id="excelFile" />
             <label for="excelFile" class="cursor-pointer">
-              <div class="text-3xl mb-2">📁</div>
+              <div class="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mb-3 shadow-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+              </div>
               <p class="text-sm font-semibold text-brand-600">Klik untuk memilih berkas Excel</p>
               <p class="text-xs text-slate-400 mt-1">Maksimal 10MB (.xlsx)</p>
             </label>
-            <p v-if="importFile" class="mt-3 text-xs font-semibold text-slate-700 bg-slate-100 py-1 px-3 rounded inline-block">
+            <p v-if="importFile" class="mt-3 text-xs font-semibold text-slate-700 bg-white py-1.5 px-3.5 rounded-lg border border-slate-200 inline-block shadow-xs">
               Terpilih: {{ importFile.name }}
             </p>
           </div>
@@ -664,22 +712,22 @@ onMounted(() => {
         <!-- Step 2: Preview & Validation Table -->
         <div v-if="importStep === 2" class="space-y-4">
           <div class="grid grid-cols-3 gap-3 text-center">
-            <div class="rounded bg-slate-100 p-2">
+            <div class="rounded-xl bg-slate-100 p-2.5">
               <p class="text-xs text-slate-500">Total Baris</p>
-              <p class="text-lg font-bold text-slate-800">{{ importPreviewData?.total_rows || 0 }}</p>
+              <p class="text-lg font-bold text-slate-800 font-mono">{{ importPreviewData?.total_rows || 0 }}</p>
             </div>
-            <div class="rounded bg-green-50 p-2">
+            <div class="rounded-xl bg-green-50 p-2.5">
               <p class="text-xs text-green-700">Baris Valid</p>
-              <p class="text-lg font-bold text-status-ok">{{ importPreviewData?.valid_count || 0 }}</p>
+              <p class="text-lg font-bold text-status-ok font-mono">{{ importPreviewData?.valid_count || 0 }}</p>
             </div>
-            <div class="rounded bg-red-50 p-2">
+            <div class="rounded-xl bg-red-50 p-2.5">
               <p class="text-xs text-red-700">Baris Error</p>
-              <p class="text-lg font-bold text-status-danger">{{ importErrors.length }}</p>
+              <p class="text-lg font-bold text-status-danger font-mono">{{ importErrors.length }}</p>
             </div>
           </div>
 
           <!-- Error Details Table -->
-          <div v-if="importErrors.length > 0" class="rounded-lg border border-red-200 bg-red-50 p-3">
+          <div v-if="importErrors.length > 0" class="rounded-xl border border-red-200 bg-red-50 p-3.5">
             <h4 class="text-xs font-bold text-red-800 mb-2">Ditemukan Kesalahan Validasi:</h4>
             <div class="max-h-48 overflow-y-auto text-xs text-red-700 space-y-1">
               <div v-for="(err, idx) in importErrors" :key="idx" class="flex gap-2">
@@ -692,8 +740,11 @@ onMounted(() => {
             </p>
           </div>
 
-          <div v-else class="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800">
-            ✓ Seluruh data valid dan siap disimpan ke basis data secara aman.
+          <div v-else class="rounded-xl border border-green-200 bg-green-50 p-3.5 text-xs text-green-800 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 text-emerald-600">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span>Seluruh data valid dan siap disimpan ke basis data secara aman.</span>
           </div>
 
           <div class="flex justify-between items-center pt-2">
@@ -709,6 +760,7 @@ onMounted(() => {
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </StafLayout>
 </template>
 

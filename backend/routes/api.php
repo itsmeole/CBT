@@ -128,6 +128,7 @@ Route::prefix('v1')->group(function () {
         // 3. PENGERJAAN UJIAN SISWA (Mobile-First) (Role Siswa)
         // ========================================================
         Route::middleware('role:siswa')->group(function () {
+            Route::get('ujian/sesi', [UjianController::class, 'getSesiTersedia']);
             Route::post('ujian/join', [UjianController::class, 'join']);
             Route::get('ujian/state', [UjianController::class, 'state']);
             Route::get('ujian/soal', [UjianController::class, 'getSoal']);
