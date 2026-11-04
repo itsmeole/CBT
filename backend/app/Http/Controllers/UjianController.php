@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PesertaProgress;
+use App\Events\PesertaStatusChanged;
+use App\Events\PesertaSubmitted;
+use App\Events\WaktuHabis;
 use App\Http\Requests\AutosaveJawabanRequest;
 use App\Jobs\ProsesPenilaianPeserta;
 use App\Models\BankSoal;
@@ -11,6 +15,7 @@ use App\Models\TokenUjian;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class UjianController extends Controller
@@ -69,8 +74,10 @@ class UjianController extends Controller
             return response()->json(['error' => ['code' => 'ALREADY_SUBMITTED', 'message' => 'Anda sudah menyelesaikan ujian ini.']], 422);
         }
 
-        if ($peserta->status === 'belum_login') {
+        $statusBerubah = $peserta->status === 'belum_login';
+        if ($statusBerubah) {
             $peserta->update(['status' => 'menunggu']);
+            event(new PesertaStatusChanged($peserta->id, $peserta->sesi_ruang_id, 'menunggu'));
         }
 
         return response()->json([
@@ -115,7 +122,7 @@ class UjianController extends Controller
         // Auto-submit jika waktu habis
         if ($peserta->status === 'mengerjakan' || $peserta->status === 'terkunci') {
             if ($peserta->waktu_selesai && Carbon::now()->greaterThanOrEqualTo($peserta->waktu_selesai)) {
-                $this->prosesSubmit($peserta);
+                $this->prosesSubmit($peserta, true);
 
                 return response()->json(['data' => ['status' => 'selesai']]);
             }
@@ -172,7 +179,7 @@ class UjianController extends Controller
 
         // Cek batas waktu
         if ($peserta->waktu_selesai && Carbon::now()->greaterThanOrEqualTo($peserta->waktu_selesai)) {
-            $this->prosesSubmit($peserta);
+            $this->prosesSubmit($peserta, true);
 
             return response()->json(['error' => ['code' => 'TIME_UP', 'message' => 'Waktu ujian telah habis.']], 423);
         }
@@ -333,11 +340,24 @@ class UjianController extends Controller
 
         if ($timeUp) {
             ProsesPenilaianPeserta::dispatch($peserta->id);
+            event(new PesertaStatusChanged($peserta->id, $peserta->sesi_ruang_id, 'selesai'));
+            event(new PesertaSubmitted($peserta->id, $peserta->sesi_ruang_id));
+            event(new WaktuHabis($peserta->id));
 
             return response()->json(['error' => ['code' => 'TIME_UP', 'message' => 'Waktu ujian telah habis.']], 423);
         }
 
         $peserta->refresh();
+        $batasProgress = now()->addSeconds(10);
+        if (Cache::add('cbt:progress:'.$peserta->id, true, $batasProgress)) {
+            $terjawab = $peserta->jawaban()->get()->filter(function (JawabanSiswa $jawaban): bool {
+                return $jawaban->jawaban !== null && $jawaban->jawaban !== '' && $jawaban->jawaban !== [];
+            })->count();
+            $sisaDetik = $peserta->waktu_selesai
+                ? max(0, (int) Carbon::now()->diffInSeconds($peserta->waktu_selesai, false))
+                : 0;
+            event(new PesertaProgress($peserta->id, $peserta->sesi_ruang_id, $terjawab, $sisaDetik));
+        }
 
         return response()->json([
             'status' => 'saved',
@@ -453,26 +473,31 @@ class UjianController extends Controller
     /**
      * Logika internal submit dan hitung nilai otomatis.
      */
-    private function prosesSubmit(PesertaUjian $peserta): void
+    private function prosesSubmit(PesertaUjian $peserta, bool $waktuHabis = false): void
     {
-        $submitted = DB::transaction(function () use ($peserta): bool {
+        $sesiRuangId = DB::transaction(function () use ($peserta): ?int {
             $peserta = PesertaUjian::query()->whereKey($peserta->id)->lockForUpdate()->first();
 
             if (! $peserta || $peserta->status === 'selesai') {
-                return false;
+                return null;
             }
 
             if (! in_array($peserta->status, ['mengerjakan', 'terkunci'], true)) {
-                return false;
+                return null;
             }
 
             $peserta->update(['status' => 'selesai']);
 
-            return true;
+            return $peserta->sesi_ruang_id;
         });
 
-        if ($submitted) {
+        if ($sesiRuangId) {
             ProsesPenilaianPeserta::dispatch($peserta->id);
+            event(new PesertaStatusChanged($peserta->id, $sesiRuangId, 'selesai'));
+            event(new PesertaSubmitted($peserta->id, $sesiRuangId));
+            if ($waktuHabis) {
+                event(new WaktuHabis($peserta->id));
+            }
         }
     }
 }

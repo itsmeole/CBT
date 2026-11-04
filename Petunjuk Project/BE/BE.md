@@ -234,6 +234,8 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 - **FR-BE-75** Hitung jumlah kunci per peserta. Jika mencapai ambang (default 3, diatur Operator), kirim peringatan ke dashboard pengawas.
 - **FR-BE-76** Setiap kunci dan buka kunci di-broadcast realtime (lihat bagian 6).
 
+Implementasi pengawasan menyediakan pengaturan `ambang_kunci` (default `3`) melalui `GET/PUT /api/v1/lock-threshold` untuk Operator/Superadmin. Endpoint lock dibatasi hingga 60 request per menit per akun.
+
 ### 4.9 Penilaian
 
 - **FR-BE-80** Penilaian otomatis dijalankan di queue setelah submit (manual/otomatis), memakai **bobot snapshot**.
@@ -293,7 +295,7 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 | `pengawas_sesi` | sesi_ruang_id, guru_id |
 | `token` | id, jadwal_id / sesi_ruang_id, kode, aktif, dibuat_oleh |
 | `peserta_ujian` | id, siswa_id, sesi_ruang_id, status, hadir, waktu_mulai, waktu_selesai, urutan_soal (JSON), urutan_opsi (JSON), jumlah_kunci, last_client_seq |
-| `jawaban_siswa` | peserta_id, soal_id, jawaban (JSON), client_seq, skor, dikoreksi_oleh, updated_at |
+| `jawaban_siswa` | peserta_id, soal_id, jawaban (JSON), client_seq, skor, dikoreksi_oleh, catatan_koreksi, updated_at |
 | `nilai` | peserta_id, skor_per_tipe (JSON), total, maksimal, nilai_akhir, status (`menunggu_koreksi`/`final`) |
 | `lock_event` | id, peserta_id, pemicu, waktu_kunci, waktu_buka, dibuka_oleh, alasan |
 | `log_aktivitas` | id, user_id, aksi, target_type, target_id, ip, user_agent, data (JSON), created_at |
@@ -316,6 +318,7 @@ belum_login -> menunggu -> mengerjakan <-> terkunci -> selesai
 - Otorisasi channel wajib memakai aturan scope yang sama dengan API (bagian 3.3).
 - Payload event untuk pengawas **tidak** berisi konten soal, jawaban, atau nilai.
 - Realtime hanya untuk notifikasi. Keputusan status tetap dibaca dari DB lewat API (FE harus bisa jalan dengan polling fallback).
+- `/broadcasting/auth` memakai Sanctum; guru hanya dapat berlangganan sesi yang ditugaskan, dan channel peserta hanya dapat diakses siswa pemilik.
 
 ---
 
@@ -348,19 +351,22 @@ Kode error minimal: `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `ACCOUNT
 | POST | `/sesi-ruang/{id}/token/generate` | Operator, Superadmin |
 | POST | `/sesi-ruang/{id}/kehadiran` | **Operator, Superadmin** |
 | POST | `/sesi-ruang/{id}/mulai`, `/peserta/{id}/mulai` | **Operator, Superadmin** |
-| GET | `/sesi-ruang/{id}/monitoring` | Operator, Superadmin, Pengawas (sesinya) |
+| GET | `/sesi-ruang/{id}/monitoring` | Operator, Superadmin, Pengawas (sesinya); hanya ringkasan aman |
 | POST | `/peserta/{id}/unlock` | Operator, Superadmin, Pengawas (sesinya) |
+| GET, PUT | `/lock-threshold` | Operator, Superadmin |
 | CRUD | `/sesi-ruang/{id}/berita-acara` | Pengawas (sesinya), Operator, Superadmin |
 | POST | `/ujian/join` (token) | Siswa |
 | GET | `/ujian/state` | Siswa |
 | GET | `/ujian/soal` | Siswa (status `mengerjakan`) |
 | PUT | `/ujian/jawaban` (batch) | Siswa |
-| POST | `/ujian/lock` | Siswa |
+| POST | `/ujian/lock` (body `pemicu`) | Siswa |
 | POST | `/ujian/submit` | Siswa |
 | GET | `/koreksi/essay`, PUT `/koreksi/essay/{jawabanId}` | Guru (scope), Superadmin |
 | GET | `/nilai`, `/nilai/export`, `/analisis-butir/{jadwalId}` | Guru (scope), Operator, Superadmin |
 | GET | `/log-aktivitas` | Superadmin |
 | POST | `/backup` | Superadmin |
+
+Koreksi essay menerima skor desimal dari `0` sampai bobot snapshot soal dan `catatan` opsional. `GET /koreksi/essay` wajib menerima `jadwal_id` dan dapat difilter dengan `kelas_id`; akses guru dibatasi pada mapel, tahun ajaran, dan kelas yang diampu. `GET /nilai` juga wajib menerima `jadwal_id` dan membatasi guru pada kelas/mapel yang diajarkan.
 
 ---
 

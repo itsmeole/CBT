@@ -18,6 +18,7 @@ class JawabanSiswa extends Model
         'client_seq',
         'skor',
         'dikoreksi_oleh',
+        'catatan_koreksi',
     ];
 
     protected function casts(): array
@@ -44,4 +45,3 @@ class JawabanSiswa extends Model
         return $this->belongsTo(User::class, 'dikoreksi_oleh');
     }
 }
-

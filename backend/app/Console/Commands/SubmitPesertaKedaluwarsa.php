@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Events\PesertaStatusChanged;
+use App\Events\PesertaSubmitted;
+use App\Events\WaktuHabis;
 use App\Jobs\ProsesPenilaianPeserta;
 use App\Models\PesertaUjian;
 use Illuminate\Console\Attributes\Description;
@@ -22,23 +25,26 @@ class SubmitPesertaKedaluwarsa extends Command
             ->pluck('id');
 
         foreach ($pesertaIds as $pesertaId) {
-            $submitted = DB::transaction(function () use ($pesertaId): bool {
+            $sesiRuangId = DB::transaction(function () use ($pesertaId): ?int {
                 $peserta = PesertaUjian::query()
                     ->whereKey($pesertaId)
                     ->lockForUpdate()
                     ->first();
 
                 if (! $peserta || ! in_array($peserta->status, ['mengerjakan', 'terkunci'], true) || ! $peserta->waktu_selesai || $peserta->waktu_selesai->isFuture()) {
-                    return false;
+                    return null;
                 }
 
                 $peserta->update(['status' => 'selesai']);
 
-                return true;
+                return $peserta->sesi_ruang_id;
             });
 
-            if ($submitted) {
+            if ($sesiRuangId) {
                 ProsesPenilaianPeserta::dispatch($pesertaId);
+                event(new PesertaStatusChanged((int) $pesertaId, $sesiRuangId, 'selesai'));
+                event(new PesertaSubmitted((int) $pesertaId, $sesiRuangId));
+                event(new WaktuHabis((int) $pesertaId));
             }
         }
 

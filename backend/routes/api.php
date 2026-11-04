@@ -4,9 +4,12 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankSoalController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\JadwalController;
+use App\Http\Controllers\KoreksiEssayController;
 use App\Http\Controllers\MasterDataController;
+use App\Http\Controllers\NilaiController;
 use App\Http\Controllers\OperatorKontrolController;
 use App\Http\Controllers\PengaturanController;
+use App\Http\Controllers\PengawasanController;
 use App\Http\Controllers\UjianController;
 use App\Http\Controllers\WordSoalController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +25,26 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+
+        Route::middleware('role:operator,superadmin,guru')->group(function () {
+            Route::post('auth/reset-login/{userId}', [PengawasanController::class, 'resetLogin']);
+            Route::get('sesi-ruang/{id}/monitoring', [PengawasanController::class, 'monitoring']);
+            Route::post('peserta/{id}/unlock', [PengawasanController::class, 'unlock']);
+        });
+
+        Route::middleware('role:operator,superadmin')->group(function () {
+            Route::get('lock-threshold', [PengawasanController::class, 'showAmbangKunci']);
+            Route::put('lock-threshold', [PengawasanController::class, 'updateAmbangKunci']);
+        });
+
+        Route::middleware('role:guru,superadmin')->group(function () {
+            Route::get('koreksi/essay', [KoreksiEssayController::class, 'index']);
+            Route::put('koreksi/essay/{jawabanId}', [KoreksiEssayController::class, 'update']);
+        });
+
+        Route::middleware('role:guru,operator,superadmin')->group(function () {
+            Route::get('nilai', [NilaiController::class, 'index']);
+        });
 
         Route::middleware('role:superadmin')->group(function () {
             Route::get('settings', [PengaturanController::class, 'show']);
@@ -132,6 +155,7 @@ Route::prefix('v1')->group(function () {
             Route::get('ujian/state', [UjianController::class, 'state']);
             Route::get('ujian/soal', [UjianController::class, 'getSoal']);
             Route::put('ujian/jawaban', [UjianController::class, 'autosave']);
+            Route::post('ujian/lock', [PengawasanController::class, 'lock'])->middleware('throttle:exam-lock');
             Route::post('ujian/submit', [UjianController::class, 'submit']);
         });
     });

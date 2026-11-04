@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BankSoal;
+use App\Models\JawabanSiswa;
 use App\Models\Nilai;
 use App\Models\PesertaUjian;
 
@@ -94,6 +95,17 @@ class PenilaianService
             $jawabanRecord = $jawabanMap->get($soal->id);
 
             if ($tipe === 'essay') {
+                if (! $jawabanRecord) {
+                    $jawabanRecord = JawabanSiswa::create([
+                        'peserta_ujian_id' => $peserta->id,
+                        'bank_soal_id' => $soal->id,
+                        'jawaban' => null,
+                        'client_seq' => 0,
+                        'skor' => '0.00',
+                    ]);
+                    $jawabanMap->put($soal->id, $jawabanRecord);
+                }
+
                 if ($jawabanRecord && $jawabanRecord->dikoreksi_oleh !== null) {
                     $skor = $this->keSatuanDesimal($jawabanRecord->skor);
                 } else {
@@ -134,6 +146,11 @@ class PenilaianService
                 'status' => $adaEssayBelumKoreksi ? 'menunggu_koreksi' : 'final',
             ]
         );
+    }
+
+    public function nilaiKeSatuanDesimal(string|int|float $nilai): int
+    {
+        return $this->keSatuanDesimal($nilai);
     }
 
     private function keSatuanDesimal(string|int|float $nilai): int

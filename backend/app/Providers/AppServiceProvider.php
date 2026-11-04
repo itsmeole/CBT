@@ -25,5 +25,8 @@ class AppServiceProvider extends ServiceProvider
         // FR-BE-02: maks 5 percobaan per menit per username + IP.
         RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
             ->by(strtolower((string) $request->input('username')).'|'.$request->ip()));
+
+        RateLimiter::for('exam-lock', fn (Request $request) => Limit::perMinute(60)
+            ->by('exam-lock|'.($request->user()?->id ?? $request->ip())));
     }
 }

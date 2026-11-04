@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PesertaStatusChanged;
+use App\Events\UjianDimulai;
 use App\Models\BankSoal;
 use App\Models\PesertaUjian;
 use App\Models\SesiRuang;
@@ -86,8 +88,9 @@ class OperatorKontrolController extends Controller
         }
 
         $startedCount = 0;
+        $startedPeserta = [];
 
-        DB::transaction(function () use ($sesi, $soalCollection, $now, $waktuSelesai, &$startedCount) {
+        DB::transaction(function () use ($sesi, $soalCollection, $now, $waktuSelesai, &$startedCount, &$startedPeserta) {
             $pesertaList = PesertaUjian::query()
                 ->where('sesi_ruang_id', $sesi->id)
                 ->where('status', 'menunggu')
@@ -98,8 +101,20 @@ class OperatorKontrolController extends Controller
             foreach ($pesertaList as $peserta) {
                 $this->inisialisasiPengerjaanPeserta($peserta, $soalCollection, $now, $waktuSelesai);
                 $startedCount++;
+                $startedPeserta[] = [
+                    'id' => $peserta->id,
+                    'waktu_selesai' => $peserta->waktu_selesai?->toIso8601String(),
+                ];
             }
         });
+
+        foreach ($startedPeserta as $item) {
+            $pesertaId = $item['id'];
+            event(new PesertaStatusChanged($pesertaId, $sesi->id, 'mengerjakan'));
+            if ($item['waktu_selesai']) {
+                event(new UjianDimulai($pesertaId, $item['waktu_selesai']));
+            }
+        }
 
         return response()->json([
             'message' => "Ujian berhasil dimulai untuk {$startedCount} peserta.",
@@ -141,6 +156,12 @@ class OperatorKontrolController extends Controller
 
             $this->inisialisasiPengerjaanPeserta($peserta, $soalCollection, $now, $waktuSelesai);
         });
+
+        $startedPeserta = $peserta->fresh();
+        event(new PesertaStatusChanged($peserta->id, $sesi->id, 'mengerjakan'));
+        if ($startedPeserta?->waktu_selesai) {
+            event(new UjianDimulai($peserta->id, $startedPeserta->waktu_selesai->toIso8601String()));
+        }
 
         return response()->json([
             'message' => 'Ujian berhasil dimulai untuk peserta ini.',
