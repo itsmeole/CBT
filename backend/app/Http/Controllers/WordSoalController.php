@@ -54,10 +54,12 @@ class WordSoalController extends Controller
         ]);
 
         if ($user->role === 'guru') {
-            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
-                return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak diizinkan menambahkan soal untuk mapel ini.']], 403);
-            }
-            $guruId = $user->guru->id;
+            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
+            $guruId = $guru->id;
+            \App\Models\GuruMapel::firstOrCreate([
+                'guru_id' => $guruId,
+                'mapel_id' => (int) $validated['mapel_id'],
+            ]);
         } else {
             $request->validate(['guru_id' => 'required|exists:guru,id']);
             $guruId = (int) $request->input('guru_id');
@@ -83,16 +85,10 @@ class WordSoalController extends Controller
         ]);
         $query = BankSoal::query();
 
-        if ($user->role === 'guru') {
-            $query->where('guru_id', $user->guru?->id ?? 0)
-                ->whereIn('mapel_id', $user->guru?->guruMapel()->pluck('mapel_id') ?? []);
-        }
-
         if (isset($validated['mapel_id'])) {
-            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
-                return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke mapel ini.']], 403);
-            }
             $query->where('mapel_id', $validated['mapel_id']);
+        } elseif ($user->role === 'guru') {
+            $query->where('guru_id', $user->guru?->id ?? 0);
         }
 
         $soalList = $query->with('opsiSoal')->orderBy('id')->get();

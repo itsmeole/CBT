@@ -70,13 +70,20 @@ class AuthController extends Controller
 
     private function userData(User $user): array
     {
-        return [
+        $data = [
             'id' => $user->id,
             'username' => $user->username,
             'name' => $user->name,
             'nama' => $user->name,
             'role' => $user->role,
         ];
+
+        if ($user->guru) {
+            $data['guru_id'] = $user->guru->id;
+            $data['mapel_ids'] = \App\Models\GuruMapel::where('guru_id', $user->guru->id)->pluck('mapel_id')->unique()->values()->all();
+        }
+
+        return $data;
     }
 
     private function error(string $code, string $message, int $status): JsonResponse

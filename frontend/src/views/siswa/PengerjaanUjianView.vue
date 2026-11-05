@@ -351,6 +351,7 @@ onUnmounted(() => {
         <!-- Question Prompt with KaTeX Math Rendering -->
         <div
           class="prose prose-base max-w-none text-slate-800 text-[16px] leading-relaxed"
+          dir="auto"
           v-html="renderMathInHtml(currentSoal.konten)"
         ></div>
 
@@ -365,12 +366,12 @@ onUnmounted(() => {
             :class="answers[currentSoal.id] === opsi.id ? 'border-brand-600 bg-brand-50/70 font-semibold' : 'border-slate-200 bg-white hover:bg-slate-50'"
           >
             <div
-              class="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold"
+              class="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold shrink-0"
               :class="answers[currentSoal.id] === opsi.id ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-600'"
             >
               {{ String.fromCharCode(65 + oIdx) }}
             </div>
-            <div class="text-[16px] flex-1" v-html="renderMathInHtml(opsi.konten)"></div>
+            <div class="text-[16px] flex-1" dir="auto" v-html="renderMathInHtml(opsi.konten)"></div>
           </div>
         </div>
 
@@ -387,10 +388,10 @@ onUnmounted(() => {
             <input
               type="checkbox"
               :checked="(answers[currentSoal.id] || []).includes(opsi.id)"
-              class="h-5 w-5 rounded text-brand-600 pointer-events-none"
+              class="h-5 w-5 rounded text-brand-600 pointer-events-none shrink-0"
             />
-            <span class="font-bold text-xs text-slate-500">{{ String.fromCharCode(65 + oIdx) }}.</span>
-            <div class="text-[16px] flex-1" v-html="renderMathInHtml(opsi.konten)"></div>
+            <span class="font-bold text-xs text-slate-500 shrink-0">{{ String.fromCharCode(65 + oIdx) }}.</span>
+            <div class="text-[16px] flex-1" dir="auto" v-html="renderMathInHtml(opsi.konten)"></div>
           </div>
         </div>
 
@@ -402,7 +403,7 @@ onUnmounted(() => {
             :key="opsi.id"
             class="rounded-xl border border-slate-200 p-3 bg-slate-50 space-y-2"
           >
-            <div class="text-[15px] font-medium text-slate-800" v-html="renderMathInHtml(opsi.konten)"></div>
+            <div class="text-[15px] font-medium text-slate-800" dir="auto" v-html="renderMathInHtml(opsi.konten)"></div>
             <div class="flex gap-2">
               <button
                 type="button"
@@ -433,8 +434,8 @@ onUnmounted(() => {
             class="rounded-xl border border-slate-200 p-3 bg-slate-50 space-y-2"
           >
             <div class="text-[15px] font-medium text-slate-800">
-              <span class="font-bold text-brand-700 mr-1">{{ kIdx + 1 }}.</span>
-              <span v-html="renderMathInHtml(kiri.konten)"></span>
+              <span class="font-bold text-brand-700 mr-1 shrink-0">{{ kIdx + 1 }}.</span>
+              <span dir="auto" v-html="renderMathInHtml(kiri.konten)"></span>
             </div>
             <div>
               <label class="block text-[11px] font-bold text-slate-500 mb-1">Pilih Pasangan:</label>

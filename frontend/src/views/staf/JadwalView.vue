@@ -57,12 +57,30 @@ async function fetchAll() {
   errorMessage.value = ''
   try {
     const [bobotRes, paketRes, jadwalRes, mapelRes, ruangRes, siswaRes] = await Promise.all([
-      apiClient.get('/bobot-tipe'),
-      apiClient.get('/paket-soal'),
-      apiClient.get('/jadwal'),
-      apiClient.get('/mapel'),
-      apiClient.get('/ruang'),
-      apiClient.get('/siswa')
+      apiClient.get('/bobot-tipe').catch(err => {
+        console.warn('Gagal memuat bobot-tipe:', err)
+        return { data: { data: [] } }
+      }),
+      apiClient.get('/paket-soal').catch(err => {
+        console.warn('Gagal memuat paket-soal:', err)
+        return { data: { data: [] } }
+      }),
+      apiClient.get('/jadwal').catch(err => {
+        console.warn('Gagal memuat jadwal:', err)
+        return { data: { data: [] } }
+      }),
+      apiClient.get('/mapel').catch(err => {
+        console.warn('Gagal memuat mapel:', err)
+        return { data: { data: [] } }
+      }),
+      apiClient.get('/ruang').catch(err => {
+        console.warn('Gagal memuat ruang:', err)
+        return { data: { data: [] } }
+      }),
+      apiClient.get('/siswa').catch(err => {
+        console.warn('Gagal memuat siswa:', err)
+        return { data: { data: [] } }
+      })
     ])
     bobotList.value = bobotRes.data.data || []
     paketList.value = paketRes.data.data || []

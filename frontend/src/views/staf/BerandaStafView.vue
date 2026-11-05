@@ -20,20 +20,16 @@ const stats = ref({
 
 async function fetchStats() {
   try {
-    if (isOperatorOrSuperadmin.value) {
-      const [sRes, gRes, jRes] = await Promise.all([
-        apiClient.get('/siswa'),
-        apiClient.get('/guru'),
-        apiClient.get('/jadwal')
-      ])
-      stats.value.totalSiswa = sRes.data.data?.length || 0
-      stats.value.totalGuru = gRes.data.data?.length || 0
-      stats.value.totalJadwal = jRes.data.data?.length || 0
-    }
-    if (isGuruOrSuperadmin.value) {
-      const soRes = await apiClient.get('/bank-soal')
-      stats.value.totalSoal = soRes.data.data?.length || 0
-    }
+    const [sRes, gRes, jRes, soRes] = await Promise.all([
+      apiClient.get('/siswa').catch(() => ({ data: { data: [] } })),
+      apiClient.get('/guru').catch(() => ({ data: { data: [] } })),
+      apiClient.get('/jadwal').catch(() => ({ data: { data: [] } })),
+      apiClient.get('/bank-soal').catch(() => ({ data: { data: [] } }))
+    ])
+    stats.value.totalSiswa = sRes.data.data?.length || 0
+    stats.value.totalGuru = gRes.data.data?.length || 0
+    stats.value.totalJadwal = jRes.data.data?.length || 0
+    stats.value.totalSoal = soRes.data.data?.length || 0
   } catch {
     // ignore
   }
@@ -48,23 +44,20 @@ onMounted(() => {
   <StafLayout>
     <div class="space-y-6">
       <!-- Welcome Banner -->
-      <div class="rounded-3xl bg-gradient-to-r from-brand-600 to-brand-800 p-6 sm:p-8 text-white shadow-md relative overflow-hidden">
-        <div class="relative z-10">
+      <div
+        class="rounded-3xl bg-brand-700 bg-cover bg-center bg-no-repeat p-6 sm:p-8 text-white shadow-md relative overflow-hidden"
+        style="background-image: url('/banner.svg'); background-size: cover; background-position: center;"
+      >
+        <div class="relative z-10 max-w-3xl">
           <span class="inline-block rounded-lg bg-white/20 backdrop-blur-xs px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-white mb-2">
             Panel Staf • {{ role }}
           </span>
           <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Selamat Datang, {{ auth.user?.nama || auth.user?.username }}
           </h1>
-          <p class="mt-2 text-sm text-brand-100 max-w-2xl leading-relaxed">
-            Sistem Computer-Based Testing (CBT) terpadu untuk pelaksanaan ujian sekolah terstandar, aman, dan efisien.
+          <p class="mt-2 text-sm sm:text-base text-blue-100 max-w-3xl leading-relaxed font-medium">
+            Integrated Computer Based Testing (ICBT) • Evaluate Knowledge, Inspire Growth.
           </p>
-        </div>
-        <!-- Decorative SVG backdrop -->
-        <div class="absolute -right-10 -bottom-10 w-48 h-48 opacity-10 pointer-events-none">
-          <svg viewBox="0 0 24 24" fill="currentColor" class="w-full h-full">
-            <path d="M11.7 2.805a.75.75 0 0 1 .6 0A60.65 60.65 0 0 1 22.83 8.72a.75.75 0 0 1-.231 1.337 49.948 49.948 0 0 0-9.902 3.912l-.003.002c-.114.06-.24.09-.364.09a.747.747 0 0 1-.365-.09l-.002-.001a49.95 49.95 0 0 0-9.903-3.913.75.75 0 0 1-.231-1.337A60.653 60.653 0 0 1 11.7 2.805Z" />
-          </svg>
         </div>
       </div>
 
@@ -123,7 +116,7 @@ onMounted(() => {
       </div>
 
       <!-- Main Navigation Modules -->
-      <div>
+      <div id="modul-utama">
         <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Akses Modul Utama</h2>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <RouterLink
@@ -175,7 +168,6 @@ onMounted(() => {
           </RouterLink>
 
           <RouterLink
-            v-if="isOperatorOrSuperadmin"
             to="/staf/kontrol-sesi"
             class="card bg-white p-6 border border-slate-200 hover:border-rose-500 hover:shadow-md transition-all group block rounded-2xl"
           >
@@ -184,9 +176,9 @@ onMounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
               </svg>
             </div>
-            <h3 class="text-base font-bold text-slate-900 group-hover:text-rose-600 transition-colors">Kontrol Sesi Operator</h3>
+            <h3 class="text-base font-bold text-slate-900 group-hover:text-rose-600 transition-colors">Kontrol Sesi Ujian</h3>
             <p class="mt-1 text-xs text-slate-500 leading-relaxed">
-              Verifikasi kehadiran siswa, monitoring status, dan mulai ujian serentak.
+              Verifikasi kehadiran siswa, monitoring status, reset sesi login, dan mulai ujian serentak.
             </p>
           </RouterLink>
         </div>

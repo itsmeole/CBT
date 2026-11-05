@@ -41,10 +41,6 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('role:superadmin')->group(function () {
             Route::get('log-aktivitas', [AdministrasiUjianController::class, 'logAktivitas']);
-            Route::get('tahun-ajaran', [MasterDataController::class, 'getTahunAjaran']);
-            Route::post('tahun-ajaran', [MasterDataController::class, 'storeTahunAjaran']);
-            Route::put('tahun-ajaran/{id}', [MasterDataController::class, 'updateTahunAjaran']);
-            Route::delete('tahun-ajaran/{id}', [MasterDataController::class, 'destroyTahunAjaran']);
         });
 
         Route::middleware('role:operator,superadmin')->group(function () {
@@ -52,7 +48,7 @@ Route::prefix('v1')->group(function () {
             Route::put('lock-threshold', [PengawasanController::class, 'updateAmbangKunci']);
         });
 
-        Route::middleware('role:guru,superadmin')->group(function () {
+        Route::middleware('role:guru,superadmin,operator')->group(function () {
             Route::get('koreksi/essay', [KoreksiEssayController::class, 'index']);
             Route::put('koreksi/essay/{jawabanId}', [KoreksiEssayController::class, 'update']);
         });
@@ -60,6 +56,25 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:guru,operator,superadmin')->group(function () {
             Route::get('nilai', [NilaiController::class, 'index']);
             Route::get('analisis-butir/{jadwalId}', [AnalisisButirController::class, 'show']);
+            Route::get('bobot-tipe', [JadwalController::class, 'getBobotTipe']);
+            Route::put('bobot-tipe', [JadwalController::class, 'updateBobotTipe']);
+            Route::get('tahun-ajaran', [MasterDataController::class, 'getTahunAjaran']);
+            Route::get('mapel', [MasterDataController::class, 'getMapel']);
+            Route::get('kelas', [MasterDataController::class, 'getKelas']);
+            Route::get('ruang', [MasterDataController::class, 'getRuang']);
+            Route::get('siswa', [MasterDataController::class, 'getSiswa']);
+            Route::get('guru', [MasterDataController::class, 'getGuru']);
+            Route::get('jadwal', [JadwalController::class, 'getJadwal']);
+            Route::post('jadwal', [JadwalController::class, 'storeJadwal']);
+            Route::post('sesi-ruang', [JadwalController::class, 'storeSesiRuang']);
+            Route::post('sesi-ruang/{id}/pengawas', [JadwalController::class, 'plotPengawas']);
+            Route::post('sesi-ruang/{id}/token/generate', [JadwalController::class, 'generateToken']);
+
+            // Kontrol Sesi Ujian (Guru, Operator, & Superadmin)
+            Route::get('sesi-ruang/{id}/peserta', [OperatorKontrolController::class, 'getPeserta']);
+            Route::post('sesi-ruang/{id}/kehadiran', [OperatorKontrolController::class, 'setKehadiran']);
+            Route::post('sesi-ruang/{id}/mulai', [OperatorKontrolController::class, 'mulaiSesi']);
+            Route::post('peserta/{id}/mulai', [OperatorKontrolController::class, 'mulaiPeserta']);
         });
 
         Route::middleware('role:superadmin')->group(function () {
@@ -75,26 +90,26 @@ Route::prefix('v1')->group(function () {
         // 1. MASTER DATA (Superadmin & Operator)
         // ========================================================
         Route::middleware('role:superadmin,operator')->group(function () {
+            // Tahun Ajaran
+            Route::post('tahun-ajaran', [MasterDataController::class, 'storeTahunAjaran']);
+            Route::put('tahun-ajaran/{id}', [MasterDataController::class, 'updateTahunAjaran']);
+            Route::delete('tahun-ajaran/{id}', [MasterDataController::class, 'destroyTahunAjaran']);
             // Kelas
-            Route::get('kelas', [MasterDataController::class, 'getKelas']);
             Route::post('kelas', [MasterDataController::class, 'storeKelas']);
             Route::put('kelas/{id}', [MasterDataController::class, 'updateKelas']);
             Route::delete('kelas/{id}', [MasterDataController::class, 'destroyKelas']);
 
-            // Siswa
-            Route::get('siswa', [MasterDataController::class, 'getSiswa']);
+            // Siswa (Mutasi: Operator & Superadmin)
             Route::post('siswa', [MasterDataController::class, 'storeSiswa']);
             Route::put('siswa/{id}', [MasterDataController::class, 'updateSiswa']);
             Route::delete('siswa/{id}', [MasterDataController::class, 'destroySiswa']);
 
-            // Guru
-            Route::get('guru', [MasterDataController::class, 'getGuru']);
+            // Guru (Mutasi: Operator & Superadmin)
             Route::post('guru', [MasterDataController::class, 'storeGuru']);
             Route::put('guru/{id}', [MasterDataController::class, 'updateGuru']);
             Route::delete('guru/{id}', [MasterDataController::class, 'destroyGuru']);
 
             // Mapel
-            Route::get('mapel', [MasterDataController::class, 'getMapel']);
             Route::post('mapel', [MasterDataController::class, 'storeMapel']);
             Route::put('mapel/{id}', [MasterDataController::class, 'updateMapel']);
             Route::delete('mapel/{id}', [MasterDataController::class, 'destroyMapel']);
@@ -105,7 +120,6 @@ Route::prefix('v1')->group(function () {
             Route::delete('guru-mapel/{id}', [MasterDataController::class, 'destroyGuruMapel']);
 
             // Ruang
-            Route::get('ruang', [MasterDataController::class, 'getRuang']);
             Route::post('ruang', [MasterDataController::class, 'storeRuang']);
             Route::put('ruang/{id}', [MasterDataController::class, 'updateRuang']);
             Route::delete('ruang/{id}', [MasterDataController::class, 'destroyRuang']);
@@ -115,29 +129,12 @@ Route::prefix('v1')->group(function () {
             Route::get('export/excel/{jenis}', [ExcelController::class, 'export']);
             Route::post('import/excel/{jenis}/preview', [ExcelController::class, 'preview']);
             Route::post('import/excel/{jenis}/commit', [ExcelController::class, 'commit']);
-
-            // Bobot Tipe Soal
-            Route::get('bobot-tipe', [JadwalController::class, 'getBobotTipe']);
-            Route::put('bobot-tipe', [JadwalController::class, 'updateBobotTipe']);
-
-            // Jadwal Ujian & Sesi Ruang
-            Route::get('jadwal', [JadwalController::class, 'getJadwal']);
-            Route::post('jadwal', [JadwalController::class, 'storeJadwal']);
-            Route::post('sesi-ruang', [JadwalController::class, 'storeSesiRuang']);
-            Route::post('sesi-ruang/{id}/pengawas', [JadwalController::class, 'plotPengawas']);
-            Route::post('sesi-ruang/{id}/token/generate', [JadwalController::class, 'generateToken']);
-
-            // KONTROL SESI OPERATOR (HANYA OPERATOR & SUPERADMIN, 403 UNTUK GURU!)
-            Route::get('sesi-ruang/{id}/peserta', [OperatorKontrolController::class, 'getPeserta']);
-            Route::post('sesi-ruang/{id}/kehadiran', [OperatorKontrolController::class, 'setKehadiran']);
-            Route::post('sesi-ruang/{id}/mulai', [OperatorKontrolController::class, 'mulaiSesi']);
-            Route::post('peserta/{id}/mulai', [OperatorKontrolController::class, 'mulaiPeserta']);
         });
 
         // ========================================================
         // 2. BANK SOAL & WORD (.docx) (Guru & Superadmin)
         // ========================================================
-        Route::middleware('role:guru,superadmin')->group(function () {
+        Route::middleware('role:guru,superadmin,operator')->group(function () {
             // CRUD Bank Soal
             Route::get('bank-soal', [BankSoalController::class, 'index']);
             Route::get('bank-soal/{id}', [BankSoalController::class, 'show']);

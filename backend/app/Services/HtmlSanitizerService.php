@@ -15,7 +15,7 @@ class HtmlSanitizerService
         $document = new \DOMDocument('1.0', 'UTF-8');
         $previousErrorSetting = libxml_use_internal_errors(true);
         $document->loadHTML(
-            '<!doctype html><html><body><div id="cbt-root">'.$html.'</div></body></html>',
+            '<?xml encoding="utf-8" ?><!doctype html><html><body><div id="cbt-root">'.$html.'</div></body></html>',
             LIBXML_HTML_NODEFDTD | LIBXML_NONET
         );
         libxml_clear_errors();

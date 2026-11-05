@@ -2,7 +2,19 @@
 import { ref, onMounted, computed } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import { renderMathInHtml } from '@/lib/katex'
+import { downloadFileFromApi } from '@/lib/download'
+
+const auth = useAuthStore()
+const isSuperadmin = computed(() => auth.user?.role === 'superadmin')
+const isOperator = computed(() => auth.user?.role === 'operator')
+const isGuru = computed(() => auth.user?.role === 'guru')
+const teacherMapelIds = computed(() => ((auth.user as any)?.mapel_ids || []) as number[])
+
+const canManageSelectedMapel = computed(() => {
+  return isSuperadmin.value || isOperator.value || isGuru.value
+})
 
 type TipeSoal = 'pg' | 'pg_kompleks' | 'benar_salah' | 'menjodohkan' | 'essay'
 
@@ -10,6 +22,7 @@ interface OpsiItem {
   id?: number
   konten: string
   sisi?: 'kiri' | 'kanan'
+  urutan?: number
 }
 
 interface SoalItem {
@@ -55,17 +68,24 @@ const uploadedMediaUrl = ref<string>('')
 const showWordImportModal = ref(false)
 const wordFile = ref<File | null>(null)
 const wordImportStep = ref<1 | 2>(1)
+const wordImportMapelId = ref<number | ''>('')
 const wordPreviewItems = ref<any[]>([])
 const wordImportLoading = ref(false)
 const wordImportErrors = ref<any[]>([])
 
 async function fetchInitial() {
   loading.value = true
+  errorMessage.value = ''
   try {
     const resMapel = await apiClient.get('/mapel')
     mapelList.value = resMapel.data.data || []
     if (mapelList.value.length > 0 && !selectedMapel.value) {
-      selectedMapel.value = mapelList.value[0].id
+      if (isGuru.value) {
+        const firstTaught = mapelList.value.find(m => teacherMapelIds.value.includes(m.id))
+        selectedMapel.value = firstTaught ? firstTaught.id : mapelList.value[0].id
+      } else {
+        selectedMapel.value = mapelList.value[0].id
+      }
     }
     await fetchSoal()
   } catch (err: any) {
@@ -151,16 +171,40 @@ function openEditModal(item: SoalItem) {
   formRubrik.value = item.rubrik || ''
 
   if (item.tipe === 'pg') {
-    formOpsi.value = (item.opsi_soal || []).map((o, idx) => ({
-      konten: o.konten,
-      isCorrect: String(item.kunci) === String(idx + 1) || String(item.kunci) === String(o.id)
-    }))
+    const rawKunci = String(item.kunci || '').toUpperCase().trim()
+    let foundCorrect = false
+    formOpsi.value = (item.opsi_soal || []).map((o, idx) => {
+      const huruf = String.fromCharCode(65 + idx)
+      const isCorrect = rawKunci === huruf
+        || rawKunci === String(idx + 1)
+        || rawKunci === String(o.id)
+        || rawKunci === String(o.urutan)
+      if (isCorrect) foundCorrect = true
+      return {
+        konten: o.konten,
+        isCorrect
+      }
+    })
+    if (!foundCorrect && formOpsi.value.length > 0) {
+      formOpsi.value[0].isCorrect = true
+    }
   } else if (item.tipe === 'pg_kompleks') {
-    const kunciArr = Array.isArray(item.kunci) ? item.kunci : []
-    formOpsi.value = (item.opsi_soal || []).map((o, idx) => ({
-      konten: o.konten,
-      isCorrect: kunciArr.includes(idx + 1) || kunciArr.includes(o.id)
-    }))
+    const rawKunci = Array.isArray(item.kunci)
+      ? item.kunci.map(k => String(k).toUpperCase().trim())
+      : (typeof item.kunci === 'object' && item.kunci !== null
+          ? Object.keys(item.kunci).map(k => String(k).toUpperCase().trim())
+          : [String(item.kunci || '').toUpperCase().trim()])
+    formOpsi.value = (item.opsi_soal || []).map((o, idx) => {
+      const huruf = String.fromCharCode(65 + idx)
+      const isCorrect = rawKunci.includes(huruf)
+        || rawKunci.includes(String(idx + 1))
+        || rawKunci.includes(String(o.id))
+        || rawKunci.includes(String(o.urutan))
+      return {
+        konten: o.konten,
+        isCorrect
+      }
+    })
   } else if (item.tipe === 'benar_salah') {
     const kunciMap = typeof item.kunci === 'object' && item.kunci !== null ? item.kunci : {}
     formOpsi.value = (item.opsi_soal || []).map((o, idx) => ({
@@ -170,10 +214,24 @@ function openEditModal(item: SoalItem) {
   } else if (item.tipe === 'menjodohkan') {
     const kiri = (item.opsi_soal || []).filter(o => o.sisi === 'kiri')
     const kanan = (item.opsi_soal || []).filter(o => o.sisi === 'kanan')
-    formMenjodohkan.value = kiri.map((k, idx) => ({
-      kiri: k.konten,
-      kanan: kanan[idx]?.konten || ''
-    }))
+    const kunciMap = typeof item.kunci === 'object' && item.kunci !== null ? item.kunci : {}
+    formMenjodohkan.value = kiri.map((k, idx) => {
+      let targetKanan = kanan[idx]?.konten || ''
+      const targetVal = kunciMap[idx + 1] || (k.id ? kunciMap[k.id] : undefined)
+      if (typeof targetVal === 'string' && /^[a-z]$/i.test(targetVal)) {
+        const knIdx = targetVal.toLowerCase().charCodeAt(0) - 97
+        if (kanan[knIdx]) targetKanan = kanan[knIdx].konten
+      } else if (typeof targetVal === 'number' || (typeof targetVal === 'string' && /^[0-9]+$/.test(targetVal))) {
+        const knIdx = parseInt(String(targetVal), 10) - 1
+        if (kanan[knIdx]) targetKanan = kanan[knIdx].konten
+      }
+      return {
+        kiri: k.konten,
+        kanan: targetKanan
+      }
+    })
+  } else {
+    formOpsi.value = []
   }
 
   showModal.value = true
@@ -189,12 +247,23 @@ async function saveSoal() {
 
   if (formTipe.value === 'pg') {
     const correctIdx = formOpsi.value.findIndex(o => o.isCorrect)
-    payloadKunci = correctIdx >= 0 ? correctIdx + 1 : 1
+    if (correctIdx === -1 && formOpsi.value.length > 0) {
+      errorMessage.value = 'Silakan pilih satu opsi sebagai kunci jawaban yang benar.'
+      loading.value = false
+      return
+    }
+    payloadKunci = correctIdx >= 0 ? String.fromCharCode(65 + correctIdx) : 'A'
     payloadOpsi = formOpsi.value.map(o => ({ konten: o.konten }))
   } else if (formTipe.value === 'pg_kompleks') {
-    payloadKunci = formOpsi.value
-      .map((o, idx) => (o.isCorrect ? idx + 1 : null))
-      .filter(v => v !== null)
+    const keys = formOpsi.value
+      .map((o, idx) => (o.isCorrect ? String.fromCharCode(65 + idx) : null))
+      .filter((v): v is string => v !== null)
+    if (keys.length < 2) {
+      errorMessage.value = 'Pilih minimal 2 opsi sebagai kunci jawaban benar untuk tipe PG Kompleks.'
+      loading.value = false
+      return
+    }
+    payloadKunci = keys
     payloadOpsi = formOpsi.value.map(o => ({ konten: o.konten }))
   } else if (formTipe.value === 'benar_salah') {
     payloadKunci = {}
@@ -207,7 +276,7 @@ async function saveSoal() {
     formMenjodohkan.value.forEach((pair, idx) => {
       payloadOpsi.push({ konten: pair.kiri, sisi: 'kiri' })
       payloadOpsi.push({ konten: pair.kanan, sisi: 'kanan' })
-      payloadKunci[idx + 1] = idx + 1
+      payloadKunci[idx + 1] = String.fromCharCode(97 + idx)
     })
   }
 
@@ -231,7 +300,13 @@ async function saveSoal() {
     showModal.value = false
     await fetchSoal()
   } catch (err: any) {
-    errorMessage.value = err.message || 'Gagal menyimpan soal.'
+    const details = err.response?.data?.error?.details
+    if (details && typeof details === 'object') {
+      const msgs = Object.values(details).flat().join(', ')
+      errorMessage.value = `${err.response?.data?.error?.message || 'Gagal menyimpan soal.'} (${msgs})`
+    } else {
+      errorMessage.value = err.response?.data?.error?.message || err.message || 'Gagal menyimpan soal.'
+    }
   } finally {
     loading.value = false
   }
@@ -290,19 +365,29 @@ function insertMediaSnippet() {
 }
 
 // Download Word Template
-function downloadWordTemplate() {
-  const url = `${apiClient.defaults.baseURL}/templates/word`
-  window.open(url, '_blank')
+async function downloadWordTemplate() {
+  errorMessage.value = ''
+  try {
+    await downloadFileFromApi('/templates/word', 'template_soal.docx')
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || err.message || 'Gagal mengunduh template soal Word.'
+  }
 }
 
 // Export Word Soal
-function exportWordSoal() {
+async function exportWordSoal() {
   if (!selectedMapel.value) {
-    alert('Pilih mata pelajaran terlebih dahulu untuk mengekspor soal.')
+    errorMessage.value = 'Silakan pilih Mata Pelajaran terlebih dahulu sebelum melakukan ekspor.'
     return
   }
-  const url = `${apiClient.defaults.baseURL}/export/word/bank-soal?mapel_id=${selectedMapel.value}`
-  window.open(url, '_blank')
+  errorMessage.value = ''
+  try {
+    const selectedObj = mapelList.value.find(m => m.id === selectedMapel.value)
+    const filename = `bank_soal_${selectedObj?.kode || selectedMapel.value}.docx`
+    await downloadFileFromApi(`/export/word/bank-soal?mapel_id=${selectedMapel.value}`, filename)
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || err.message || 'Gagal mengekspor soal Word.'
+  }
 }
 
 // Word (.docx) Import Wizard
@@ -311,6 +396,7 @@ function openWordImport() {
   wordImportStep.value = 1
   wordPreviewItems.value = []
   wordImportErrors.value = []
+  wordImportMapelId.value = selectedMapel.value || (mapelList.value[0]?.id ?? '')
   showWordImportModal.value = true
 }
 
@@ -342,19 +428,21 @@ async function previewWord() {
 }
 
 async function commitWord() {
-  if (!selectedMapel.value) {
-    alert('Pilih mata pelajaran tujuan impor terlebih dahulu.')
+  const targetMapelId = wordImportMapelId.value || selectedMapel.value
+  if (!targetMapelId) {
+    errorMessage.value = 'Silakan pilih Mata Pelajaran tujuan impor terlebih dahulu.'
     return
   }
   wordImportLoading.value = true
   errorMessage.value = ''
   try {
     await apiClient.post('/import/word/commit', {
-      mapel_id: selectedMapel.value,
+      mapel_id: targetMapelId,
       items: wordPreviewItems.value
     })
     feedbackMessage.value = 'Soal dari berkas Word berhasil disimpan ke Bank Soal.'
     showWordImportModal.value = false
+    selectedMapel.value = targetMapelId
     await fetchSoal()
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal menyimpan soal hasil impor.'
@@ -380,13 +468,20 @@ onMounted(() => {
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+          <span v-if="!canManageSelectedMapel" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            <span>Mode Lihat Saja</span>
+          </span>
           <button @click="downloadWordTemplate" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Unduh format template soal .docx">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             <span>Unduh Template</span>
           </button>
-          <button @click="openWordImport" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Impor butir soal dari dokumen Word (.docx)">
+          <button v-if="canManageSelectedMapel" @click="openWordImport" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Impor butir soal dari dokumen Word (.docx)">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
@@ -398,7 +493,7 @@ onMounted(() => {
             </svg>
             <span>Ekspor Soal</span>
           </button>
-          <button @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5 font-medium shadow-xs">
+          <button v-if="canManageSelectedMapel" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5 font-medium shadow-xs">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
@@ -428,7 +523,7 @@ onMounted(() => {
             <label class="text-xs font-semibold text-slate-600">Mapel:</label>
             <select v-model="selectedMapel" @change="fetchSoal" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-colors">
               <option v-for="m in mapelList" :key="m.id" :value="m.id">
-                {{ m.kode }} - {{ m.nama }}
+                {{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
               </option>
             </select>
           </div>
@@ -486,7 +581,7 @@ onMounted(() => {
               </span>
             </div>
 
-            <div class="flex items-center gap-1.5">
+            <div v-if="canManageSelectedMapel && (isSuperadmin || isOperator || soal.guru_id === (auth.user as any)?.guru_id || !soal.guru_id)" class="flex items-center gap-1.5">
               <button
                 type="button"
                 @click="openEditModal(soal)"
@@ -515,6 +610,7 @@ onMounted(() => {
           <!-- Soal Content with Math KaTeX -->
           <div
             class="prose prose-sm max-w-none text-slate-800 mb-4"
+            dir="auto"
             v-html="renderMathInHtml(soal.konten)"
           ></div>
 
@@ -526,10 +622,11 @@ onMounted(() => {
                 v-for="(opsi, oIdx) in soal.opsi_soal"
                 :key="oIdx"
                 class="rounded border border-slate-100 bg-slate-50 p-2 text-xs flex items-center gap-2"
+                dir="auto"
               >
-                <span class="font-bold text-slate-500">{{ String.fromCharCode(65 + oIdx) }}.</span>
-                <span v-html="renderMathInHtml(opsi.konten)"></span>
-                <span v-if="opsi.sisi" class="text-[10px] bg-slate-200 px-1 rounded ml-auto">{{ opsi.sisi }}</span>
+                <span class="font-bold text-slate-500 shrink-0">{{ String.fromCharCode(65 + oIdx) }}.</span>
+                <span class="flex-1" dir="auto" v-html="renderMathInHtml(opsi.konten)"></span>
+                <span v-if="opsi.sisi" class="text-[10px] bg-slate-200 px-1 rounded ml-auto shrink-0">{{ opsi.sisi }}</span>
               </div>
             </div>
           </div>
@@ -559,7 +656,7 @@ onMounted(() => {
             <div>
               <label class="block text-xs font-medium text-slate-700">Mata Pelajaran</label>
               <select v-model="formMapelId" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}</option>
               </select>
             </div>
             <div>
@@ -589,6 +686,7 @@ onMounted(() => {
               v-model="formKonten"
               rows="4"
               required
+              dir="auto"
               placeholder="Tuliskan pertanyaan di sini. Gunakan $rumus$ untuk rumus matematika KaTeX..."
               class="input text-sm font-sans"
             ></textarea>
@@ -596,7 +694,7 @@ onMounted(() => {
             <!-- Live KaTeX Preview -->
             <div v-if="formKonten" class="mt-2 rounded bg-slate-50 border p-3">
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pratinjau Rumus Math (KaTeX):</p>
-              <div class="text-sm text-slate-800" v-html="renderMathInHtml(formKonten)"></div>
+              <div class="text-sm text-slate-800" dir="auto" v-html="renderMathInHtml(formKonten)"></div>
             </div>
           </div>
 
@@ -610,10 +708,10 @@ onMounted(() => {
                 name="kunci_pg"
                 :checked="opsi.isCorrect"
                 @change="formOpsi.forEach((o, i) => o.isCorrect = (i === idx))"
-                class="h-4 w-4 text-brand-600"
+                class="h-4 w-4 text-brand-600 shrink-0"
               />
-              <span class="font-bold text-sm w-4">{{ String.fromCharCode(65 + idx) }}.</span>
-              <input v-model="opsi.konten" required placeholder="Teks opsi..." class="input !min-h-0 !py-1 text-sm flex-1" />
+              <span class="font-bold text-sm w-4 shrink-0">{{ String.fromCharCode(65 + idx) }}.</span>
+              <input v-model="opsi.konten" required dir="auto" placeholder="Teks opsi..." class="input !min-h-0 !py-1 text-sm flex-1" />
             </div>
           </div>
 
@@ -621,9 +719,9 @@ onMounted(() => {
           <div v-if="formTipe === 'pg_kompleks'" class="space-y-2">
             <label class="block text-xs font-bold text-slate-700">Opsi Jawaban (Centang semua kunci yang benar):</label>
             <div v-for="(opsi, idx) in formOpsi" :key="idx" class="flex items-center gap-2">
-              <input type="checkbox" v-model="opsi.isCorrect" class="h-4 w-4 rounded text-brand-600" />
-              <span class="font-bold text-sm w-4">{{ String.fromCharCode(65 + idx) }}.</span>
-              <input v-model="opsi.konten" required placeholder="Teks opsi..." class="input !min-h-0 !py-1 text-sm flex-1" />
+              <input type="checkbox" v-model="opsi.isCorrect" class="h-4 w-4 rounded text-brand-600 shrink-0" />
+              <span class="font-bold text-sm w-4 shrink-0">{{ String.fromCharCode(65 + idx) }}.</span>
+              <input v-model="opsi.konten" required dir="auto" placeholder="Teks opsi..." class="input !min-h-0 !py-1 text-sm flex-1" />
             </div>
           </div>
 
@@ -631,9 +729,9 @@ onMounted(() => {
           <div v-if="formTipe === 'benar_salah'" class="space-y-2">
             <label class="block text-xs font-bold text-slate-700">Daftar Pernyataan & Kunci:</label>
             <div v-for="(item, idx) in formOpsi" :key="idx" class="flex items-center gap-2">
-              <span class="font-bold text-xs w-6">{{ idx + 1 }}.</span>
-              <input v-model="item.konten" required placeholder="Pernyataan..." class="input !min-h-0 !py-1 text-sm flex-1" />
-              <select v-model="item.jawabanBS" class="input !min-h-0 !py-1 text-xs w-28">
+              <span class="font-bold text-xs w-6 shrink-0">{{ idx + 1 }}.</span>
+              <input v-model="item.konten" required dir="auto" placeholder="Pernyataan..." class="input !min-h-0 !py-1 text-sm flex-1" />
+              <select v-model="item.jawabanBS" class="input !min-h-0 !py-1 text-xs w-28 shrink-0">
                 <option value="Benar">Benar</option>
                 <option value="Salah">Salah</option>
               </select>
@@ -651,10 +749,10 @@ onMounted(() => {
           <div v-if="formTipe === 'menjodohkan'" class="space-y-2">
             <label class="block text-xs font-bold text-slate-700">Pasangan Menjodohkan (Kiri ke Kanan):</label>
             <div v-for="(pair, idx) in formMenjodohkan" :key="idx" class="flex items-center gap-2">
-              <span class="font-bold text-xs w-4">{{ idx + 1 }}.</span>
-              <input v-model="pair.kiri" required placeholder="Item Kiri (Pertanyaan)..." class="input !min-h-0 !py-1 text-sm flex-1" />
-              <span>↔</span>
-              <input v-model="pair.kanan" required placeholder="Item Kanan (Jawaban)..." class="input !min-h-0 !py-1 text-sm flex-1" />
+              <span class="font-bold text-xs w-4 shrink-0">{{ idx + 1 }}.</span>
+              <input v-model="pair.kiri" required dir="auto" placeholder="Item Kiri (Pertanyaan)..." class="input !min-h-0 !py-1 text-sm flex-1" />
+              <span class="shrink-0">↔</span>
+              <input v-model="pair.kanan" required dir="auto" placeholder="Item Kanan (Jawaban)..." class="input !min-h-0 !py-1 text-sm flex-1" />
             </div>
             <button
               type="button"
@@ -671,6 +769,7 @@ onMounted(() => {
             <textarea
               v-model="formRubrik"
               rows="3"
+              dir="auto"
               placeholder="Petunjuk penilaian bagi guru saat koreksi manual..."
               class="input text-sm"
             ></textarea>
@@ -744,6 +843,16 @@ onMounted(() => {
             Unggah dokumen Microsoft Word (.docx) dengan tag format baku [SOAL]...[/SOAL].
           </p>
 
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mata Pelajaran Tujuan Impor *</label>
+            <select v-model="wordImportMapelId" class="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+              <option value="" disabled>-- Pilih Mata Pelajaran --</option>
+              <option v-for="m in mapelList" :key="m.id" :value="m.id">
+                {{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
+              </option>
+            </select>
+          </div>
+
           <div class="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-colors">
             <input type="file" accept=".docx" @change="onWordFileSelect" class="hidden" id="wordFileInput" />
             <label for="wordFileInput" class="cursor-pointer">
@@ -807,9 +916,9 @@ onMounted(() => {
               :key="idx"
               class="rounded-lg border border-slate-200 p-2.5 text-xs bg-slate-50 flex items-start gap-2"
             >
-              <span class="font-bold text-brand-700 font-mono">#{{ idx + 1 }}</span>
-              <span class="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] uppercase font-bold">{{ item.tipe }}</span>
-              <div class="flex-1 truncate" v-html="renderMathInHtml(item.konten)"></div>
+              <span class="font-bold text-brand-700 font-mono shrink-0">#{{ idx + 1 }}</span>
+              <span class="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] uppercase font-bold shrink-0">{{ item.tipe }}</span>
+              <div class="flex-1 truncate" dir="auto" v-html="renderMathInHtml(item.konten || item.teks)"></div>
               <span v-if="item.error" class="text-status-danger font-bold">Error</span>
               <span v-else class="text-status-ok font-bold flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5 text-emerald-600">

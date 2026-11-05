@@ -129,11 +129,9 @@ async function handleConfirmedLogout() {
     <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3 sm:px-6 shadow-xs">
       <div class="mx-auto flex max-w-2xl items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 font-black text-white text-sm shadow-xs">
-            CBT
-          </div>
+          <img src="/favicon.svg" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
           <div>
-            <h1 class="text-sm font-extrabold text-slate-900 leading-tight">CBT Siswa</h1>
+            <h1 class="text-sm font-extrabold text-slate-900 leading-tight">ICBT Siswa</h1>
             <p class="text-xs text-slate-500 font-medium">
               {{ auth.user?.nama }} <span class="text-slate-400">({{ auth.user?.username || 'Peserta' }})</span>
             </p>
@@ -406,7 +404,7 @@ async function handleConfirmedLogout() {
 
     <!-- Footer -->
     <footer class="py-4 text-center text-xs text-slate-400">
-      <p>© {{ new Date().getFullYear() }} CBT Ujian Sekolah • Terstandar & Terpadu</p>
+      <p>© {{ new Date().getFullYear() }} ICBT • Terstandar & Terpadu</p>
     </footer>
 
     <!-- Confirm Logout Dialog -->

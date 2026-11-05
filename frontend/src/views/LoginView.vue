@@ -176,7 +176,7 @@ async function submit() {
         <!-- Keterangan Tahun di Paling Bawah Layar Desktop -->
         <footer class="mt-auto pt-4 text-center shrink-0">
           <p class="text-[11px] text-slate-400 font-medium">
-            © {{ new Date().getFullYear() }} CBT Ujian Sekolah
+            © {{ new Date().getFullYear() }} ICBT • Integrated Computer Based Testing
           </p>
         </footer>
       </div>
@@ -334,7 +334,7 @@ async function submit() {
         <!-- Keterangan Tahun di Paling Bawah Layar Mobile -->
         <footer class="mt-auto pt-4 pb-2 text-center shrink-0">
           <p class="text-[11px] text-slate-400 font-medium">
-            © {{ new Date().getFullYear() }} CBT Ujian Sekolah
+            © {{ new Date().getFullYear() }} ICBT • Integrated Computer Based Testing
           </p>
         </footer>
       </div>

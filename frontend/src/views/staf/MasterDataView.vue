@@ -2,8 +2,14 @@
 import { ref, onMounted, computed } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+import { downloadFileFromApi } from '@/lib/download'
 
 type TabType = 'siswa' | 'guru' | 'kelas' | 'mapel' | 'ruang' | 'tahun_ajaran'
+
+const auth = useAuthStore()
+const isSuperadmin = computed(() => auth.user?.role === 'superadmin')
+const isOperatorOrSuperadmin = computed(() => auth.user?.role === 'superadmin' || auth.user?.role === 'operator')
 
 const activeTab = ref<TabType>('siswa')
 const loading = ref(false)
@@ -83,12 +89,22 @@ async function handleTabChange(tab: TabType) {
 // Filtered Lists
 const filteredSiswa = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  return siswaList.value.filter(s => s.nama?.toLowerCase().includes(q) || s.nis?.toLowerCase().includes(q))
+  return siswaList.value.filter(s => {
+    const nama = (s.nama || s.user?.name || '').toLowerCase()
+    const nis = (s.nis || '').toLowerCase()
+    const username = (s.username || s.user?.username || '').toLowerCase()
+    return nama.includes(q) || nis.includes(q) || username.includes(q)
+  })
 })
 
 const filteredGuru = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  return guruList.value.filter(g => g.nama?.toLowerCase().includes(q) || g.nip?.toLowerCase().includes(q))
+  return guruList.value.filter(g => {
+    const nama = (g.nama || g.user?.name || '').toLowerCase()
+    const nip = (g.nip || '').toLowerCase()
+    const username = (g.username || g.user?.username || '').toLowerCase()
+    return nama.includes(q) || nip.includes(q) || username.includes(q)
+  })
 })
 
 const filteredKelas = computed(() => {
@@ -115,17 +131,38 @@ const filteredTahunAjaran = computed(() => {
 function openCreateModal() {
   isEditing.value = false
   editId.value = null
-  formData.value = {}
-  if (activeTab.value === 'siswa' && kelasList.value.length > 0) {
-    formData.value.kelas_id = kelasList.value[0].id
-    formData.value.jenis_kelamin = 'L'
-  }
-  if (activeTab.value === 'kelas' && tahunAjaranList.value.length > 0) {
-    formData.value.tahun_ajaran_id = tahunAjaranList.value[0].id
-  }
-  if (activeTab.value === 'tahun_ajaran') {
-    formData.value.semester = 1
-    formData.value.aktif = true
+  if (activeTab.value === 'siswa') {
+    formData.value = {
+      nis: '',
+      nama: '',
+      kelas_id: kelasList.value[0]?.id || '',
+      jk: 'L',
+      username: '',
+      password: ''
+    }
+  } else if (activeTab.value === 'guru') {
+    formData.value = {
+      nip: '',
+      nama: '',
+      username: '',
+      password: '',
+      mapel_ids: [],
+      role: 'guru'
+    }
+  } else if (activeTab.value === 'kelas') {
+    formData.value = {
+      nama: '',
+      tingkat: '7',
+      tahun_ajaran_id: tahunAjaranList.value[0]?.id || ''
+    }
+  } else if (activeTab.value === 'mapel') {
+    formData.value = { kode: '', nama: '' }
+  } else if (activeTab.value === 'ruang') {
+    formData.value = { kode: '', nama: '', kapasitas: 36 }
+  } else if (activeTab.value === 'tahun_ajaran') {
+    formData.value = { semester: 1, aktif: true }
+  } else {
+    formData.value = {}
   }
   showFormModal.value = true
 }
@@ -133,7 +170,29 @@ function openCreateModal() {
 function openEditModal(item: any) {
   isEditing.value = true
   editId.value = item.id
-  formData.value = { ...item }
+  if (activeTab.value === 'siswa') {
+    formData.value = {
+      id: item.id,
+      nis: item.nis || '',
+      nama: item.nama || item.user?.name || '',
+      kelas_id: item.kelas_id || item.kelas?.id || '',
+      jk: item.jk || item.jenis_kelamin || 'L',
+      username: item.username || item.user?.username || '',
+      password: ''
+    }
+  } else if (activeTab.value === 'guru') {
+    formData.value = {
+      id: item.id,
+      nip: item.nip || '',
+      nama: item.nama || item.user?.name || '',
+      username: item.username || item.user?.username || '',
+      password: '',
+      mapel_ids: (item.mapel || []).map((m: any) => m.id),
+      role: item.user?.role || 'guru'
+    }
+  } else {
+    formData.value = { ...item }
+  }
   showFormModal.value = true
 }
 
@@ -143,11 +202,33 @@ async function saveEntity() {
   errorMessage.value = ''
   try {
     const endpoint = activeTab.value.replace('_', '-')
+    let payload = { ...formData.value }
+
+    if (activeTab.value === 'siswa') {
+      payload = {
+        nis: formData.value.nis,
+        name: formData.value.nama,
+        kelas_id: formData.value.kelas_id,
+        jk: formData.value.jk || 'L',
+        username: formData.value.username,
+        ...(formData.value.password ? { password: formData.value.password } : {})
+      }
+    } else if (activeTab.value === 'guru') {
+      payload = {
+        nip: formData.value.nip || null,
+        name: formData.value.nama,
+        username: formData.value.username,
+        mapel_ids: formData.value.mapel_ids || [],
+        ...(formData.value.role ? { role: formData.value.role } : {}),
+        ...(formData.value.password ? { password: formData.value.password } : {})
+      }
+    }
+
     if (isEditing.value && editId.value) {
-      await apiClient.put(`/${endpoint}/${editId.value}`, formData.value)
+      await apiClient.put(`/${endpoint}/${editId.value}`, payload)
       feedbackMessage.value = 'Data berhasil diperbarui.'
     } else {
-      await apiClient.post(`/${endpoint}`, formData.value)
+      await apiClient.post(`/${endpoint}`, payload)
       feedbackMessage.value = 'Data berhasil ditambahkan.'
     }
     showFormModal.value = false
@@ -177,9 +258,16 @@ async function deleteEntity(id: number) {
 }
 
 // Download Excel Template
-function downloadTemplate(jenis: string) {
-  const url = `${apiClient.defaults.baseURL}/templates/excel/${jenis}`
-  window.open(url, '_blank')
+async function downloadTemplate(jenis: string) {
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    await downloadFileFromApi(`/templates/excel/${jenis}`, `template_${jenis}.xlsx`)
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Gagal mengunduh template Excel.'
+  } finally {
+    loading.value = false
+  }
 }
 
 // Excel Import Wizard
@@ -277,8 +365,15 @@ const currentListCount = computed(() => {
             </svg>
             <span>Unduh Template</span>
           </button>
+          <span v-if="!isOperatorOrSuperadmin" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            <span>Mode Lihat Saja</span>
+          </span>
           <button
-            v-if="['siswa', 'guru', 'kelas'].includes(activeTab)"
+            v-if="['siswa', 'guru', 'kelas'].includes(activeTab) && isOperatorOrSuperadmin"
             @click="openImport(activeTab)"
             class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
           >
@@ -288,7 +383,7 @@ const currentListCount = computed(() => {
             </svg>
             <span>Impor Data</span>
           </button>
-          <button @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+          <button v-if="isOperatorOrSuperadmin" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
             <!-- Plus SVG -->
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -363,19 +458,28 @@ const currentListCount = computed(() => {
             <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
               <tr>
                 <th class="p-3">NIS</th>
-                <th class="p-3">Nama</th>
+                <th class="p-3">Nama Siswa</th>
                 <th class="p-3">Kelas</th>
                 <th class="p-3">L/P</th>
-                <th class="p-3 text-right">Aksi</th>
+                <th class="p-3">Username</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-for="item in filteredSiswa" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-mono font-medium text-slate-900">{{ item.nis }}</td>
-                <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
+                <td class="p-3 font-medium text-slate-900">{{ item.nama || item.user?.name }}</td>
                 <td class="p-3">{{ item.kelas?.nama || '-' }}</td>
-                <td class="p-3">{{ item.jenis_kelamin }}</td>
-                <td class="p-3 text-right">
+                <td class="p-3">
+                  <span
+                    class="inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold"
+                    :class="(item.jk || item.jenis_kelamin) === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'"
+                  >
+                    {{ item.jk || item.jenis_kelamin || 'L' }}
+                  </span>
+                </td>
+                <td class="p-3 font-mono text-xs text-slate-700">{{ item.user?.username || '-' }}</td>
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -403,7 +507,7 @@ const currentListCount = computed(() => {
                 </td>
               </tr>
               <tr v-if="filteredSiswa.length === 0">
-                <td colspan="5" class="p-6 text-center text-slate-400">Belum ada data siswa.</td>
+                <td colspan="6" class="p-6 text-center text-slate-400">Belum ada data siswa.</td>
               </tr>
             </tbody>
           </table>
@@ -414,18 +518,42 @@ const currentListCount = computed(() => {
           <table class="w-full text-left text-sm text-slate-600">
             <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
               <tr>
-                <th class="p-3">NIP</th>
+                <th class="p-3">NIP / NIY</th>
                 <th class="p-3">Nama Guru</th>
-                <th class="p-3">Email</th>
-                <th class="p-3 text-right">Aksi</th>
+                <th class="p-3">Username</th>
+                <th class="p-3">Mata Pelajaran</th>
+                <th v-if="isSuperadmin" class="p-3">Role</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-for="item in filteredGuru" :key="item.id" class="hover:bg-slate-50">
-                <td class="p-3 font-mono font-medium text-slate-900">{{ item.nip }}</td>
-                <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
-                <td class="p-3">{{ item.email || '-' }}</td>
-                <td class="p-3 text-right">
+                <td class="p-3 font-mono font-medium text-slate-900">{{ item.nip || '-' }}</td>
+                <td class="p-3 font-medium text-slate-900">{{ item.nama || item.user?.name }}</td>
+                <td class="p-3 font-mono text-xs text-slate-700">{{ item.user?.username || '-' }}</td>
+                <td class="p-3">
+                  <div class="flex flex-wrap gap-1">
+                    <span
+                      v-for="m in (item.mapel || [])"
+                      :key="m.id"
+                      class="inline-block rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-brand-700"
+                    >
+                      {{ m.nama }}
+                    </span>
+                    <span v-if="!item.mapel || item.mapel.length === 0" class="text-xs text-slate-400 italic">
+                      Belum ada mapel
+                    </span>
+                  </div>
+                </td>
+                <td v-if="isSuperadmin" class="p-3">
+                  <span
+                    class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold uppercase"
+                    :class="item.user?.role === 'operator' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'"
+                  >
+                    {{ item.user?.role || 'guru' }}
+                  </span>
+                </td>
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -453,7 +581,7 @@ const currentListCount = computed(() => {
                 </td>
               </tr>
               <tr v-if="filteredGuru.length === 0">
-                <td colspan="4" class="p-6 text-center text-slate-400">Belum ada data guru.</td>
+                <td :colspan="isSuperadmin ? 6 : 5" class="p-6 text-center text-slate-400">Belum ada data guru.</td>
               </tr>
             </tbody>
           </table>
@@ -467,7 +595,7 @@ const currentListCount = computed(() => {
                 <th class="p-3">Nama Kelas</th>
                 <th class="p-3">Tingkat</th>
                 <th class="p-3">Tahun Ajaran</th>
-                <th class="p-3 text-right">Aksi</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -475,7 +603,7 @@ const currentListCount = computed(() => {
                 <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
                 <td class="p-3">{{ item.tingkat }}</td>
                 <td class="p-3">{{ item.tahun_ajaran?.nama || '-' }}</td>
-                <td class="p-3 text-right">
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -516,14 +644,14 @@ const currentListCount = computed(() => {
               <tr>
                 <th class="p-3">Kode</th>
                 <th class="p-3">Nama Mata Pelajaran</th>
-                <th class="p-3 text-right">Aksi</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-for="item in filteredMapel" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-mono font-medium text-slate-900">{{ item.kode }}</td>
                 <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
-                <td class="p-3 text-right">
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -565,7 +693,7 @@ const currentListCount = computed(() => {
                 <th class="p-3">Kode Ruang</th>
                 <th class="p-3">Nama Ruang</th>
                 <th class="p-3">Kapasitas</th>
-                <th class="p-3 text-right">Aksi</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -573,7 +701,7 @@ const currentListCount = computed(() => {
                 <td class="p-3 font-mono font-medium text-slate-900">{{ item.kode }}</td>
                 <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
                 <td class="p-3">{{ item.kapasitas }} Peserta</td>
-                <td class="p-3 text-right">
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -615,7 +743,7 @@ const currentListCount = computed(() => {
                 <th class="p-3">Tahun Ajaran</th>
                 <th class="p-3">Semester</th>
                 <th class="p-3">Status</th>
-                <th class="p-3 text-right">Aksi</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -626,7 +754,7 @@ const currentListCount = computed(() => {
                   <span v-if="item.aktif" class="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Aktif</span>
                   <span v-else class="text-xs text-slate-400">Non-aktif</span>
                 </td>
-                <td class="p-3 text-right">
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -672,49 +800,101 @@ const currentListCount = computed(() => {
           <!-- Siswa Fields -->
           <template v-if="activeTab === 'siswa'">
             <div>
-              <label class="block text-xs font-medium text-slate-700">NIS</label>
-              <input v-model="formData.nis" required class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">NIS *</label>
+              <input v-model="formData.nis" required placeholder="Nomor Induk Siswa" class="input !min-h-0 !py-1.5 text-sm font-mono" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-700">Nama Lengkap</label>
-              <input v-model="formData.nama" required class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">Nama Lengkap Siswa *</label>
+              <input v-model="formData.nama" required placeholder="Nama Siswa" class="input !min-h-0 !py-1.5 text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700">Kelas *</label>
+                <select v-model="formData.kelas_id" required class="input !min-h-0 !py-1.5 text-sm">
+                  <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700">Jenis Kelamin *</label>
+                <select v-model="formData.jk" class="input !min-h-0 !py-1.5 text-sm">
+                  <option value="L">Laki-laki (L)</option>
+                  <option value="P">Perempuan (P)</option>
+                </select>
+              </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-700">Kelas</label>
-              <select v-model="formData.kelas_id" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
-              </select>
+              <label class="block text-xs font-medium text-slate-700">Username *</label>
+              <input v-model="formData.username" :required="!isEditing" placeholder="Username login siswa" class="input !min-h-0 !py-1.5 text-sm font-mono" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-700">Jenis Kelamin</label>
-              <select v-model="formData.jenis_kelamin" class="input !min-h-0 !py-1.5 text-sm">
-                <option value="L">Laki-laki (L)</option>
-                <option value="P">Perempuan (P)</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700">Kata Sandi (Opsional)</label>
-              <input v-model="formData.password" type="password" placeholder="Default: cbt12345" class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">
+                Kata Sandi {{ isEditing ? '(Kosongkan jika tidak ingin diubah)' : '*' }}
+              </label>
+              <input v-model="formData.password" type="password" :required="!isEditing" placeholder="Minimal 6 karakter" class="input !min-h-0 !py-1.5 text-sm" />
             </div>
           </template>
 
           <!-- Guru Fields -->
           <template v-if="activeTab === 'guru'">
             <div>
-              <label class="block text-xs font-medium text-slate-700">NIP</label>
-              <input v-model="formData.nip" required class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">NIP / NIY (Opsional)</label>
+              <input v-model="formData.nip" placeholder="NIP/NIY (Boleh dikosongkan)" class="input !min-h-0 !py-1.5 text-sm font-mono" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-700">Nama Lengkap</label>
-              <input v-model="formData.nama" required class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">Nama Lengkap Guru *</label>
+              <input v-model="formData.nama" required placeholder="Nama Lengkap Beserta Gelar" class="input !min-h-0 !py-1.5 text-sm" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-700">Email</label>
-              <input v-model="formData.email" type="email" class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">Username *</label>
+              <input v-model="formData.username" :required="!isEditing" placeholder="Username login guru" class="input !min-h-0 !py-1.5 text-sm font-mono" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-700">Kata Sandi (Opsional)</label>
-              <input v-model="formData.password" type="password" placeholder="Default: guru12345" class="input !min-h-0 !py-1.5 text-sm" />
+              <label class="block text-xs font-medium text-slate-700">
+                Kata Sandi {{ isEditing ? '(Kosongkan jika tidak ingin diubah)' : '*' }}
+              </label>
+              <input v-model="formData.password" type="password" :required="!isEditing" placeholder="Minimal 6 karakter" class="input !min-h-0 !py-1.5 text-sm" />
+            </div>
+
+            <!-- Mata Pelajaran yang Diampu (Multi-Select) -->
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">
+                Mata Pelajaran yang Diampu (Pilih 1 atau lebih)
+              </label>
+              <div class="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-1">
+                <label
+                  v-for="m in mapelList"
+                  :key="m.id"
+                  class="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-white text-xs text-slate-700 cursor-pointer transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="m.id"
+                    v-model="formData.mapel_ids"
+                    class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span class="font-bold text-slate-900 font-mono">{{ m.kode }}</span>
+                  <span>-</span>
+                  <span>{{ m.nama }}</span>
+                </label>
+                <p v-if="mapelList.length === 0" class="text-xs text-slate-400 italic">
+                  Belum ada data mata pelajaran.
+                </p>
+              </div>
+            </div>
+
+            <!-- Superadmin: Pengaturan Role Guru -> Operator -->
+            <div v-if="isSuperadmin" class="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-1.5">
+              <label class="block text-xs font-bold text-amber-900">Role Guru</label>
+              <div class="flex items-center gap-4 pt-1">
+                <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-800 cursor-pointer">
+                  <input type="radio" value="guru" v-model="formData.role" class="text-brand-600" />
+                  <span>Guru Standar</span>
+                </label>
+                <label class="flex items-center gap-1.5 text-xs font-semibold text-amber-900 cursor-pointer">
+                  <input type="radio" value="operator" v-model="formData.role" class="text-amber-600" />
+                  <span>Jadikan Operator</span>
+                </label>
+              </div>
             </div>
           </template>
 

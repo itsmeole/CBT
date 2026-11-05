@@ -17,12 +17,13 @@ const jadwalList = ref<any[]>([])
 const selectedSesiId = ref<number | null>(null)
 const sesiData = ref<any>(null)
 const showMulaiModal = ref(false)
+const searchKeyword = ref('')
 
 // Presensi Model
 const presensiState = ref<Record<number, boolean>>({})
 
-// Guard: strictly block guru
-if (auth.role !== 'superadmin' && auth.role !== 'operator') {
+// Guard: allow guru, operator, and superadmin
+if (auth.role !== 'superadmin' && auth.role !== 'operator' && auth.role !== 'guru') {
   router.replace({ name: 'forbidden' })
 }
 
@@ -87,6 +88,29 @@ const allSessions = computed(() => {
   return list
 })
 
+const filteredPeserta = computed(() => {
+  if (!sesiData.value?.peserta_ujian) return []
+  const q = searchKeyword.value.toLowerCase().trim()
+  if (!q) return sesiData.value.peserta_ujian
+  return sesiData.value.peserta_ujian.filter((p: any) => {
+    const nama = (p.siswa?.nama || '').toLowerCase()
+    const nis = (p.siswa?.nis || '').toLowerCase()
+    const kelas = (p.siswa?.kelas?.nama || '').toLowerCase()
+    return nama.includes(q) || nis.includes(q) || kelas.includes(q)
+  })
+})
+
+const statusCounts = computed(() => {
+  const counts = { belum_login: 0, menunggu: 0, mengerjakan: 0, terkunci: 0, selesai: 0 }
+  if (!sesiData.value?.peserta_ujian) return counts
+  sesiData.value.peserta_ujian.forEach((p: any) => {
+    if (p.status in counts) {
+      counts[p.status as keyof typeof counts]++
+    }
+  })
+  return counts
+})
+
 async function saveKehadiran() {
   if (!selectedSesiId.value) return
   actionLoading.value = true
@@ -143,6 +167,80 @@ async function mulaiPesertaIndividu(pesertaId: number) {
   }
 }
 
+async function resetLoginPeserta(p: any) {
+  const userId = p.siswa?.user?.id
+  const namaSiswa = p.siswa?.nama || 'Siswa'
+  if (!userId) {
+    errorMessage.value = 'Data akun pengguna siswa tidak ditemukan.'
+    return
+  }
+  if (!confirm(`Reset sesi login untuk siswa "${namaSiswa}"? Siswa dapat segera login kembali di perangkatnya.`)) {
+    return
+  }
+  actionLoading.value = true
+  errorMessage.value = ''
+  feedbackMessage.value = ''
+  try {
+    const res = await apiClient.post(`/auth/reset-login/${userId}`)
+    feedbackMessage.value = res.data.message || `Sesi login "${namaSiswa}" berhasil direset.`
+    await fetchSesiDetail()
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Gagal mereset sesi login siswa.'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function bukaKunciPeserta(p: any) {
+  const namaSiswa = p.siswa?.nama || 'Siswa'
+  if (!confirm(`Buka kunci ujian untuk siswa "${namaSiswa}"?`)) {
+    return
+  }
+  actionLoading.value = true
+  errorMessage.value = ''
+  feedbackMessage.value = ''
+  try {
+    const res = await apiClient.post(`/peserta/${p.id}/unlock`, {
+      alasan: 'Buka kunci ujian oleh guru/pengawas'
+    })
+    feedbackMessage.value = res.data.message || `Kunci ujian siswa "${namaSiswa}" berhasil dibuka.`
+    await fetchSesiDetail()
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Gagal membuka kunci ujian.'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function resetSemuaLoginSesi() {
+  if (!sesiData.value?.peserta_ujian?.length) return
+  if (!confirm('Apakah Anda yakin ingin mereset sesi login semua siswa pada ruang ini? Gunakan tindakan ini bila terjadi kendala jaringan massal di ruangan.')) {
+    return
+  }
+  actionLoading.value = true
+  errorMessage.value = ''
+  feedbackMessage.value = ''
+  try {
+    let successCount = 0
+    for (const p of sesiData.value.peserta_ujian) {
+      if (p.siswa?.user?.id && p.status !== 'selesai') {
+        try {
+          await apiClient.post(`/auth/reset-login/${p.siswa.user.id}`)
+          successCount++
+        } catch {
+          // ignore individual error
+        }
+      }
+    }
+    feedbackMessage.value = `Berhasil mereset sesi login ${successCount} siswa.`
+    await fetchSesiDetail()
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Gagal mereset sesi login massal.'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
 function getStatusBadge(status: string) {
   switch (status) {
     case 'belum_login':
@@ -186,19 +284,30 @@ onUnmounted(() => {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6 text-brand-600">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
             </svg>
-            <span>Panel Kontrol Sesi & Presensi Operator</span>
+            <span>Kontrol Sesi Ujian</span>
           </h1>
           <p class="text-sm text-slate-500">
-            Verifikasi kehadiran siswa, monitoring status realtime, dan mulai ujian serentak.
+            Monitoring peserta realtime, reset sesi login siswa, buka kunci, dan mulai ujian serentak.
           </p>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <button @click="fetchSesiDetail" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" :disabled="loading">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            <span>Segarkan Data</span>
+            <span>Segarkan</span>
+          </button>
+          <button
+            @click="resetSemuaLoginSesi"
+            :disabled="!selectedSesiId || actionLoading"
+            class="btn-secondary !min-h-0 !py-2 text-xs border-amber-300 text-amber-700 bg-amber-50/50 hover:bg-amber-100 flex items-center gap-1.5"
+            title="Reset login semua siswa aktif di ruangan ini"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span>Reset Semua Login</span>
           </button>
           <button
             @click="showMulaiModal = true"
@@ -272,10 +381,37 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Status Summary Badges -->
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            Belum Login: {{ statusCounts.belum_login }}
+          </span>
+          <span class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            Ruang Tunggu: {{ statusCounts.menunggu }}
+          </span>
+          <span class="rounded-lg bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">
+            Mengerjakan: {{ statusCounts.mengerjakan }}
+          </span>
+          <span class="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-bold text-red-800">
+            Terkunci: {{ statusCounts.terkunci }}
+          </span>
+          <span class="rounded-lg bg-green-100 px-2.5 py-1 text-xs font-bold text-green-800">
+            Selesai: {{ statusCounts.selesai }}
+          </span>
+        </div>
+
         <!-- Attendance & Participants Table -->
-        <div class="mt-4">
-          <div class="mb-3 flex items-center justify-between">
-            <h3 class="text-sm font-bold text-slate-800">Daftar Presensi Peserta:</h3>
+        <div class="mt-5">
+          <div class="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div class="flex items-center gap-3">
+              <h3 class="text-sm font-bold text-slate-800">Daftar Peserta & Presensi</h3>
+              <input
+                v-model="searchKeyword"
+                type="text"
+                placeholder="Cari nama atau NIS siswa..."
+                class="input !min-h-0 !py-1 text-xs w-56"
+              />
+            </div>
             <button
               @click="saveKehadiran"
               :disabled="actionLoading"
@@ -302,7 +438,7 @@ onUnmounted(() => {
               </thead>
               <tbody class="divide-y divide-slate-100">
                 <tr
-                  v-for="p in sesiData.peserta_ujian"
+                  v-for="p in filteredPeserta"
                   :key="p.id"
                   class="hover:bg-slate-50"
                   :class="{'bg-red-50/50': p.status === 'terkunci'}"
@@ -326,18 +462,40 @@ onUnmounted(() => {
                     </span>
                   </td>
                   <td class="p-3 text-right">
-                    <button
-                      v-if="['belum_login', 'menunggu'].includes(p.status)"
-                      @click="mulaiPesertaIndividu(p.id)"
-                      class="text-xs font-semibold text-brand-600 hover:underline"
-                    >
-                      Mulai Sekarang
-                    </button>
+                    <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                      <button
+                        v-if="['belum_login', 'menunggu'].includes(p.status)"
+                        @click="mulaiPesertaIndividu(p.id)"
+                        class="btn-secondary !min-h-0 !py-1 !px-2.5 text-xs text-brand-700 bg-brand-50 hover:bg-brand-100 border-brand-200"
+                        title="Mulai ujian untuk siswa ini"
+                      >
+                        Mulai
+                      </button>
+                      <button
+                        v-if="p.status === 'terkunci'"
+                        @click="bukaKunciPeserta(p)"
+                        class="btn-secondary !min-h-0 !py-1 !px-2.5 text-xs text-red-700 bg-red-50 hover:bg-red-100 border-red-200"
+                        title="Buka kunci ujian siswa"
+                      >
+                        Buka Kunci
+                      </button>
+                      <button
+                        v-if="p.siswa?.user?.id && p.status !== 'selesai'"
+                        @click="resetLoginPeserta(p)"
+                        class="btn-secondary !min-h-0 !py-1 !px-2.5 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 flex items-center gap-1"
+                        title="Reset sesi login agar siswa dapat login ulang"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span>Reset Login</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
-                <tr v-if="!sesiData.peserta_ujian || sesiData.peserta_ujian.length === 0">
+                <tr v-if="filteredPeserta.length === 0">
                   <td colspan="6" class="p-6 text-center text-slate-400">
-                    Belum ada siswa yang diplot ke sesi ruang ini.
+                    {{ searchKeyword ? 'Tidak ada peserta yang cocok dengan pencarian.' : 'Belum ada siswa yang diplot ke sesi ruang ini.' }}
                   </td>
                 </tr>
               </tbody>
@@ -346,32 +504,31 @@ onUnmounted(() => {
         </div>
       </div>
 
-    <!-- Confirmation Modal: Mulai Ujian -->
-    <div v-if="showMulaiModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div class="card w-full max-w-md bg-white">
-        <h3 class="text-base font-bold text-slate-900 mb-2">Konfirmasi Mulai Ujian Serentak</h3>
-        <p class="text-sm text-slate-600 mb-4">
-          Apakah Anda yakin ingin memulai ujian untuk seluruh siswa yang berada di ruang tunggu pada sesi ini?
-        </p>
-        <div class="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 mb-4 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-amber-600">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-          </svg>
-          <span>Durasi timer akan langsung berjalan serentak bagi semua siswa yang statusnya sudah terverifikasi.</span>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button @click="showMulaiModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
-          <button
-            @click="mulaiSesiUjian"
-            :disabled="actionLoading"
-            class="btn-primary !min-h-0 !py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700"
-          >
-            {{ actionLoading ? 'Memulai...' : 'Ya, Mulai Sekarang' }}
-          </button>
+      <!-- Confirmation Modal: Mulai Ujian -->
+      <div v-if="showMulaiModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="card w-full max-w-md bg-white">
+          <h3 class="text-base font-bold text-slate-900 mb-2">Konfirmasi Mulai Ujian Serentak</h3>
+          <p class="text-sm text-slate-600 mb-4">
+            Apakah Anda yakin ingin memulai ujian untuk seluruh siswa yang berada di ruang tunggu pada sesi ini?
+          </p>
+          <div class="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-amber-600">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+            <span>Durasi timer akan langsung berjalan serentak bagi semua siswa yang statusnya sudah terverifikasi.</span>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button @click="showMulaiModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
+            <button
+              @click="mulaiSesiUjian"
+              :disabled="actionLoading"
+              class="btn-primary !min-h-0 !py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+            >
+              {{ actionLoading ? 'Memulai...' : 'Ya, Mulai Sekarang' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
-    </div>
   </StafLayout>
 </template>
-

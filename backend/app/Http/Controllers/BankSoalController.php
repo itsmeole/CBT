@@ -25,8 +25,17 @@ class BankSoalController extends Controller
         $query = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal']);
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            $query->where('guru_id', $user->guru?->id ?? 0)->whereIn('mapel_id', $mapelIds);
+            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
+            if ($request->filled('mapel_id')) {
+                $query->where('mapel_id', $request->input('mapel_id'));
+            } else {
+                $mapelIds = GuruMapel::where('guru_id', $guru->id)->pluck('mapel_id')->unique();
+                if ($mapelIds->isNotEmpty()) {
+                    $query->where(function ($q) use ($guru, $mapelIds) {
+                        $q->where('guru_id', $guru->id)->orWhereIn('mapel_id', $mapelIds);
+                    });
+                }
+            }
         }
 
         if ($request->filled('mapel_id')) {
@@ -48,8 +57,11 @@ class BankSoalController extends Controller
         $user = $request->user();
         $query = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal']);
         if ($user->role === 'guru') {
-            $query->where('guru_id', $user->guru?->id ?? 0)
-                ->whereIn('mapel_id', GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id'));
+            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
+            $query->where(function ($q) use ($guru) {
+                $q->where('guru_id', $guru->id)
+                    ->orWhereIn('mapel_id', GuruMapel::where('guru_id', $guru->id)->pluck('mapel_id'));
+            });
         }
         $soal = $query->whereKey($id)->firstOrFail();
 
@@ -80,10 +92,12 @@ class BankSoalController extends Controller
         }
 
         if ($user->role === 'guru') {
-            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
-                return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak diizinkan membuat soal untuk mapel ini.']], 403);
-            }
-            $guruId = $user->guru->id;
+            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
+            $guruId = $guru->id;
+            GuruMapel::firstOrCreate([
+                'guru_id' => $guruId,
+                'mapel_id' => (int) $validated['mapel_id'],
+            ]);
         } else {
             $request->validate(['guru_id' => 'required|exists:guru,id']);
             $guruId = (int) $request->input('guru_id');
@@ -396,9 +410,19 @@ class BankSoalController extends Controller
             }
 
             $labels = $jumlah > 0 ? range('A', chr(64 + $jumlah)) : [];
-            $keys = is_array($kunci)
+            $rawKeys = is_array($kunci)
                 ? (array_is_list($kunci) ? array_map('strval', $kunci) : array_map('strval', array_keys($kunci)))
                 : [(string) $kunci];
+
+            $keys = array_map(function ($k) {
+                $str = strtoupper(trim((string) $k));
+                if (ctype_digit($str) && (int) $str >= 1) {
+                    return chr(64 + (int) $str);
+                }
+
+                return $str;
+            }, $rawKeys);
+
             if ($tipe === 'pg' && (count($keys) !== 1 || ! in_array($keys[0], $labels, true))) {
                 $errors['kunci'] = ['Kunci PG harus menunjuk tepat satu opsi yang tersedia.'];
             }
@@ -431,7 +455,15 @@ class BankSoalController extends Controller
                 $errors['opsi'] = ['Soal menjodohkan harus memiliki respons yang cukup dan satu kunci per premis.'];
             }
             $labelKanan = $kanan === [] ? [] : range('a', chr(96 + count($kanan)));
-            $normalizedAnswers = array_map('strtolower', array_map('strval', array_values($kunciMap)));
+            $normalizedAnswers = array_map(function ($val) {
+                $valStr = strtolower(trim((string) $val));
+                if (ctype_digit($valStr) && (int) $valStr >= 1) {
+                    return chr(96 + (int) $valStr);
+                }
+
+                return $valStr;
+            }, array_values($kunciMap));
+
             if ($kunciMap !== [] && (array_diff($normalizedAnswers, $labelKanan) !== []
                 || count(array_unique($normalizedAnswers)) !== count($normalizedAnswers))) {
                 $errors['kunci'] = ['Kunci menjodohkan harus mengarah ke pilihan yang tersedia.'];
@@ -452,21 +484,40 @@ class BankSoalController extends Controller
     private function normalisasiKunci(string $tipe, mixed $kunci): mixed
     {
         if ($tipe === 'pg') {
-            return is_array($kunci) ? (string) reset($kunci) : strtoupper((string) $kunci);
+            $val = is_array($kunci) ? (string) reset($kunci) : strtoupper((string) $kunci);
+            if (ctype_digit($val) && (int) $val >= 1) {
+                return chr(64 + (int) $val);
+            }
+
+            return $val;
         }
         if ($tipe === 'pg_kompleks') {
             $values = (array) $kunci;
+            $items = array_is_list($values) ? $values : array_keys($values);
 
-            return array_values(array_map(
-                fn ($value) => strtoupper((string) $value),
-                array_is_list($values) ? $values : array_keys($values)
-            ));
+            return array_values(array_map(function ($value) {
+                $v = strtoupper(trim((string) $value));
+                if (ctype_digit($v) && (int) $v >= 1) {
+                    return chr(64 + (int) $v);
+                }
+
+                return $v;
+            }, $items));
         }
         if ($tipe === 'benar_salah') {
             return array_map(fn ($value) => strtoupper((string) $value), (array) $kunci);
         }
-        if ($tipe === 'menjodohkan') {
-            return array_map(fn ($value) => strtolower((string) $value), (array) $kunci);
+        if ($tipe === 'menjodohkan' && is_array($kunci)) {
+            $normalized = [];
+            foreach ($kunci as $k => $v) {
+                $valStr = strtolower(trim((string) $v));
+                if (ctype_digit($valStr) && (int) $valStr >= 1) {
+                    $valStr = chr(96 + (int) $valStr);
+                }
+                $normalized[(string) $k] = $valStr;
+            }
+
+            return $normalized;
         }
 
         return $kunci;

@@ -9,58 +9,82 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use ZipArchive;
 
 class WordSoalService
 {
     /**
-     * Buat file template Word (.docx) resmi dengan penanda baku 5 tipe soal.
+     * Buat file template Word (.docx) resmi dengan dukungan Bahasa Arab, Gambar, dan Opsi Tanpa A/B/C.
      */
     public function generateTemplate(): string
     {
         $phpWord = new PhpWord;
         $section = $phpWord->addSection();
 
+        // 1. Buat gambar sampel diagram sederhana via GD agar file template self-contained
+        $tempImgPath = null;
+        if (function_exists('imagecreatetruecolor')) {
+            $im = imagecreatetruecolor(240, 120);
+            $bg = imagecolorallocate($im, 240, 245, 255);
+            imagefill($im, 0, 0, $bg);
+            $border = imagecolorallocate($im, 37, 99, 235);
+            imagerectangle($im, 2, 2, 237, 117, $border);
+            $textColor = imagecolorallocate($im, 30, 41, 59);
+            imagestring($im, 5, 25, 50, 'Contoh Gambar CBT', $textColor);
+            $tempImgPath = tempnam(sys_get_temp_dir(), 'tpl_img_').'.png';
+            imagepng($im, $tempImgPath);
+            imagedestroy($im);
+        }
+
         $section->addTitle('TEMPLATE SOAL CBT', 1);
-        $section->addText('Petunjuk: Jangan ubah struktur penanda kurung siku pembuka dan penutup soal. Tipe soal: PG, PG_KOMPLEKS, BENAR_SALAH, MENJODOHKAN, ESSAY.');
+        $section->addText('Petunjuk Pengisian Dokumen Soal CBT:');
+        $section->addText('1. Setiap butir soal wajib diawali dengan penanda kurung siku pembuka SOAL dan diakhiri penutup /SOAL.');
+        $section->addText('2. Tipe soal yang didukung: PG, PG_KOMPLEKS, BENAR_SALAH, MENJODOHKAN, ESSAY.');
+        $section->addText('3. Pilihan Ganda (PG / PG_KOMPLEKS): Gunakan [OPSI] untuk pilihan biasa, dan [OPSI_BENAR] untuk pilihan jawaban benar.');
+        $section->addText('   PENTING: Jangan gunakan huruf A, B, C, D di depan pilihan agar sistem dapat mengacak (shuffle) opsi di layar ujian siswa tanpa memunculkan huruf yang salah.');
+        $section->addText('4. Gambar: Anda dapat menyisipkan gambar (Insert Picture) langsung di dalam teks soal maupun teks pilihan.');
+        $section->addText('5. Bahasa Arab: Dokumen mendukung penuh teks bahasa Arab lengkap berharakat dan tata letak RTL.');
         $section->addTextBreak();
 
-        // 1. PG
+        // 1. PG (Contoh Bahasa Arab berharakat & tanpa huruf A, B, C)
         $section->addText('[SOAL]');
         $section->addText('TIPE: PG');
-        $section->addText('TEKS: Ibu kota negara Indonesia saat ini adalah ...');
-        $section->addText('A. Bandung');
-        $section->addText('B. Jakarta');
-        $section->addText('C. Surabaya');
-        $section->addText('D. Medan');
-        $section->addText('KUNCI: B');
+        $section->addText('TEKS: مَنْ هُوَ خَاتَمُ الأَنْبِيَاءِ وَالمُرْسَلِينَ عَلَيْهِمُ السَّلَامُ؟ (Siapakah penutup para Nabi dan Rasul?)', ['name' => 'Traditional Arabic', 'size' => 13]);
+        $section->addText('[OPSI] نَبِيُّ اللهِ مُوْسَى عَلَيْهِ السَّلَامُ', ['name' => 'Traditional Arabic', 'size' => 12]);
+        $section->addText('[OPSI] نَبِيُّ اللهِ عِيْسَى عَلَيْهِ السَّلَامُ', ['name' => 'Traditional Arabic', 'size' => 12]);
+        $section->addText('[OPSI_BENAR] نَبِيُّنَا مُحَمَّدٌ صَلَّى اللهُ عَلَيْهِ وَسَلَّمَ', ['name' => 'Traditional Arabic', 'size' => 12]);
+        $section->addText('[OPSI] نَبِيُّ اللهِ إِبْرَاهِيمُ عَلَيْهِ السَّلَامُ', ['name' => 'Traditional Arabic', 'size' => 12]);
         $section->addText('[/SOAL]');
         $section->addTextBreak();
 
-        // 2. PG Kompleks
+        // 2. PG Kompleks (Contoh dengan Gambar dan Opsi Tanpa A, B, C)
         $section->addText('[SOAL]');
         $section->addText('TIPE: PG_KOMPLEKS');
-        $section->addText('TEKS: Manakah di bawah ini yang merupakan bilangan prima?');
-        $section->addText('A. 2');
-        $section->addText('B. 4');
-        $section->addText('C. 5');
-        $section->addText('D. 9');
-        $section->addText('KUNCI: A, C');
+        $section->addText('TEKS: Perhatikan gambar bangun datar di bawah ini:');
+        if ($tempImgPath && file_exists($tempImgPath)) {
+            $section->addImage($tempImgPath, ['width' => 160, 'height' => 80]);
+        }
+        $section->addText('Manakah pernyataan yang BENAR mengenai sifat-sifat bangun persegi panjang di atas?');
+        $section->addText('[OPSI_BENAR] Memiliki 4 sisi dengan sisi-sisi yang berhadapan sejajar dan sama panjang');
+        $section->addText('[OPSI] Memiliki 3 buah sudut lancip');
+        $section->addText('[OPSI_BENAR] Memiliki 4 buah sudut siku-siku berukuran 90 derajat');
+        $section->addText('[OPSI] Memiliki keliling lingkaran sempurna');
         $section->addText('[/SOAL]');
         $section->addTextBreak();
 
         // 3. Benar / Salah
         $section->addText('[SOAL]');
         $section->addText('TIPE: BENAR_SALAH');
-        $section->addText('TEKS: Tentukan apakah pernyataan berikut Benar atau Salah.');
-        $section->addText('1. Air mendidih pada suhu 100 derajat Celcius pada tekanan 1 atm. | B');
-        $section->addText('2. Matahari mengelilingi planet bumi. | S');
+        $section->addText('TEKS: Tentukan apakah pernyataan ilmiah berikut Benar (B) atau Salah (S).');
+        $section->addText('1. Air mendidih pada suhu 100 derajat Celcius pada tekanan atmosfer normal 1 atm. | B');
+        $section->addText('2. Matahari mengelilingi planet bumi setiap 24 jam sekali. | S');
         $section->addText('[/SOAL]');
         $section->addTextBreak();
 
         // 4. Menjodohkan
         $section->addText('[SOAL]');
         $section->addText('TIPE: MENJODOHKAN');
-        $section->addText('TEKS: Jodohkan nama negara dengan nama ibu kotanya.');
+        $section->addText('TEKS: Jodohkan nama negara di kolom kiri dengan nama ibu kotanya di kolom kanan.');
         $section->addText('KIRI:');
         $section->addText('1. Jepang');
         $section->addText('2. Prancis');
@@ -75,14 +99,18 @@ class WordSoalService
         // 5. Essay
         $section->addText('[SOAL]');
         $section->addText('TIPE: ESSAY');
-        $section->addText('TEKS: Jelaskan proses fotosintesis pada tumbuhan secara singkat.');
-        $section->addText('KUNCI: Tumbuhan menyerap air dan CO2 dengan bantuan cahaya matahari untuk menghasilkan glukosa dan oksigen.');
+        $section->addText('TEKS: Jelaskan proses fotosintesis pada tumbuhan hijau secara singkat.');
+        $section->addText('KUNCI: Tumbuhan menyerap air dan CO2 dengan bantuan klorofil dan cahaya matahari untuk menghasilkan glukosa dan oksigen.');
         $section->addText('RUBRIK: Skor maksimal 5 jika menyebutkan klorofil, air, CO2, dan oksigen.');
         $section->addText('[/SOAL]');
 
         $tempPath = tempnam(sys_get_temp_dir(), 'word_tpl_').'.docx';
         $writer = IOFactory::createWriter($phpWord, 'Word2007');
         $writer->save($tempPath);
+
+        if ($tempImgPath && file_exists($tempImgPath)) {
+            @unlink($tempImgPath);
+        }
 
         return $tempPath;
     }
@@ -94,8 +122,8 @@ class WordSoalService
     {
         $rawText = $this->extractTextFromDocx($file->getRealPath());
 
-        // Cari blok [SOAL] ... [/SOAL]
-        preg_match_all('/\[SOAL\](.*?)\[\/SOAL\]/is', $rawText, $matches);
+        // Cari blok [SOAL] ... [/SOAL] dengan modifier Unicode (/isu)
+        preg_match_all('/\[SOAL\](.*?)\[\/SOAL\]/isu', $rawText, $matches);
 
         if (empty($matches[1])) {
             return [
@@ -148,7 +176,12 @@ class WordSoalService
         return DB::transaction(function () use ($guruId, $mapelId, $items) {
             $count = 0;
             foreach ($items as $item) {
-                $sanitizedTeks = HtmlSanitizerService::sanitize($item['teks']);
+                $rawTeks = $item['konten'] ?? $item['teks'] ?? '';
+                $rawTeks = str_replace("\r", '', (string) $rawTeks);
+                if (! str_contains($rawTeks, '<p>') && ! str_contains($rawTeks, '<br')) {
+                    $rawTeks = nl2br($rawTeks);
+                }
+                $sanitizedTeks = HtmlSanitizerService::sanitize($rawTeks);
 
                 $bankSoal = BankSoal::create([
                     'guru_id' => $guruId,
@@ -171,9 +204,14 @@ class WordSoalService
                             $urutanPerSisi[$sisi] = max($urutanPerSisi[$sisi] ?? 0, $urutan);
                         }
 
+                        $rawOpsiKonten = (string) ($opsi['konten'] ?? '');
+                        if (! str_contains($rawOpsiKonten, '<p>') && ! str_contains($rawOpsiKonten, '<br')) {
+                            $rawOpsiKonten = nl2br($rawOpsiKonten);
+                        }
+
                         OpsiSoal::create([
                             'bank_soal_id' => $bankSoal->id,
-                            'konten' => HtmlSanitizerService::sanitize($opsi['konten']),
+                            'konten' => HtmlSanitizerService::sanitize($rawOpsiKonten),
                             'sisi' => $sisi,
                             'urutan' => $urutan,
                         ]);
@@ -187,7 +225,7 @@ class WordSoalService
     }
 
     /**
-     * Ekspor daftar soal ke file .docx dengan format template yang sama (round-trip).
+     * Ekspor daftar soal ke file .docx dengan format baku non-ABC (round-trip).
      */
     public function exportToWord(iterable $soalList): string
     {
@@ -205,12 +243,16 @@ class WordSoalService
                 case 'pg_kompleks':
                     foreach ($soal->opsiSoal as $opsi) {
                         $huruf = chr(64 + (int) $opsi->urutan);
-                        $section->addText("{$huruf}. ".strip_tags($opsi->konten));
-                    }
-                    if ($soal->tipe === 'pg') {
-                        $section->addText('KUNCI: '.(is_string($soal->kunci) ? $soal->kunci : ''));
-                    } else {
-                        $section->addText('KUNCI: '.(is_array($soal->kunci) ? implode(', ', $soal->kunci) : ''));
+                        $isCorrect = false;
+                        if ($soal->tipe === 'pg') {
+                            $isCorrect = (strtoupper((string) $soal->kunci) === $huruf);
+                        } elseif ($soal->tipe === 'pg_kompleks' && is_array($soal->kunci)) {
+                            $isCorrect = in_array($huruf, array_map('strtoupper', $soal->kunci), true);
+                        }
+
+                        $tag = $isCorrect ? '[OPSI_BENAR]' : '[OPSI]';
+                        $cleanText = strip_tags($opsi->konten);
+                        $section->addText("{$tag} {$cleanText}");
                     }
                     break;
 
@@ -278,32 +320,68 @@ class WordSoalService
         $readingTeks = false;
         $readingKiri = false;
         $readingKanan = false;
+        $currentOpsiIdx = null;
 
         foreach ($lines as $line) {
-            if (preg_match('/^TIPE:\s*([A-Z_]+)/i', $line, $m)) {
+            if (preg_match('/^TIPE:\s*([A-Z_]+)/iu', $line, $m)) {
                 $tipe = strtolower(trim($m[1]));
                 $readingTeks = false;
+                $currentOpsiIdx = null;
 
                 continue;
             }
 
-            if (preg_match('/^TEKS:\s*(.*)/i', $line, $m)) {
+            if (preg_match('/^TEKS:\s*(.*)/iu', $line, $m)) {
                 $teks = trim($m[1]);
                 $readingTeks = true;
+                $currentOpsiIdx = null;
 
                 continue;
             }
 
-            if (preg_match('/^KUNCI:\s*(.*)/i', $line, $m)) {
+            if (preg_match('/^KUNCI:\s*(.*)/iu', $line, $m)) {
                 $rawKunci = trim($m[1]);
                 $readingTeks = false;
                 $readingKiri = false;
                 $readingKanan = false;
+                $currentOpsiIdx = null;
 
                 if ($tipe === 'pg') {
-                    $kunci = strtoupper($rawKunci);
+                    if (ctype_digit($rawKunci)) {
+                        $kunci = chr(64 + (int) $rawKunci);
+                    } elseif (preg_match('/^[A-Z]$/i', $rawKunci)) {
+                        $kunci = strtoupper($rawKunci);
+                    } else {
+                        // Cocokkan jika kunci berupa teks konten pilihan
+                        $matchedLabel = null;
+                        foreach ($opsi as $op) {
+                            if (strcasecmp((string) $op['konten'], $rawKunci) === 0) {
+                                $matchedLabel = $op['label'];
+                                break;
+                            }
+                        }
+                        $kunci = $matchedLabel ?? strtoupper($rawKunci);
+                    }
                 } elseif ($tipe === 'pg_kompleks') {
-                    $kunci = array_map('trim', explode(',', strtoupper($rawKunci)));
+                    $rawItems = array_map('trim', explode(',', $rawKunci));
+                    $resolvedKeys = [];
+                    foreach ($rawItems as $ri) {
+                        if (ctype_digit($ri)) {
+                            $resolvedKeys[] = chr(64 + (int) $ri);
+                        } elseif (preg_match('/^[A-Z]$/i', $ri)) {
+                            $resolvedKeys[] = strtoupper($ri);
+                        } else {
+                            foreach ($opsi as $op) {
+                                if (strcasecmp((string) $op['konten'], $ri) === 0) {
+                                    $resolvedKeys[] = $op['label'];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (! empty($resolvedKeys)) {
+                        $kunci = array_values(array_unique($resolvedKeys));
+                    }
                 } elseif ($tipe === 'menjodohkan') {
                     // 1-b, 2-a
                     $pairs = array_map('trim', explode(',', $rawKunci));
@@ -321,9 +399,10 @@ class WordSoalService
                 continue;
             }
 
-            if (preg_match('/^RUBRIK:\s*(.*)/i', $line, $m)) {
+            if (preg_match('/^RUBRIK:\s*(.*)/iu', $line, $m)) {
                 $rubrik = trim($m[1]);
                 $readingTeks = false;
+                $currentOpsiIdx = null;
 
                 continue;
             }
@@ -332,6 +411,7 @@ class WordSoalService
                 $readingTeks = false;
                 $readingKiri = true;
                 $readingKanan = false;
+                $currentOpsiIdx = null;
 
                 continue;
             }
@@ -340,24 +420,96 @@ class WordSoalService
                 $readingTeks = false;
                 $readingKiri = false;
                 $readingKanan = true;
+                $currentOpsiIdx = null;
 
                 continue;
             }
 
-            // Opsi PG / PG_KOMPLEKS: A. Teks
-            if (! $readingKiri && ! $readingKanan && preg_match('/^([A-Z])[\.\)]\s*(.*)/i', $line, $m)) {
+            // Opsi baku baru: [OPSI] atau [OPSI_BENAR] (Bebas dari A, B, C)
+            if (preg_match('/^\[(OPSI_BENAR|OPSI)\]\s*(.*)/iu', $line, $m)) {
+                $readingTeks = false;
+                $isBenar = (strtoupper($m[1]) === 'OPSI_BENAR');
+                $kontenOpsi = trim($m[2]);
+                // Bersihkan awalan A. atau B) jika pengguna tidak sengaja mengetiknya
+                $kontenOpsi = preg_replace('/^[A-Za-z][\.\)]\s*/u', '', $kontenOpsi);
+
+                $huruf = chr(65 + count($opsi));
                 $opsi[] = [
-                    'label' => strtoupper($m[1]),
-                    'konten' => trim($m[2]),
+                    'label' => $huruf,
+                    'konten' => $kontenOpsi,
+                    'sisi' => null,
+                ];
+                $currentOpsiIdx = count($opsi) - 1;
+
+                if ($isBenar) {
+                    if ($tipe === 'pg') {
+                        $kunci = $huruf;
+                    } elseif ($tipe === 'pg_kompleks') {
+                        if (! is_array($kunci)) {
+                            $kunci = [];
+                        }
+                        if (! in_array($huruf, $kunci, true)) {
+                            $kunci[] = $huruf;
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            // Opsi format butir simbol: - Opsi [BENAR] atau * Opsi
+            if (in_array($tipe, ['pg', 'pg_kompleks'], true) && preg_match('/^[-*•]\s*(.*)/iu', $line, $m)) {
+                $readingTeks = false;
+                $rawContent = trim($m[1]);
+                $isBenar = false;
+                if (preg_match('/\[BENAR\]/i', $rawContent)) {
+                    $isBenar = true;
+                    $rawContent = trim(preg_replace('/\[BENAR\]/i', '', $rawContent));
+                }
+                $rawContent = preg_replace('/^[A-Za-z][\.\)]\s*/u', '', $rawContent);
+
+                $huruf = chr(65 + count($opsi));
+                $opsi[] = [
+                    'label' => $huruf,
+                    'konten' => $rawContent,
+                    'sisi' => null,
+                ];
+                $currentOpsiIdx = count($opsi) - 1;
+
+                if ($isBenar) {
+                    if ($tipe === 'pg') {
+                        $kunci = $huruf;
+                    } elseif ($tipe === 'pg_kompleks') {
+                        if (! is_array($kunci)) {
+                            $kunci = [];
+                        }
+                        if (! in_array($huruf, $kunci, true)) {
+                            $kunci[] = $huruf;
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            // Opsi legacy kompatibilitas: A. Teks (Huruf dihilangkan dari konten agar saat di-shuffle siswa tidak rancu)
+            if (! $readingKiri && ! $readingKanan && preg_match('/^([A-Z])[\.\)]\s*(.*)/iu', $line, $m)) {
+                $huruf = strtoupper($m[1]);
+                $kontenOpsi = trim($m[2]);
+                $opsi[] = [
+                    'label' => $huruf,
+                    'konten' => $kontenOpsi,
                     'sisi' => null,
                 ];
                 $readingTeks = false;
+                $currentOpsiIdx = count($opsi) - 1;
 
                 continue;
             }
 
             // Benar / Salah: 1. Pernyataan | B
             if ($tipe === 'benar_salah' && str_contains($line, '|')) {
+                $currentOpsiIdx = null;
                 $parts = explode('|', $line);
                 if (count($parts) !== 2) {
                     $errors[] = "Soal #{$soalNum}: Format pernyataan benar/salah harus memakai satu pemisah |.";
@@ -374,9 +526,7 @@ class WordSoalService
                 }
 
                 $idxBS = count($opsi) + 1;
-
-                // Cek nomor di awal pernyataan
-                if (preg_match('/^([0-9]+)[\.\)]\s*(.*)/', $pernyataan, $pm)) {
+                if (preg_match('/^([0-9]+)[\.\)]\s*(.*)/u', $pernyataan, $pm)) {
                     $idxBS = (int) $pm[1];
                     $pernyataan = trim($pm[2]);
                 }
@@ -395,7 +545,8 @@ class WordSoalService
             }
 
             // Menjodohkan
-            if ($readingKiri && preg_match('/^([0-9]+)[\.\)]\s*(.*)/', $line, $m)) {
+            if ($readingKiri && preg_match('/^([0-9]+)[\.\)]\s*(.*)/u', $line, $m)) {
+                $currentOpsiIdx = null;
                 $opsi[] = [
                     'label' => trim($m[1]),
                     'konten' => trim($m[2]),
@@ -405,7 +556,8 @@ class WordSoalService
                 continue;
             }
 
-            if ($readingKanan && preg_match('/^([a-z])[\.\)]\s*(.*)/i', $line, $m)) {
+            if ($readingKanan && preg_match('/^([a-z])[\.\)]\s*(.*)/iu', $line, $m)) {
+                $currentOpsiIdx = null;
                 $opsi[] = [
                     'label' => strtolower(trim($m[1])),
                     'konten' => trim($m[2]),
@@ -415,8 +567,11 @@ class WordSoalService
                 continue;
             }
 
+            // Baris kelanjutan teks / gambar
             if ($readingTeks) {
                 $teks .= "\n".$line;
+            } elseif ($currentOpsiIdx !== null && isset($opsi[$currentOpsiIdx])) {
+                $opsi[$currentOpsiIdx]['konten'] .= "\n".$line;
             }
         }
 
@@ -425,6 +580,7 @@ class WordSoalService
             'data' => [
                 'tipe' => $tipe,
                 'teks' => trim($teks),
+                'konten' => trim($teks),
                 'kunci' => $kunci,
                 'rubrik' => $rubrik,
                 'opsi' => $opsi,
@@ -515,11 +671,11 @@ class WordSoalService
     }
 
     /**
-     * Ekstraksi teks dari .docx file via ZipArchive membaca word/document.xml.
+     * Ekstraksi teks & gambar dari .docx file via ZipArchive membaca word/document.xml dan word/media/*.
      */
     private function extractTextFromDocx(string $filePath): string
     {
-        $zip = new \ZipArchive;
+        $zip = new ZipArchive;
         if ($zip->open($filePath) !== true) {
             throw new Exception('Gagal membuka file Word (.docx).');
         }
@@ -530,12 +686,74 @@ class WordSoalService
             throw new Exception('File Word tidak valid atau tidak memuat word/document.xml.');
         }
 
+        // 1. Petakan relasi gambar dari word/_rels/document.xml.rels
+        $relMap = [];
+        $relsXml = $zip->getFromName('word/_rels/document.xml.rels');
+        if ($relsXml) {
+            $dom = new \DOMDocument;
+            if (@$dom->loadXML($relsXml)) {
+                foreach ($dom->getElementsByTagName('Relationship') as $rel) {
+                    $type = (string) $rel->getAttribute('Type');
+                    if (str_contains($type, '/image')) {
+                        $id = $rel->getAttribute('Id');
+                        $target = $rel->getAttribute('Target');
+
+                        // Normalisasi path target di dalam zip
+                        if (str_starts_with($target, '/')) {
+                            $zipEntry = ltrim($target, '/');
+                        } elseif (str_starts_with($target, 'media/')) {
+                            $zipEntry = 'word/'.$target;
+                        } elseif (str_starts_with($target, '../media/')) {
+                            $zipEntry = 'word/'.substr($target, 3);
+                        } else {
+                            $zipEntry = 'word/'.ltrim($target, '/');
+                        }
+
+                        $imageData = $zip->getFromName($zipEntry);
+                        if ($imageData !== false && strlen($imageData) > 0) {
+                            $ext = strtolower(pathinfo($zipEntry, PATHINFO_EXTENSION));
+                            if (! in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'], true)) {
+                                $ext = 'png';
+                            }
+                            $filename = 'word_img_'.substr(md5($imageData), 0, 16).'_'.time().'.'.$ext;
+
+                            // Simpan berkas ke storage/app/public/soal dan public/storage/soal
+                            $publicDir = public_path('storage'.DIRECTORY_SEPARATOR.'soal');
+                            if (! is_dir($publicDir)) {
+                                @mkdir($publicDir, 0755, true);
+                            }
+                            @file_put_contents($publicDir.DIRECTORY_SEPARATOR.$filename, $imageData);
+
+                            $appPublicDir = storage_path('app'.DIRECTORY_SEPARATOR.'public'.DIRECTORY_SEPARATOR.'soal');
+                            if (is_dir($appPublicDir) || @mkdir($appPublicDir, 0755, true)) {
+                                @file_put_contents($appPublicDir.DIRECTORY_SEPARATOR.$filename, $imageData);
+                            }
+
+                            $relMap[$id] = '/storage/soal/'.$filename;
+                        }
+                    }
+                }
+            }
+        }
+
         $xmlData = $zip->getFromIndex($xmlIndex);
         $zip->close();
 
-        // Ganti w:p dengan newline
-        $xmlData = str_replace(['</w:p>', '<w:br/>'], "\n", $xmlData);
-        $text = strip_tags($xmlData);
+        // 2. Ganti elemen drawing & pict dengan tag <img>
+        $xmlData = preg_replace_callback('/<w:(?:drawing|pict)[\s\S]*?<\/w:(?:drawing|pict)>/u', function ($match) use ($relMap) {
+            if (preg_match('/(?:r:embed|r:id)=["\']([^"\']+)["\']/u', $match[0], $m)) {
+                $rId = $m[1];
+                if (isset($relMap[$rId])) {
+                    return '<img src="'.htmlspecialchars($relMap[$rId], ENT_QUOTES, 'UTF-8').'" alt="Gambar Soal" />';
+                }
+            }
+
+            return '';
+        }, $xmlData);
+
+        // 3. Konversi paragraf & baris baru
+        $xmlData = str_replace(['</w:p>', '<w:br/>', '<w:cr/>'], "\n", $xmlData);
+        $text = strip_tags($xmlData, '<img>');
 
         return html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
     }

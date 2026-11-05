@@ -212,12 +212,26 @@ class PengawasanController extends Controller
         }
 
         $pesertaIds = DB::transaction(function () use ($user, $request): array {
-            $pesertaIds = PesertaUjian::query()
+            $pesertaList = PesertaUjian::query()
                 ->where('siswa_id', $user->siswa->id)
                 ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+                ->get();
+            $pesertaIds = $pesertaList->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            foreach ($pesertaList as $p) {
+                if ($p->status === 'terkunci') {
+                    $p->update(['status' => 'mengerjakan']);
+                    LockEvent::query()
+                        ->where('peserta_ujian_id', $p->id)
+                        ->whereNull('waktu_buka')
+                        ->update([
+                            'waktu_buka' => Carbon::now(),
+                            'dibuka_oleh' => $request->user()->id,
+                            'alasan' => 'Reset login sesi oleh pengawas/guru',
+                        ]);
+                }
+            }
+
             $user->tokens()->delete();
             $user->deviceSessions()->where('aktif', true)->update(['aktif' => false]);
             $this->auditLog->record(

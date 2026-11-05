@@ -13,27 +13,20 @@ class OtorisasiCbtService
 {
     public function bolehKelolaMapel(User $user, int $mapelId): bool
     {
-        return $user->role === 'superadmin'
-            || ($user->role === 'guru'
-                && $user->guru
-                && GuruMapel::query()
-                    ->where('guru_id', $user->guru->id)
-                    ->where('mapel_id', $mapelId)
-                    ->exists());
+        if (in_array($user->role, ['superadmin', 'operator', 'guru'], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     public function bolehAwasiSesi(User $user, int $sesiRuangId): bool
     {
-        if (in_array($user->role, ['operator', 'superadmin'], true)) {
+        if (in_array($user->role, ['operator', 'superadmin', 'guru'], true)) {
             return SesiRuang::whereKey($sesiRuangId)->exists();
         }
 
-        return $user->role === 'guru'
-            && $user->guru
-            && PengawasSesi::query()
-                ->where('sesi_ruang_id', $sesiRuangId)
-                ->where('guru_id', $user->guru->id)
-                ->exists();
+        return false;
     }
 
     public function bolehAksesMapelKelas(User $user, JadwalUjian $jadwal, ?int $kelasId = null): bool
@@ -56,18 +49,10 @@ class OtorisasiCbtService
 
     public function bolehResetSiswa(User $actor, User $target): bool
     {
-        if (in_array($actor->role, ['operator', 'superadmin'], true)) {
+        if (in_array($actor->role, ['operator', 'superadmin', 'guru'], true)) {
             return $target->role === 'siswa';
         }
 
-        if ($actor->role !== 'guru' || ! $actor->guru || $target->role !== 'siswa') {
-            return false;
-        }
-
-        return PesertaUjian::query()
-            ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
-            ->whereHas('siswa', fn ($query) => $query->where('user_id', $target->id))
-            ->whereHas('sesiRuang.pengawasSesi', fn ($query) => $query->where('guru_id', $actor->guru->id))
-            ->exists();
+        return false;
     }
 }

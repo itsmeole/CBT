@@ -23,12 +23,22 @@ export function renderLatex(latex: string, displayMode = false): string {
 }
 
 /**
- * Render semua rumus math inline ($...$) dan display ($$...$$) di dalam string HTML/teks.
+ * Render semua rumus math inline ($...$) dan display ($$...$$) di dalam string HTML/teks,
+ * serta memastikan path media relatif (/storage/...) mengarah ke backend host.
  */
 export function renderMathInHtml(content: string): string {
   if (!content) return ''
+  let result = content
+
+  // Normalisasi path relatif gambar/audio /storage/ ke backend host jika diperlukan
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/v1\/?$/, '')
+  if (apiBase) {
+    result = result.replace(/<img([^>]+)src=["']\/(storage\/[^"']+)["']/gi, `<img$1src="${apiBase}/$2"`)
+    result = result.replace(/<audio([^>]+)src=["']\/(storage\/[^"']+)["']/gi, `<audio$1src="${apiBase}/$2"`)
+  }
+
   // 1. Display math: $$...$$
-  let result = content.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+  result = result.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
     return renderLatex(math.trim(), true)
   })
   // 2. Inline math: $...$

@@ -70,7 +70,7 @@ export const router = createRouter({
       path: '/staf/bank-soal',
       name: 'staf-bank-soal',
       component: () => import('@/views/staf/BankSoalView.vue'),
-      meta: { roles: ['superadmin', 'guru'] }
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
     },
     {
       path: '/staf/jadwal',
@@ -82,7 +82,7 @@ export const router = createRouter({
       path: '/staf/kontrol-sesi',
       name: 'staf-kontrol-sesi',
       component: () => import('@/views/staf/KontrolSesiOperatorView.vue'),
-      meta: { roles: ['superadmin', 'operator'] }
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
     },
     {
       path: '/403',

@@ -33,9 +33,9 @@ function handleKembali() {
 <template>
   <main class="mx-auto flex min-h-dvh max-w-md flex-col justify-between p-4 sm:p-6 text-center">
     <!-- Header -->
-    <header class="border-b border-slate-200 pb-3">
-      <h1 class="text-lg font-bold text-slate-800">CBT Ujian Sekolah</h1>
-      <p class="text-xs text-slate-500">Status Pengerjaan Ujian</p>
+    <header class="border-b border-slate-200 pb-3 flex items-center justify-center gap-2">
+      <img src="/favicon.svg" alt="ICBT" class="h-6 w-6 shrink-0 object-contain rounded-md" />
+      <h1 class="text-lg font-bold text-slate-800">ICBT</h1>
     </header>
 
     <!-- Main Card -->

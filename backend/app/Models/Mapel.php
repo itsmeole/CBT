@@ -22,6 +22,11 @@ class Mapel extends Model
         return $this->hasMany(GuruMapel::class);
     }
 
+    public function guru()
+    {
+        return $this->belongsToMany(Guru::class, 'guru_mapel', 'mapel_id', 'guru_id')->distinct();
+    }
+
     public function bankSoal()
     {
         return $this->hasMany(BankSoal::class);

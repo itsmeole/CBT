@@ -73,7 +73,7 @@ const navItems = computed<NavItem[]>(() => [
   {
     name: 'Bank Soal',
     to: '/staf/bank-soal',
-    visible: isGuruOrSuperadmin.value,
+    visible: true,
     icon: 'book'
   },
   {
@@ -83,9 +83,9 @@ const navItems = computed<NavItem[]>(() => [
     icon: 'calendar'
   },
   {
-    name: 'Kontrol Sesi Operator',
+    name: 'Kontrol Sesi',
     to: '/staf/kontrol-sesi',
-    visible: isOperatorOrSuperadmin.value,
+    visible: true,
     icon: 'control'
   }
 ])
@@ -117,10 +117,8 @@ function isActive(path: string) {
           </svg>
         </button>
         <div class="flex items-center gap-2">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-xs font-black text-white shadow-xs">
-            CBT
-          </div>
-          <span class="text-sm font-bold text-slate-900 tracking-tight">CBT Ujian Sekolah</span>
+          <img src="/favicon.svg" alt="ICBT" class="h-8 w-8 shrink-0 object-contain rounded-lg" />
+          <span class="text-sm font-bold text-slate-900 tracking-tight">ICBT</span>
         </div>
       </div>
 
@@ -178,11 +176,9 @@ function isActive(path: string) {
           <!-- Drawer Header -->
           <div class="flex items-center justify-between border-b border-slate-100 p-4">
             <div class="flex items-center gap-2.5">
-              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-black text-white shadow">
-                CBT
-              </div>
+              <img src="/favicon.svg" alt="ICBT" class="h-9 w-9 shrink-0 object-contain rounded-xl" />
               <div>
-                <h2 class="text-sm font-bold text-slate-900 leading-tight">CBT Ujian Sekolah</h2>
+                <h2 class="text-sm font-bold text-slate-900 leading-tight">ICBT</h2>
                 <p class="text-[11px] text-slate-500">Panel Manajemen Staf</p>
               </div>
             </div>
@@ -280,16 +276,14 @@ function isActive(path: string) {
         <div class="flex items-center border-b border-slate-100 px-4 py-4" :class="isCollapsed ? 'justify-center' : 'justify-between'">
           <!-- Brand -->
           <div v-if="!isCollapsed" class="flex items-center gap-3 overflow-hidden">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-sm font-black text-white shadow-xs">
-              CBT
-            </div>
+            <img src="/favicon.svg" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
             <div class="truncate">
-              <h1 class="text-sm font-extrabold text-slate-900 leading-tight">CBT Ujian Sekolah</h1>
+              <h1 class="text-sm font-extrabold text-slate-900 leading-tight">ICBT</h1>
               <p class="text-[11px] text-slate-400 font-medium">Panel Staf</p>
             </div>
           </div>
-          <div v-else class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-sm font-black text-white shadow-xs">
-            CBT
+          <div v-else class="flex items-center justify-center">
+            <img src="/favicon.svg" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
           </div>
 
           <!-- Collapse Button -->
@@ -441,7 +435,7 @@ function isActive(path: string) {
     <ConfirmLogoutModal
       v-model="showLogoutConfirm"
       :loading="isLoggingOut"
-      message="Apakah Anda yakin ingin keluar dari panel staf CBT?"
+      message="Apakah Anda yakin ingin keluar dari panel staf ICBT?"
       @confirm="handleConfirmedLogout"
     />
   </div>

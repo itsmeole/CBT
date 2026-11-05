@@ -200,6 +200,7 @@ class MasterDataController extends Controller
             'password' => 'required|string|min:6',
             'nis' => 'required|string|max:30|unique:siswa,nis',
             'kelas_id' => 'required|exists:kelas,id',
+            'jk' => 'nullable|string|in:L,P',
         ]);
 
         $siswa = DB::transaction(function () use ($validated): Siswa {
@@ -215,6 +216,7 @@ class MasterDataController extends Controller
                 'user_id' => $user->id,
                 'nis' => $validated['nis'],
                 'kelas_id' => $validated['kelas_id'],
+                'jk' => $validated['jk'] ?? 'L',
             ]);
 
             return $siswa;
@@ -228,20 +230,28 @@ class MasterDataController extends Controller
         $siswa = Siswa::findOrFail($id);
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'username' => 'sometimes|required|string|max:100|unique:users,username,'.$siswa->user_id,
             'password' => 'nullable|string|min:6',
             'nis' => 'sometimes|required|string|max:30|unique:siswa,nis,'.$siswa->id,
             'kelas_id' => 'sometimes|required|exists:kelas,id',
+            'jk' => 'nullable|string|in:L,P',
         ]);
 
         if (isset($validated['name'])) {
             $siswa->user->name = $validated['name'];
+        }
+        if (isset($validated['username'])) {
+            $siswa->user->username = $validated['username'];
         }
         if (! empty($validated['password'])) {
             $siswa->user->password = Hash::make($validated['password']);
         }
         $siswa->user->save();
 
-        $siswa->update($validated);
+        $siswaData = array_intersect_key($validated, array_flip(['nis', 'kelas_id', 'jk']));
+        if (! empty($siswaData)) {
+            $siswa->update($siswaData);
+        }
 
         return response()->json(['data' => $siswa->load(['user', 'kelas']), 'message' => 'Siswa berhasil diperbarui.']);
     }
@@ -265,7 +275,7 @@ class MasterDataController extends Controller
     // ==========================================
     public function getGuru(): JsonResponse
     {
-        return response()->json(['data' => Guru::with('user')->get()]);
+        return response()->json(['data' => Guru::with(['user', 'mapel'])->get()]);
     }
 
     public function storeGuru(Request $request): JsonResponse
@@ -275,14 +285,22 @@ class MasterDataController extends Controller
             'name' => 'required|string|max:255',
             'password' => 'required|string|min:6',
             'nip' => 'nullable|string|max:50|unique:guru,nip',
+            'mapel_ids' => 'nullable|array',
+            'mapel_ids.*' => 'exists:mapel,id',
+            'role' => 'nullable|string|in:guru,operator',
         ]);
 
-        $guru = DB::transaction(function () use ($validated): Guru {
+        $guru = DB::transaction(function () use ($validated, $request): Guru {
+            $targetRole = 'guru';
+            if ($request->user() && $request->user()->role === 'superadmin' && ! empty($validated['role'])) {
+                $targetRole = $validated['role'];
+            }
+
             $user = User::create([
                 'username' => $validated['username'],
                 'name' => $validated['name'],
                 'password' => Hash::make($validated['password']),
-                'role' => 'guru',
+                'role' => $targetRole,
                 'aktif' => true,
             ]);
 
@@ -291,10 +309,19 @@ class MasterDataController extends Controller
                 'nip' => $validated['nip'] ?? null,
             ]);
 
+            if (! empty($validated['mapel_ids'])) {
+                foreach ($validated['mapel_ids'] as $mId) {
+                    GuruMapel::create([
+                        'guru_id' => $guru->id,
+                        'mapel_id' => (int) $mId,
+                    ]);
+                }
+            }
+
             return $guru;
         });
 
-        return response()->json(['data' => $guru->load('user'), 'message' => 'Guru berhasil ditambahkan.'], 201);
+        return response()->json(['data' => $guru->load(['user', 'mapel']), 'message' => 'Guru berhasil ditambahkan.'], 201);
     }
 
     public function updateGuru(Request $request, int $id): JsonResponse
@@ -302,21 +329,46 @@ class MasterDataController extends Controller
         $guru = Guru::findOrFail($id);
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'username' => 'sometimes|required|string|max:100|unique:users,username,'.$guru->user_id,
             'password' => 'nullable|string|min:6',
             'nip' => 'nullable|string|max:50|unique:guru,nip,'.$guru->id,
+            'mapel_ids' => 'nullable|array',
+            'mapel_ids.*' => 'exists:mapel,id',
+            'role' => 'nullable|string|in:guru,operator',
         ]);
 
-        if (isset($validated['name'])) {
-            $guru->user->name = $validated['name'];
-        }
-        if (! empty($validated['password'])) {
-            $guru->user->password = Hash::make($validated['password']);
-        }
-        $guru->user->save();
+        DB::transaction(function () use ($guru, $validated, $request): void {
+            if (isset($validated['name'])) {
+                $guru->user->name = $validated['name'];
+            }
+            if (isset($validated['username'])) {
+                $guru->user->username = $validated['username'];
+            }
+            if (! empty($validated['password'])) {
+                $guru->user->password = Hash::make($validated['password']);
+            }
+            if ($request->user() && $request->user()->role === 'superadmin' && isset($validated['role'])) {
+                $guru->user->role = $validated['role'];
+            }
+            $guru->user->save();
 
-        $guru->update($validated);
+            $guru->update(['nip' => $validated['nip'] ?? $guru->nip]);
 
-        return response()->json(['data' => $guru->load('user'), 'message' => 'Guru berhasil diperbarui.']);
+            if (array_key_exists('mapel_ids', $validated)) {
+                // Hapus asosiasi mapel umum (yang belum terkait kelas spesifik)
+                GuruMapel::where('guru_id', $guru->id)->whereNull('kelas_id')->delete();
+                if (! empty($validated['mapel_ids'])) {
+                    foreach ($validated['mapel_ids'] as $mId) {
+                        GuruMapel::firstOrCreate([
+                            'guru_id' => $guru->id,
+                            'mapel_id' => (int) $mId,
+                        ]);
+                    }
+                }
+            }
+        });
+
+        return response()->json(['data' => $guru->fresh()->load(['user', 'mapel']), 'message' => 'Guru berhasil diperbarui.']);
     }
 
     public function destroyGuru(int $id): JsonResponse
