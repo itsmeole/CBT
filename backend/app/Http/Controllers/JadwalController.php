@@ -14,12 +14,15 @@ use App\Models\SesiRuang;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\TokenUjian;
+use App\Services\OtorisasiCbtService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class JadwalController extends Controller
 {
+    public function __construct(private readonly OtorisasiCbtService $otorisasi) {}
+
     // ==========================================
     // BOBOT TIPE SOAL (Operator & Superadmin)
     // ==========================================
@@ -52,7 +55,13 @@ class JadwalController extends Controller
 
         if ($user->role === 'guru') {
             $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            $query->whereIn('mapel_id', $mapelIds);
+            $query->where('guru_id', $user->guru?->id ?? 0)
+                ->whereIn('mapel_id', $mapelIds)
+                ->whereDoesntHave('items', fn ($items) => $items->whereHas(
+                    'bankSoal',
+                    fn ($soal) => $soal->where('guru_id', '!=', $user->guru?->id ?? 0)
+                        ->orWhereColumn('bank_soal.mapel_id', '!=', 'paket_soal.mapel_id'),
+                ));
         }
 
         return response()->json(['data' => $query->latest()->get()]);
@@ -69,18 +78,23 @@ class JadwalController extends Controller
             'soal_ids.*' => 'required|distinct|exists:bank_soal,id',
         ]);
 
-        $soalMapelIds = BankSoal::query()
-            ->whereIn('id', $validated['soal_ids'])
-            ->pluck('mapel_id')
-            ->unique();
+        $soalQuery = BankSoal::query()->whereIn('id', $validated['soal_ids']);
+        if ($user->role === 'guru') {
+            $soalQuery->where('guru_id', $user->guru?->id ?? 0);
+        }
+        $accessibleSoalCount = (clone $soalQuery)->count();
+        $soalMapelIds = $soalQuery->pluck('mapel_id')->unique();
+
+        if ($user->role === 'guru' && $accessibleSoalCount !== count($validated['soal_ids'])) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Paket hanya dapat menggunakan soal milik Anda.']], 403);
+        }
 
         if ($soalMapelIds->count() !== 1 || (int) $soalMapelIds->first() !== (int) $validated['mapel_id']) {
             return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Semua soal dalam paket harus berasal dari mapel yang dipilih.']], 422);
         }
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (! $mapelIds->contains($validated['mapel_id'])) {
+            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke mapel ini.']], 403);
             }
             $guruId = $user->guru->id;
@@ -116,7 +130,9 @@ class JadwalController extends Controller
     {
         $paket = PaketSoal::findOrFail($id);
 
-        if ($request->user()->role === 'guru' && $paket->guru_id !== $request->user()->guru?->id) {
+        if ($request->user()->role === 'guru'
+            && ((int) $paket->guru_id !== (int) $request->user()->guru?->id
+                || ! $this->otorisasi->bolehKelolaMapel($request->user(), (int) $paket->mapel_id))) {
             return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke paket soal ini.']], 403);
         }
 
@@ -150,12 +166,19 @@ class JadwalController extends Controller
             'durasi_menit' => 'required|integer|min:1',
         ]);
 
-        $paket = PaketSoal::with('items.bankSoal')->findOrFail($validated['paket_soal_id']);
-        if ((int) $paket->mapel_id !== (int) $validated['mapel_id'] || $paket->items->isEmpty()) {
+        $mapelId = (int) $validated['mapel_id'];
+        $paket = PaketSoal::with('items.bankSoal')->findOrFail((int) $validated['paket_soal_id']);
+        $items = $paket->items;
+
+        if ((int) $paket->mapel_id !== $mapelId || $items->isEmpty()) {
             return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal harus berisi soal dan berasal dari mapel yang dipilih.']], 422);
         }
 
-        if ($paket->items->contains(fn ($item) => (int) $item->bankSoal->mapel_id !== (int) $validated['mapel_id'])) {
+        if ($items->contains(fn (PaketSoalItem $item): bool => $item->bankSoal === null)) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal yang sudah tidak tersedia.']], 422);
+        }
+
+        if ($items->contains(fn (PaketSoalItem $item): bool => (int) ($item->bankSoal?->mapel_id ?? 0) !== $mapelId)) {
             return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal dari mapel lain.']], 422);
         }
 
@@ -166,7 +189,7 @@ class JadwalController extends Controller
 
         // FR-BE-42: Snapshot bobot saat jadwal dibuat!
         $bobotMap = BobotTipe::all()->pluck('bobot', 'tipe')->toArray();
-        $soalSnapshot = $paket->items->pluck('bank_soal_id')->map(fn ($id) => (int) $id)->all();
+        $soalSnapshot = $items->map(fn (PaketSoalItem $item): int => (int) $item->bank_soal_id)->all();
 
         $jadwal = JadwalUjian::create([
             'mapel_id' => $validated['mapel_id'],

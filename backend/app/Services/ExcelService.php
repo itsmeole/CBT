@@ -13,8 +13,11 @@ use Exception;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExcelService
@@ -63,6 +66,72 @@ class ExcelService
         $tempPath = tempnam(sys_get_temp_dir(), 'tpl_').'.xlsx';
         $writer = new Xlsx($spreadsheet);
         $writer->save($tempPath);
+
+        return $tempPath;
+    }
+
+    /**
+     * Ekspor master data tanpa mengekspor kredensial akun.
+     */
+    public function export(string $jenis): string
+    {
+        $this->validateJenis($jenis);
+
+        [$headers, $rows] = match ($jenis) {
+            'siswa' => [
+                ['username', 'nama', 'nis', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
+                Siswa::query()->with(['user', 'kelas.tahunAjaran'])->orderBy('id')->get()
+                    ->map(fn (Siswa $siswa): array => [
+                        $siswa->user?->username,
+                        $siswa->user?->name,
+                        $siswa->nis,
+                        $siswa->kelas?->nama,
+                        $siswa->kelas?->tahunAjaran?->nama,
+                        $siswa->kelas?->tahunAjaran?->semester,
+                    ])->all(),
+            ],
+            'guru' => [
+                ['username', 'nama', 'nip'],
+                Guru::query()->with('user')->orderBy('id')->get()
+                    ->map(fn (Guru $guru): array => [
+                        $guru->user?->username,
+                        $guru->user?->name,
+                        $guru->nip,
+                    ])->all(),
+            ],
+            'kelas' => [
+                ['nama_kelas', 'tingkat', 'nama_tahun_ajaran', 'semester'],
+                Kelas::query()->with('tahunAjaran')->orderBy('id')->get()
+                    ->map(fn (Kelas $kelas): array => [
+                        $kelas->nama,
+                        $kelas->tingkat,
+                        $kelas->tahunAjaran?->nama,
+                        $kelas->tahunAjaran?->semester,
+                    ])->all(),
+            ],
+            'guru_mapel' => [
+                ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
+                GuruMapel::query()->with(['guru.user', 'mapel', 'kelas.tahunAjaran'])->orderBy('id')->get()
+                    ->map(fn (GuruMapel $guruMapel): array => [
+                        $guruMapel->guru?->user?->username,
+                        $guruMapel->mapel?->kode,
+                        $guruMapel->kelas?->nama,
+                        $guruMapel->tahunAjaran?->nama,
+                        $guruMapel->tahunAjaran?->semester,
+                    ])->all(),
+            ],
+        };
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $this->writeExportRows($sheet, $headers, $rows);
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'export_');
+        if ($tempPath === false) {
+            throw new Exception('File sementara ekspor tidak dapat dibuat.');
+        }
+
+        (new Xlsx($spreadsheet))->save($tempPath);
 
         return $tempPath;
     }
@@ -434,6 +503,27 @@ class ExcelService
 
         if (! in_array($jenis, ['siswa', 'guru', 'kelas', 'guru_mapel'])) {
             throw new Exception("Jenis data master '{$jenis}' tidak didukung.");
+        }
+    }
+
+    private function writeExportRows(Worksheet $sheet, array $headers, array $rows): void
+    {
+        foreach ($headers as $index => $header) {
+            $sheet->setCellValueExplicit(
+                Coordinate::stringFromColumnIndex($index + 1).'1',
+                $header,
+                DataType::TYPE_STRING,
+            );
+        }
+
+        foreach ($rows as $rowIndex => $row) {
+            foreach ($row as $columnIndex => $value) {
+                $sheet->setCellValueExplicit(
+                    Coordinate::stringFromColumnIndex($columnIndex + 1).($rowIndex + 2),
+                    (string) ($value ?? ''),
+                    DataType::TYPE_STRING,
+                );
+            }
         }
     }
 }

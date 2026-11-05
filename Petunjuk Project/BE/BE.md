@@ -67,7 +67,7 @@ Backend menyediakan REST API, realtime (WebSocket), antrean job, dan penyimpanan
 
 ### 3.3 Aturan Scope Guru
 
-- **Scope guru mapel:** akses soal, paket, essay, dan nilai hanya jika ada baris `guru_mapel` (guru, mapel, kelas, tahun ajaran) yang cocok.
+- **Scope guru mapel:** akses essay dan nilai dibatasi oleh baris `guru_mapel` yang cocok pada guru, mapel, kelas, dan tahun ajaran. Bank soal dan paket tidak memiliki kolom kelas/tahun ajaran; karena itu konten tersebut hanya dapat diakses/dikelola oleh guru pemiliknya, dan hanya selama guru memiliki penugasan untuk mapel terkait. Paket guru tidak boleh memuat soal milik guru lain.
 - **Scope pengawas:** akses monitoring, buka kunci, reset login, dan berita acara hanya untuk sesi di `pengawas_sesi` miliknya.
 - Guru yang mengawas mapel lain **tidak boleh** menerima konten soal, kunci, jawaban, maupun nilai mapel tersebut. Data monitoring untuk pengawas hanya berisi: nama, NIS, kelas, status, jumlah soal terjawab, jumlah kunci, sisa waktu.
 - Implementasi: Laravel Policy/Gate per resource + query scope. Tidak cukup hanya menyembunyikan menu di FE.
@@ -372,6 +372,8 @@ Kode error minimal: `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `ACCOUNT
 Berita Acara menyimpan catatan pengawas; jumlah hadir/tidak hadir dihitung server dari roster, bukan dipercaya dari body. Log aktivitas bersifat append-only melalui API (tidak ada endpoint ubah/hapus), dipaginasi, dan dapat difilter Superadmin menggunakan `user_id`, `aksi`, `target_type`, `mulai`, `sampai`, `per_page`. Event penting yang dicatat meliputi login/logout, mulai ujian, presensi, lock/unlock, reset login, submit, koreksi essay, perubahan ambang, penyimpanan Berita Acara, dan permintaan PDF.
 
 Permintaan PDF mengembalikan HTTP 202 dan ID laporan; file dikerjakan pada queue `reports`, disimpan di disk privat, lalu dapat diunduh peminta melalui endpoint status/unduh. Analisis butir hanya memakai peserta yang sudah selesai dan nilainya final. Indeks kesukaran `p` adalah rata-rata skor butir dibagi skor maksimal (0–1); daya pembeda `D` adalah selisih rata-rata proporsi skor kelompok atas dan bawah (masing-masing 27%), dan bernilai `null` bila peserta final kurang dari 3.
+
+Endpoint ekspor Excel dan Word mengembalikan file secara langsung untuk mempertahankan kontrak yang sedang digunakan frontend. Pemindahan ekspor ke queue tetap menjadi tindak lanjut karena memerlukan kontrak frontend untuk polling status dan mengunduh hasil; ini belum memenuhi NFR-BE-04 untuk proses ekspor berat.
 
 Perintah `php artisan app:backup-database` membuat dump konsisten MySQL/MariaDB dan dijadwalkan harian pukul 02:00 WIB. Pengaturan worker Redis, konfigurasi backup, prosedur load test dan recovery drill dijelaskan di [`backend/docs/operasional-produksi.md`](../../backend/docs/operasional-produksi.md). Hasil load/restore drill harus dijalankan dan dicatat pada environment uji sebelum menyatakan kapasitas produksi tervalidasi.
 

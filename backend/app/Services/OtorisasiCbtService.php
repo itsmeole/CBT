@@ -11,6 +11,17 @@ use App\Models\User;
 
 class OtorisasiCbtService
 {
+    public function bolehKelolaMapel(User $user, int $mapelId): bool
+    {
+        return $user->role === 'superadmin'
+            || ($user->role === 'guru'
+                && $user->guru
+                && GuruMapel::query()
+                    ->where('guru_id', $user->guru->id)
+                    ->where('mapel_id', $mapelId)
+                    ->exists());
+    }
+
     public function bolehAwasiSesi(User $user, int $sesiRuangId): bool
     {
         if (in_array($user->role, ['operator', 'superadmin'], true)) {
