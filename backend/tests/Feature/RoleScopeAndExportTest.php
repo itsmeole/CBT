@@ -130,6 +130,29 @@ class RoleScopeAndExportTest extends TestCase
         $this->assertNotContains('password', $contents[0]);
     }
 
+    public function test_schedule_rejects_package_with_soft_deleted_question(): void
+    {
+        $fixture = $this->teachingFixture();
+        $question = $this->createQuestion($fixture['teacher'], $fixture['mapel']);
+        $package = $this->createPackage($fixture['teacher'], $fixture['mapel'], $question);
+        $question->delete();
+        $operator = User::factory()->role('operator')->create();
+
+        $this->actingAs($operator, 'sanctum')
+            ->postJson('/api/v1/jadwal', [
+                'mapel_id' => $fixture['mapel']->id,
+                'paket_soal_id' => $package->id,
+                'tahun_ajaran_id' => $fixture['tahun']->id,
+                'nama' => 'Ujian Matematika',
+                'tanggal' => '2026-11-06',
+                'durasi_menit' => 60,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+
+        $this->assertDatabaseMissing('jadwal_ujian', ['paket_soal_id' => $package->id]);
+    }
+
     private function teachingFixture(): array
     {
         $tahun = TahunAjaran::query()->create(['nama' => '2026/2027', 'semester' => 1, 'aktif' => true]);

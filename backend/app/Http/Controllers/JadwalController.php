@@ -166,12 +166,19 @@ class JadwalController extends Controller
             'durasi_menit' => 'required|integer|min:1',
         ]);
 
-        $paket = PaketSoal::with('items.bankSoal')->findOrFail($validated['paket_soal_id']);
-        if ((int) $paket->mapel_id !== (int) $validated['mapel_id'] || $paket->items->isEmpty()) {
+        $mapelId = (int) $validated['mapel_id'];
+        $paket = PaketSoal::with('items.bankSoal')->findOrFail((int) $validated['paket_soal_id']);
+        $items = $paket->items;
+
+        if ((int) $paket->mapel_id !== $mapelId || $items->isEmpty()) {
             return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal harus berisi soal dan berasal dari mapel yang dipilih.']], 422);
         }
 
-        if ($paket->items->contains(fn ($item) => (int) $item->bankSoal->mapel_id !== (int) $validated['mapel_id'])) {
+        if ($items->contains(fn (PaketSoalItem $item): bool => $item->bankSoal === null)) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal yang sudah tidak tersedia.']], 422);
+        }
+
+        if ($items->contains(fn (PaketSoalItem $item): bool => (int) ($item->bankSoal?->mapel_id ?? 0) !== $mapelId)) {
             return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal dari mapel lain.']], 422);
         }
 
@@ -182,7 +189,7 @@ class JadwalController extends Controller
 
         // FR-BE-42: Snapshot bobot saat jadwal dibuat!
         $bobotMap = BobotTipe::all()->pluck('bobot', 'tipe')->toArray();
-        $soalSnapshot = $paket->items->pluck('bank_soal_id')->map(fn ($id) => (int) $id)->all();
+        $soalSnapshot = $items->map(fn (PaketSoalItem $item): int => (int) $item->bank_soal_id)->all();
 
         $jadwal = JadwalUjian::create([
             'mapel_id' => $validated['mapel_id'],
