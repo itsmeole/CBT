@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdministrasiUjianController;
 use App\Http\Controllers\AnalisisButirController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankSoalController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\JadwalController;
@@ -28,7 +28,6 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
-
         Route::middleware('role:operator,superadmin,guru')->group(function () {
             Route::post('auth/reset-login/{userId}', [PengawasanController::class, 'resetLogin']);
             Route::get('sesi-ruang/{id}/monitoring', [PengawasanController::class, 'monitoring']);
@@ -42,6 +41,10 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('role:superadmin')->group(function () {
             Route::get('log-aktivitas', [AdministrasiUjianController::class, 'logAktivitas']);
+            Route::get('tahun-ajaran', [MasterDataController::class, 'getTahunAjaran']);
+            Route::post('tahun-ajaran', [MasterDataController::class, 'storeTahunAjaran']);
+            Route::put('tahun-ajaran/{id}', [MasterDataController::class, 'updateTahunAjaran']);
+            Route::delete('tahun-ajaran/{id}', [MasterDataController::class, 'destroyTahunAjaran']);
         });
 
         Route::middleware('role:operator,superadmin')->group(function () {
@@ -72,12 +75,6 @@ Route::prefix('v1')->group(function () {
         // 1. MASTER DATA (Superadmin & Operator)
         // ========================================================
         Route::middleware('role:superadmin,operator')->group(function () {
-            // Tahun Ajaran
-            Route::get('tahun-ajaran', [MasterDataController::class, 'getTahunAjaran']);
-            Route::post('tahun-ajaran', [MasterDataController::class, 'storeTahunAjaran']);
-            Route::put('tahun-ajaran/{id}', [MasterDataController::class, 'updateTahunAjaran']);
-            Route::delete('tahun-ajaran/{id}', [MasterDataController::class, 'destroyTahunAjaran']);
-
             // Kelas
             Route::get('kelas', [MasterDataController::class, 'getKelas']);
             Route::post('kelas', [MasterDataController::class, 'storeKelas']);
@@ -115,6 +112,7 @@ Route::prefix('v1')->group(function () {
 
             // Impor / Ekspor Excel Master Data
             Route::get('templates/excel/{jenis}', [ExcelController::class, 'template']);
+            Route::get('export/excel/{jenis}', [ExcelController::class, 'export']);
             Route::post('import/excel/{jenis}/preview', [ExcelController::class, 'preview']);
             Route::post('import/excel/{jenis}/commit', [ExcelController::class, 'commit']);
 
@@ -153,6 +151,7 @@ Route::prefix('v1')->group(function () {
             Route::post('import/word/preview', [WordSoalController::class, 'preview']);
             Route::post('import/word/commit', [WordSoalController::class, 'commit']);
             Route::get('export/word/bank-soal', [WordSoalController::class, 'export']);
+            Route::get('export/word/paket/{id}', [WordSoalController::class, 'exportPaket'])->whereNumber('id');
 
             // Paket Soal
             Route::get('paket-soal', [JadwalController::class, 'getPaketSoal']);

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\BankSoal;
-use App\Models\GuruMapel;
+use App\Models\PaketSoal;
+use App\Services\AuditLogService;
+use App\Services\OtorisasiCbtService;
 use App\Services\WordSoalService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -12,12 +14,11 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WordSoalController extends Controller
 {
-    protected WordSoalService $wordSoalService;
-
-    public function __construct(WordSoalService $wordSoalService)
-    {
-        $this->wordSoalService = $wordSoalService;
-    }
+    public function __construct(
+        private readonly WordSoalService $wordSoalService,
+        private readonly AuditLogService $auditLog,
+        private readonly OtorisasiCbtService $otorisasi,
+    ) {}
 
     public function template(): BinaryFileResponse
     {
@@ -53,8 +54,7 @@ class WordSoalController extends Controller
         ]);
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (! $mapelIds->contains($validated['mapel_id'])) {
+            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak diizinkan menambahkan soal untuk mapel ini.']], 403);
             }
             $guruId = $user->guru->id;
@@ -78,24 +78,77 @@ class WordSoalController extends Controller
     public function export(Request $request): BinaryFileResponse|JsonResponse
     {
         $user = $request->user();
-        $query = BankSoal::with('opsiSoal');
+        $validated = $request->validate([
+            'mapel_id' => ['nullable', 'integer', 'exists:mapel,id'],
+        ]);
+        $query = BankSoal::query();
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            $query->whereIn('mapel_id', $mapelIds);
+            $query->where('guru_id', $user->guru?->id ?? 0)
+                ->whereIn('mapel_id', $user->guru?->guruMapel()->pluck('mapel_id') ?? []);
         }
 
-        if ($request->filled('mapel_id')) {
-            $query->where('mapel_id', $request->input('mapel_id'));
+        if (isset($validated['mapel_id'])) {
+            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
+                return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke mapel ini.']], 403);
+            }
+            $query->where('mapel_id', $validated['mapel_id']);
         }
 
-        $soalList = $query->get();
+        $soalList = $query->with('opsiSoal')->orderBy('id')->get();
         if ($soalList->isEmpty()) {
             return response()->json(['error' => ['code' => 'NOT_FOUND', 'message' => 'Tidak ada soal yang dapat diekspor.']], 404);
         }
 
         $filePath = $this->wordSoalService->exportToWord($soalList);
+        $this->auditLog->record(
+            $user,
+            'bank_soal.export_word',
+            'bank_soal',
+            null,
+            ['jumlah_soal' => $soalList->count(), 'mapel_id' => $validated['mapel_id'] ?? null],
+            $request,
+        );
 
         return response()->download($filePath, 'bank_soal_export.docx')->deleteFileAfterSend(true);
+    }
+
+    public function exportPaket(Request $request, int $id): BinaryFileResponse|JsonResponse
+    {
+        $user = $request->user();
+        $paket = PaketSoal::query()->findOrFail($id);
+
+        if ($user->role === 'guru'
+            && ((int) $paket->guru_id !== (int) $user->guru?->id
+                || ! $this->otorisasi->bolehKelolaMapel($user, (int) $paket->mapel_id))) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke paket soal ini.']], 403);
+        }
+
+        $soal = $paket->items()->with('bankSoal.opsiSoal')->orderBy('urutan')->get()
+            ->pluck('bankSoal')
+            ->filter()
+            ->values();
+        if ($soal->isEmpty()) {
+            return response()->json(['error' => ['code' => 'NOT_FOUND', 'message' => 'Paket soal tidak memiliki butir soal aktif.']], 404);
+        }
+
+        if ($user->role === 'guru' && $soal->contains(
+            fn (BankSoal $item): bool => (int) $item->guru_id !== (int) $user->guru?->id
+                || (int) $item->mapel_id !== (int) $paket->mapel_id,
+        )) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Paket memuat soal yang bukan milik Anda.']], 403);
+        }
+
+        $filePath = $this->wordSoalService->exportToWord($soal);
+        $this->auditLog->record(
+            $user,
+            'paket_soal.export_word',
+            'paket_soal',
+            $paket->id,
+            ['jumlah_soal' => $soal->count()],
+            $request,
+        );
+
+        return response()->download($filePath, 'paket_soal_'.$paket->id.'.docx')->deleteFileAfterSend(true);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\GuruMapel;
 use App\Models\Media;
 use App\Models\OpsiSoal;
 use App\Services\HtmlSanitizerService;
+use App\Services\OtorisasiCbtService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -16,15 +17,16 @@ use Illuminate\Support\Str;
 
 class BankSoalController extends Controller
 {
+    public function __construct(private readonly OtorisasiCbtService $otorisasi) {}
+
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
         $query = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal']);
 
-        // Isolasi scope guru: hanya mapel yang diampunya
         if ($user->role === 'guru') {
             $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            $query->whereIn('mapel_id', $mapelIds);
+            $query->where('guru_id', $user->guru?->id ?? 0)->whereIn('mapel_id', $mapelIds);
         }
 
         if ($request->filled('mapel_id')) {
@@ -44,16 +46,12 @@ class BankSoalController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        $soal = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal'])
-            ->whereKey($id)
-            ->firstOrFail();
-
+        $query = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal']);
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (! $mapelIds->contains((int) $soal->mapel_id)) {
-                return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke soal mapel ini.']], 403);
-            }
+            $query->where('guru_id', $user->guru?->id ?? 0)
+                ->whereIn('mapel_id', GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id'));
         }
+        $soal = $query->whereKey($id)->firstOrFail();
 
         return response()->json(['data' => $soal]);
     }
@@ -82,8 +80,7 @@ class BankSoalController extends Controller
         }
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (! $mapelIds->contains((int) $validated['mapel_id'])) {
+            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak diizinkan membuat soal untuk mapel ini.']], 403);
             }
             $guruId = $user->guru->id;
@@ -132,8 +129,8 @@ class BankSoalController extends Controller
         $soal = BankSoal::findOrFail($id);
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (! $mapelIds->contains((int) $soal->mapel_id)) {
+            if ((int) $soal->guru_id !== (int) $user->guru?->id
+                || ! $this->otorisasi->bolehKelolaMapel($user, (int) $soal->mapel_id)) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke soal mapel ini.']], 403);
             }
         }
@@ -209,8 +206,8 @@ class BankSoalController extends Controller
         $soal = BankSoal::findOrFail($id);
 
         if ($user->role === 'guru') {
-            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
-            if (! $mapelIds->contains((int) $soal->mapel_id)) {
+            if ((int) $soal->guru_id !== (int) $user->guru?->id
+                || ! $this->otorisasi->bolehKelolaMapel($user, (int) $soal->mapel_id)) {
                 return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak memiliki akses ke soal mapel ini.']], 403);
             }
         }
