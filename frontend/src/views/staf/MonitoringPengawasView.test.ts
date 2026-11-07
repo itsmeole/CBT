@@ -19,6 +19,14 @@ vi.mock('@/lib/echo', () => {
     listen(nama: string, cb: (payload: unknown) => void) {
       handlers[nama] = cb
       return channel
+    },
+    subscribed(cb: () => void) {
+      handlers.__subscribed = cb as never
+      return channel
+    },
+    error(cb: () => void) {
+      handlers.__error = cb as never
+      return channel
     }
   }
   return { getEcho: () => ({ private: () => channel, leave, connector: {} }) }
@@ -76,6 +84,22 @@ describe('MonitoringPengawasView', () => {
     expect(kartu[0].text()).toContain('Buka Kunci')
     expect(kartu[2].text()).toContain('Ani')
     expect(wrapper.vm).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('status Realtime baru tampil setelah langganan channel berhasil; gagal berarti polling', async () => {
+    const wrapper = pasang()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Menyambung...')
+    expect(wrapper.text()).not.toContain('Realtime')
+
+    ;(handlers.__subscribed as unknown as () => void)()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Realtime')
+
+    ;(handlers.__error as unknown as () => void)()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Polling (offline)')
     wrapper.unmount()
   })
 

@@ -97,6 +97,30 @@ class Fase3Test extends TestCase
             ->assertJsonPath('data.0.data.pemicu', 'blur');
     }
 
+    public function test_audit_log_can_be_searched_by_actor_name_or_username(): void
+    {
+        $fixture = $this->createFixture();
+        LogAktivitas::query()->forceCreate([
+            'user_id' => $fixture['teacherUser']->id,
+            'aksi' => 'ujian.lock',
+            'target_type' => 'peserta_ujian',
+            'target_id' => $fixture['participant']->id,
+            'data' => [],
+            'created_at' => now(),
+        ]);
+        $superadmin = User::factory()->role('superadmin')->create();
+
+        $this->actingAs($superadmin, 'sanctum')
+            ->getJson('/api/v1/log-aktivitas?cari='.urlencode($fixture['teacherUser']->username))
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->actingAs($superadmin, 'sanctum')
+            ->getJson('/api/v1/log-aktivitas?cari=tidak-ada-orang-ini')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
     public function test_item_analysis_calculates_difficulty_and_discrimination_only_for_final_students(): void
     {
         $fixture = $this->createFixture();

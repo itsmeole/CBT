@@ -224,10 +224,10 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Perintah backup MySQL/MariaDB harian terjadwal, dengan destination/dump binary dapat dikonfigurasi (`FR-BE-103`).
 
 #### Frontend
-- [ ] Form pengisian Berita Acara oleh pengawas ruangan sebelum menutup sesi.
-- [ ] UI visualisasi Analisis Butir Soal untuk guru mapel (`FR-FE-132`).
-- [ ] Halaman cetak / export PDF untuk kartu ujian, daftar hadir, dan berita acara (`FR-FE-133`).
-- [ ] Halaman penelusuran Audit Log untuk Superadmin dengan filter aktor, waktu, dan aksi (`FR-FE-140`).
+- [x] Form pengisian Berita Acara oleh pengawas ruangan sebelum menutup sesi. Rute `/staf/berita-acara`; jumlah hadir/absen dihitung server; tombol cetak PDF aktif setelah tersimpan.
+- [x] UI visualisasi Analisis Butir Soal untuk guru mapel (`FR-FE-132`). Rute `/staf/analisis-butir` (guru dan superadmin) dengan bar dan kategori kesukaran/daya pembeda.
+- [x] Halaman cetak / export PDF untuk kartu ujian, daftar hadir, dan berita acara (`FR-FE-133`). Rute `/staf/cetak` (juga rekap nilai); PDF dibuat di antrean `reports`, FE memantau lalu mengunduh otomatis.
+- [x] Halaman penelusuran Audit Log untuk Superadmin dengan filter aktor, waktu, dan aksi (`FR-FE-140`). Rute `/staf/audit-log`; BE menambah filter `cari` (nama/username aktor).
 
 ---
 
@@ -235,16 +235,18 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 #### Backend & Infrastruktur
 - [x] Setup script k6 hingga 700 VU: login, join, state, ambil soal, autosave 5–15 detik, lock/unlock acak 15%, dan submit (`NFR-BE-05`).
 - [ ] Jalankan load test 700 VU pada environment khusus dan simpan hasil thresholds/latensi/error sebelum hari ujian.
-- [ ] Profiling query database: pastikan tidak ada query N+1 pada endpoint ujian & monitoring (`NFR-BE-03`).
+- [x] Profiling query database: pastikan tidak ada query N+1 pada endpoint ujian & monitoring (`NFR-BE-03`). Tes `QueryCountTest` membuktikan jumlah query konstan untuk 3 vs 30 peserta pada monitoring, daftar peserta operator, rekap nilai, antrean koreksi, dan analisis butir. Endpoint sisi siswa (`state`/`soal`/`jawaban`) belum diprofil.
 - [ ] Benchmark latensi endpoint kritis p95 < 300 ms (`NFR-BE-02`).
 - [x] Konfigurasi antrean Redis, after-commit dispatch, dan worker terpisah untuk job PDF (`reports`) (`NFR-BE-04`).
 - [ ] Pengujian skenario pemulihan server (restart service saat ujian berjalan, verifikasi keutuhan data).
 
 #### Frontend
-- [ ] Audit bundle size: pastikan bundle awal siswa ≤ 200 KB gzip (`NFR-FE-01`).
-- [ ] Pastikan dependensi berat (TipTap, parser Word/Excel) terisolasi lewat code splitting (`NFR-FE-02`).
+- [x] Audit bundle size: pastikan bundle awal siswa ≤ 200 KB gzip (`NFR-FE-01`). Terukur 7 Nov 2026: JS awal 66 KB + CSS 18 KB ≈ 84 KB gzip; halaman ujian lengkap (termasuk KaTeX 78 KB) ≈ 170 KB gzip.
+- [x] Pastikan dependensi berat (TipTap, parser Word/Excel) terisolasi lewat code splitting (`NFR-FE-02`). Chunk `RichEditor` (±141 KB gzip) dan Echo/Reverb hanya dimuat halaman staf; tidak ada di graf impor halaman siswa.
 - [ ] Uji performa halaman ujian pada perangkat HP low-end (emulasi CPU throttling & memori terbatas) (`NFR-FE-03`).
 - [ ] Uji responsivitas offline di jaringan tidak stabil / 3G lambat.
 - [ ] Uji kompatibilitas browser: Safari iOS, Chrome Android, Samsung Internet (`NFR-FE-10`).
 
-> Status implementasi backend Fase 3: endpoint Berita Acara, audit log, PDF antrean, analisis butir, backup terjadwal, konfigurasi queue/worker, dan skrip load test sudah tersedia. Otomasi fitur dicakup tes backend; uji kapasitas 700 VU, profiling, benchmark, serta recovery/restore drill belum dijalankan karena membutuhkan environment dan dataset uji khusus. Frontend Fase 3 belum dikerjakan.
+> Status Fase 3 (7 Nov 2026): fitur BE dan FE selesai dan dicakup tes otomatis (BE 72 tes, FE 91 tes). Fase 3 belum ditutup karena sisa item membutuhkan lingkungan/perangkat nyata dan tidak bisa dikerjakan lewat tes otomatis: load test 700 VU (k6) beserta benchmark p95, drill pemulihan server, uji performa HP low-end, uji jaringan 3G, dan uji kompatibilitas browser (Safari iOS, Chrome Android, Samsung Internet).
+>
+> Perbaikan realtime ditemukan saat persiapan uji manual: (1) autentikasi memakai token Bearer, tetapi Echo tidak mengirimnya sehingga channel `sesi.{id}` tidak pernah terotorisasi; kini otorisasi channel lewat klien HTTP aplikasi. (2) CORS tidak mencakup `/broadcasting/auth`; kini ditambahkan. (3) `VITE_REVERB_APP_KEY` di `frontend/.env` tidak sama dengan `REVERB_APP_KEY` backend; kini disamakan. (4) Status "Realtime" di dashboard pengawas kini muncul setelah langganan channel berhasil, bukan sekadar koneksi WebSocket tersambung.

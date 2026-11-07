@@ -165,14 +165,19 @@ function berlangganan(id: number) {
         tangani(store.terapkan({ jenis: 'ambang', pesertaId: e.peserta_id, jumlahKunci: e.jumlah_kunci }))
       )
 
-    const pusher = (echo.connector as unknown as { pusher?: { connection: { state: string; bind: (n: string, cb: (s: { current: string }) => void) => void } } }).pusher
-    if (pusher) {
-      store.setKoneksi(pusher.connection.state === 'connected' ? 'terhubung' : 'menyambung')
-      pusher.connection.bind('state_change', (s) => {
-        store.setKoneksi(s.current === 'connected' ? 'terhubung' : s.current === 'connecting' ? 'menyambung' : 'terputus')
-        if (s.current === 'connected') void muatMonitoring(false)
-      })
-    }
+    // "Realtime" hanya bila LANGGANAN channel berhasil (koneksi WebSocket saja belum cukup:
+    // otorisasi channel bisa ditolak sementara socket tetap tersambung).
+    channel.subscribed(() => {
+      store.setKoneksi('terhubung')
+      void muatMonitoring(false)
+    })
+    channel.error(() => store.setKoneksi('terputus'))
+
+    const pusher = (echo.connector as unknown as { pusher?: { connection: { bind: (n: string, cb: (s: { current: string }) => void) => void } } }).pusher
+    pusher?.connection.bind('state_change', (s) => {
+      if (s.current === 'connecting') store.setKoneksi('menyambung')
+      else if (s.current !== 'connected') store.setKoneksi('terputus')
+    })
   } catch {
     store.setKoneksi('terputus')
   }

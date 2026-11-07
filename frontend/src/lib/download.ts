@@ -22,6 +22,11 @@ export async function downloadFileFromApi(endpoint: string, defaultFilename: str
   const blob = new Blob([response.data], {
     type: contentType
   })
+  unduhBlob(blob, filename)
+}
+
+/** Picu unduhan browser untuk Blob yang sudah ada di memori. */
+export function unduhBlob(blob: Blob, filename: string): void {
   const objectUrl = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = objectUrl

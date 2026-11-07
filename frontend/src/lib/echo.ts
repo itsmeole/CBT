@@ -1,5 +1,6 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
+import { apiClient } from '@/api/client'
 
 declare global {
   interface Window {
@@ -9,15 +10,32 @@ declare global {
 
 let instance: Echo<'reverb'> | null = null
 
+type KirimOtorisasi = (url: string, body: { socket_id: string; channel_name: string }) => Promise<{ data: unknown }>
+
 /**
- * Klien realtime ke Laravel Reverb. Dibuat lazy dan hanya saat dibutuhkan (dashboard pengawas,
- * event siswa), supaya tidak membebani bundle awal. Otorisasi channel private memakai cookie Sanctum.
+ * Otorisasi channel private. Autentikasi aplikasi memakai token Bearer di memori (bukan cookie),
+ * jadi permintaan `/broadcasting/auth` harus lewat klien HTTP aplikasi agar header Authorization ikut terkirim.
+ */
+export function buatAuthorizer(endpoint: string, kirim: KirimOtorisasi) {
+  return (channel: { name: string }) => ({
+    authorize: (socketId: string, callback: (error: Error | null, data: unknown) => void) => {
+      kirim(endpoint, { socket_id: socketId, channel_name: channel.name })
+        .then((res) => callback(null, res.data))
+        .catch((err: unknown) => callback(err instanceof Error ? err : new Error('Otorisasi channel gagal.'), null))
+    }
+  })
+}
+
+/**
+ * Klien realtime ke Laravel Reverb. Dibuat lazy dan hanya saat dibutuhkan (dashboard pengawas),
+ * supaya tidak membebani bundle siswa.
  */
 export function getEcho(): Echo<'reverb'> {
   if (instance) return instance
 
   window.Pusher = Pusher
   const origin = new URL(import.meta.env.VITE_API_BASE_URL, window.location.origin).origin
+  const endpoint = `${origin}/broadcasting/auth`
 
   instance = new Echo({
     broadcaster: 'reverb',
@@ -27,8 +45,8 @@ export function getEcho(): Echo<'reverb'> {
     wssPort: Number(import.meta.env.VITE_REVERB_PORT),
     forceTLS: import.meta.env.VITE_REVERB_SCHEME === 'https',
     enabledTransports: ['ws', 'wss'],
-    authEndpoint: `${origin}/broadcasting/auth`,
-    withCredentials: true
+    authEndpoint: endpoint,
+    authorizer: buatAuthorizer(endpoint, (url, body) => apiClient.post(url, body))
   } as ConstructorParameters<typeof Echo<'reverb'>>[0])
 
   return instance
@@ -38,4 +56,3 @@ export function disconnectEcho(): void {
   instance?.disconnect()
   instance = null
 }
-

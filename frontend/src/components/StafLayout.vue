@@ -105,6 +105,30 @@ const navItems = computed<NavItem[]>(() => [
     to: '/staf/nilai',
     visible: true,
     icon: 'dashboard'
+  },
+  {
+    name: 'Analisis Butir',
+    to: '/staf/analisis-butir',
+    visible: isGuruOrSuperadmin.value,
+    icon: 'book'
+  },
+  {
+    name: 'Berita Acara',
+    to: '/staf/berita-acara',
+    visible: true,
+    icon: 'control'
+  },
+  {
+    name: 'Cetak Dokumen',
+    to: '/staf/cetak',
+    visible: true,
+    icon: 'dashboard'
+  },
+  {
+    name: 'Audit Log',
+    to: '/staf/audit-log',
+    visible: role.value === 'superadmin',
+    icon: 'users'
   }
 ])
 

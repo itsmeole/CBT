@@ -103,6 +103,30 @@ export const router = createRouter({
       meta: { roles: ['superadmin', 'operator', 'guru'] }
     },
     {
+      path: '/staf/berita-acara',
+      name: 'staf-berita-acara',
+      component: () => import('@/views/staf/BeritaAcaraView.vue'),
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
+    },
+    {
+      path: '/staf/cetak',
+      name: 'staf-cetak',
+      component: () => import('@/views/staf/CetakDokumenView.vue'),
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
+    },
+    {
+      path: '/staf/analisis-butir',
+      name: 'staf-analisis-butir',
+      component: () => import('@/views/staf/AnalisisButirView.vue'),
+      meta: { roles: ['superadmin', 'guru'] }
+    },
+    {
+      path: '/staf/audit-log',
+      name: 'staf-audit-log',
+      component: () => import('@/views/staf/AuditLogView.vue'),
+      meta: { roles: ['superadmin'] }
+    },
+    {
       path: '/403',
       name: 'forbidden',
       component: () => import('@/views/ForbiddenView.vue'),
