@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
+
+const RichEditor = defineAsyncComponent(() => import('@/components/RichEditor.vue'))
+const editorKonten = ref<{ insertImage: (src: string) => void; insertAudio: (src: string) => void } | null>(null)
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
@@ -247,6 +250,12 @@ function openEditModal(item: SoalItem) {
 }
 
 async function saveSoal() {
+  // Editor kaya tidak punya atribut `required`; pastikan ada teks atau media (gambar/audio).
+  const adaIsi = formKonten.value.replace(/<[^>]*>/g, '').trim() !== '' || /<(img|audio)\b/i.test(formKonten.value)
+  if (!adaIsi) {
+    errorMessage.value = 'Isi pertanyaan wajib diisi.'
+    return
+  }
   loading.value = true
   isSavingSoal.value = true
   errorMessage.value = ''
@@ -376,9 +385,9 @@ async function uploadMedia() {
 function insertMediaSnippet() {
   if (!uploadedMediaUrl.value) return
   if (uploadedMediaUrl.value.match(/\.(mp3|wav|ogg)$/i)) {
-    formKonten.value += `\n<audio controls src="${uploadedMediaUrl.value}"></audio>\n`
+    editorKonten.value?.insertAudio(uploadedMediaUrl.value)
   } else {
-    formKonten.value += `\n<img src="${uploadedMediaUrl.value}" alt="Media Soal" class="max-w-md rounded-lg shadow-sm" />\n`
+    editorKonten.value?.insertImage(uploadedMediaUrl.value)
   }
   showMediaModal.value = false
   uploadedMediaUrl.value = ''
@@ -721,14 +730,8 @@ onMounted(() => {
                 <span>Sisipkan Gambar / Audio</span>
               </button>
             </div>
-            <textarea
-              v-model="formKonten"
-              rows="4"
-              required
-              dir="auto"
-              placeholder="Tuliskan pertanyaan di sini. Gunakan $rumus$ untuk rumus matematika KaTeX..."
-              class="input text-sm font-sans"
-            ></textarea>
+            <!-- Editor TipTap dimuat lazy (hanya halaman staf, tidak masuk bundle siswa) -->
+            <RichEditor ref="editorKonten" v-model="formKonten" placeholder="Tuliskan pertanyaan di sini" />
 
             <!-- Live KaTeX Preview -->
             <div v-if="formKonten" class="mt-2 rounded bg-slate-50 border p-3">

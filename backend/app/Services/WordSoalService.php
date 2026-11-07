@@ -739,6 +739,9 @@ class WordSoalService
         $xmlData = $zip->getFromIndex($xmlIndex);
         $zip->close();
 
+        // 1b. Rumus Word (OMML) -> LaTeX berpembatas $...$ / $$...$$ agar dirender KaTeX (FR-BE-33)
+        $xmlData = app(OmmlToLatexService::class)->gantiRumusDiXml($xmlData);
+
         // 2. Ganti elemen drawing & pict dengan tag <img>
         $xmlData = preg_replace_callback('/<w:(?:drawing|pict)[\s\S]*?<\/w:(?:drawing|pict)>/u', function ($match) use ($relMap) {
             if (preg_match('/(?:r:embed|r:id)=["\']([^"\']+)["\']/u', $match[0], $m)) {

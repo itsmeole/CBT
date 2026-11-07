@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderLatex, renderMathInHtml } from './katex'
+import { decodeEntitasMath, renderLatex, renderMathInHtml } from './katex'
 
 describe('renderLatex', () => {
   it('merender formula inline ke html katex', () => {
@@ -33,3 +33,16 @@ describe('renderMathInHtml', () => {
   })
 })
 
+
+describe('decodeEntitasMath', () => {
+  it('mengembalikan entitas HTML di dalam rumus sebelum dirender', () => {
+    expect(decodeEntitasMath('a &lt; b &amp; c &gt; d')).toBe('a < b & c > d')
+  })
+
+  it('merender matriks yang pemisah kolomnya tersimpan sebagai &amp;', () => {
+    const html = renderMathInHtml(String.raw`$$\begin{matrix} 1 &amp; 2 \\ 3 &amp; 4 \end{matrix}$$`)
+    expect(html).toContain('katex-display')
+    expect(html).not.toContain('&amp;amp;')
+    expect(html).not.toContain('katex-error')
+  })
+})

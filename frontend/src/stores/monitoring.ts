@@ -1,33 +1,35 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { PesertaStatus } from './ujian'
+import { terapkanEvent, urutkanPeserta, type EventSesi, type PesertaMonitoring } from '@/lib/monitoringLogic'
 
-/** Ringkasan peserta untuk dashboard pengawas. Tidak memuat soal, jawaban, atau nilai (FR-FE-96). */
-export interface PesertaMonitoring {
-  id: number
-  nama: string
-  nis: string
-  kelas: string
-  status: PesertaStatus
-  terjawab: number
-  jumlahKunci: number
-  sisaDetik: number
-}
+export type { PesertaMonitoring } from '@/lib/monitoringLogic'
 
 export type KoneksiRealtime = 'terhubung' | 'terputus' | 'menyambung'
 
 export const useMonitoringStore = defineStore('monitoring', () => {
   const peserta = ref<PesertaMonitoring[]>([])
   const koneksi = ref<KoneksiRealtime>('menyambung')
+  const alertAktif = ref(false)
 
   function setPeserta(daftar: PesertaMonitoring[]): void {
-    peserta.value = daftar
+    peserta.value = urutkanPeserta(daftar)
   }
 
   function setKoneksi(status: KoneksiRealtime): void {
     koneksi.value = status
   }
 
-  return { peserta, koneksi, setPeserta, setKoneksi }
-})
+  /** Terapkan event realtime; mengembalikan true bila perlu alert visual/audio. */
+  function terapkan(event: EventSesi): boolean {
+    const hasil = terapkanEvent(peserta.value, event)
+    peserta.value = urutkanPeserta(hasil.daftar)
+    if (hasil.perluAlert) alertAktif.value = true
+    return hasil.perluAlert
+  }
 
+  function tutupAlert(): void {
+    alertAktif.value = false
+  }
+
+  return { peserta, koneksi, alertAktif, setPeserta, setKoneksi, terapkan, tutupAlert }
+})

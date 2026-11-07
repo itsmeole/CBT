@@ -82,6 +82,24 @@ export const router = createRouter({
       path: '/staf/kontrol-sesi',
       name: 'staf-kontrol-sesi',
       component: () => import('@/views/staf/KontrolSesiOperatorView.vue'),
+      meta: { roles: ['superadmin', 'operator'] }
+    },
+    {
+      path: '/staf/monitoring',
+      name: 'staf-monitoring',
+      component: () => import('@/views/staf/MonitoringPengawasView.vue'),
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
+    },
+    {
+      path: '/staf/koreksi-essay',
+      name: 'staf-koreksi-essay',
+      component: () => import('@/views/staf/KoreksiEssayView.vue'),
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
+    },
+    {
+      path: '/staf/nilai',
+      name: 'staf-nilai',
+      component: () => import('@/views/staf/RekapNilaiView.vue'),
       meta: { roles: ['superadmin', 'operator', 'guru'] }
     },
     {

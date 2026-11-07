@@ -25,17 +25,9 @@ class BankSoalController extends Controller
         $query = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal']);
 
         if ($user->role === 'guru') {
-            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
-            if ($request->filled('mapel_id')) {
-                $query->where('mapel_id', $request->input('mapel_id'));
-            } else {
-                $mapelIds = GuruMapel::where('guru_id', $guru->id)->pluck('mapel_id')->unique();
-                if ($mapelIds->isNotEmpty()) {
-                    $query->where(function ($q) use ($guru, $mapelIds) {
-                        $q->where('guru_id', $guru->id)->orWhereIn('mapel_id', $mapelIds);
-                    });
-                }
-            }
+            // Isolasi guru mapel: hanya soal milik sendiri pada mapel yang diampu.
+            $mapelIds = GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id')->unique();
+            $query->where('guru_id', $user->guru?->id ?? 0)->whereIn('mapel_id', $mapelIds);
         }
 
         if ($request->filled('mapel_id')) {
@@ -57,11 +49,8 @@ class BankSoalController extends Controller
         $user = $request->user();
         $query = BankSoal::query()->with(['mapel', 'guru.user', 'opsiSoal']);
         if ($user->role === 'guru') {
-            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
-            $query->where(function ($q) use ($guru) {
-                $q->where('guru_id', $guru->id)
-                    ->orWhereIn('mapel_id', GuruMapel::where('guru_id', $guru->id)->pluck('mapel_id'));
-            });
+            $query->where('guru_id', $user->guru?->id ?? 0)
+                ->whereIn('mapel_id', GuruMapel::where('guru_id', $user->guru?->id)->pluck('mapel_id'));
         }
         $soal = $query->whereKey($id)->firstOrFail();
 
@@ -92,12 +81,10 @@ class BankSoalController extends Controller
         }
 
         if ($user->role === 'guru') {
-            $guru = $user->guru ?? \App\Models\Guru::create(['user_id' => $user->id]);
-            $guruId = $guru->id;
-            GuruMapel::firstOrCreate([
-                'guru_id' => $guruId,
-                'mapel_id' => (int) $validated['mapel_id'],
-            ]);
+            if (! $this->otorisasi->bolehKelolaMapel($user, (int) $validated['mapel_id'])) {
+                return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak diizinkan membuat soal untuk mapel ini.']], 403);
+            }
+            $guruId = $user->guru->id;
         } else {
             $request->validate(['guru_id' => 'required|exists:guru,id']);
             $guruId = (int) $request->input('guru_id');

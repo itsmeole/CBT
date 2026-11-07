@@ -26,11 +26,14 @@ class RoleScopeAndExportTest extends TestCase
         $operator = User::factory()->role('operator')->create();
         $superadmin = User::factory()->role('superadmin')->create();
 
-        $this->actingAs($operator, 'sanctum')->getJson('/api/v1/tahun-ajaran')->assertForbidden();
+        // Operator boleh membaca (dropdown kelas/jadwal), tetapi tidak boleh mengubah tahun ajaran.
+        $this->actingAs($operator, 'sanctum')->getJson('/api/v1/tahun-ajaran')->assertOk();
         $this->actingAs($operator, 'sanctum')->postJson('/api/v1/tahun-ajaran', [
             'nama' => '2026/2027',
             'semester' => 1,
         ])->assertForbidden();
+        $this->actingAs($operator, 'sanctum')->putJson('/api/v1/tahun-ajaran/1', ['nama' => 'x'])->assertForbidden();
+        $this->actingAs($operator, 'sanctum')->deleteJson('/api/v1/tahun-ajaran/1')->assertForbidden();
 
         $this->actingAs($superadmin, 'sanctum')->postJson('/api/v1/tahun-ajaran', [
             'nama' => '2026/2027',

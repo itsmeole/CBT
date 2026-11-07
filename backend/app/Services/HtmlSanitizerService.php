@@ -10,7 +10,7 @@ class HtmlSanitizerService
      */
     public static function sanitize(string $html): string
     {
-        $allowedTags = ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'sub', 'sup', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'span'];
+        $allowedTags = ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'sub', 'sup', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'span', 'audio'];
         $removedTags = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math'];
         $document = new \DOMDocument('1.0', 'UTF-8');
         $previousErrorSetting = libxml_use_internal_errors(true);
@@ -59,8 +59,16 @@ class HtmlSanitizerService
                 foreach (iterator_to_array($node->attributes) as $attribute) {
                     $name = strtolower($attribute->name);
                     $allowed = ($tag === 'img' && in_array($name, ['src', 'alt', 'title'], true))
+                        || ($tag === 'audio' && in_array($name, ['src', 'controls'], true))
                         || ($tag === 'span' && $name === 'data-latex');
                     if (! $allowed) {
+                        $node->removeAttributeNode($attribute);
+
+                        continue;
+                    }
+
+                    // Audio hanya boleh berasal dari media yang diunggah ke server ini (bukan URL luar).
+                    if ($tag === 'audio' && $name === 'src' && ! preg_match('#^/storage/[A-Za-z0-9._/-]+$#', $attribute->value)) {
                         $node->removeAttributeNode($attribute);
 
                         continue;

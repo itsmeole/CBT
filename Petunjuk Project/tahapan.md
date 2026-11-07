@@ -9,11 +9,13 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 ## Ringkasan Progres Utama
 
 - [x] **Fase 0:** Setup Arsitektur & Lingkungan Kerja
-- [ ] **Fase 1 (MVP):** Autentikasi, Master Data, Bank Soal, Pengerjaan Ujian, & Penilaian Otomatis
-- [ ] **Fase 2:** Kunci Sesi Realtime, Pengawasan, & Koreksi Essay
+- [x] **Fase 1 (MVP):** Autentikasi, Master Data, Bank Soal, Pengerjaan Ujian, & Penilaian Otomatis
+- [x] **Fase 2:** Kunci Sesi Realtime, Pengawasan, & Koreksi Essay
 - [ ] **Fase 3:** Rekap Nilai, Laporan/Cetak, Audit Log, & Uji Beban (Load Test 700 User)
 
-> Audit checklist 4 November 2026; pembaruan implementasi backend Fase 2: tanda `[x]` hanya untuk pekerjaan yang implementasi dan tes backend-nya sudah tersedia. Fase 1 tetap belum selesai; Fase 2 belum selesai secara keseluruhan karena frontend dan uji operasional belum dikerjakan.
+> Audit checklist 7 November 2026: tanda `[x]` hanya untuk pekerjaan yang implementasi dan tes otomatisnya sudah tersedia. Fase 1 dan Fase 2 (BE + FE) selesai: BE 62 tes lolos, FE 71 tes lolos, `vue-tsc` bersih, build produksi berhasil.
+>
+> **Belum diverifikasi (di luar tes otomatis)** — disarankan dicek sebelum hari ujian: (1) alur realtime dengan server Reverb sungguhan; tes FE memakai Echo tiruan, (2) deteksi pelanggaran (`visibilitychange`/`pagehide`/`blur`/`fullscreenchange`) di perangkat HP asli (Safari iOS, Chrome Android, Samsung Internet), (3) editor soal TipTap dan konversi rumus Word dengan dokumen `.docx` asli buatan guru, (4) impor Excel besar (±700 siswa) dengan worker queue sungguhan.
 
 ---
 
@@ -66,15 +68,15 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] CRUD Master data untuk Operator & Superadmin (`FR-BE-10`).
 - [x] Endpoint unduh template Excel resmi untuk siswa, guru, kelas, guru_mapel (`FR-BE-12`).
 - [x] Impor Excel tahap 1: Unggah & validasi baris, return pratinjau + laporan error per baris (`FR-BE-11`).
-- [ ] Impor Excel tahap 2: Commit data via database transaction dalam antrean queue (`FR-BE-11`).
+- [x] Impor Excel tahap 2: Commit data via database transaction dalam antrean queue (`FR-BE-11`). Endpoint `commit` kini mengembalikan 202 + `import_id`, job `ImporExcelMasterData` (payload dienkripsi), status via `GET /import/excel/status/{id}` (hanya pengunggah).
 - [x] Proteksi ketat: larang impor/ekspor soal lewat Excel (`FR-BE-14`).
 
 #### Frontend
-- [ ] UI CRUD Master data lengkap untuk Operator (tabel, pencarian, filter, paginasi).
-- [ ] Wizard Impor Excel 2 langkah (Upload -> Pratinjau Error per Baris -> Konfirmasi Simpan) (`FR-FE-121`).
-- [ ] Tombol unduh template Excel resmi di masing-masing master data.
+- [x] UI CRUD Master data lengkap untuk Operator (tabel, pencarian, filter, paginasi). Kini mencakup tab Pengampu Mapel (guru-mapel), filter kelas untuk siswa, dan paginasi 25 baris. Tahun ajaran hanya dapat diubah Superadmin.
+- [x] Wizard Impor Excel 2 langkah (Upload -> Pratinjau Error per Baris -> Konfirmasi Simpan) (`FR-FE-121`). Kontrak disesuaikan: FE mengirim `items` dari pratinjau lalu memantau status job.
+- [x] Tombol unduh template Excel resmi di masing-masing master data (siswa, guru, kelas, pengampu mapel).
 
-> Temuan audit: UI master data belum mencakup semua jenis data yang didukung backend. Alur impor Excel FE juga belum cocok dengan kontrak BE: FE mengirim `temp_key` saat commit, sedangkan BE mengembalikan preview baris dan meminta `items`.
+> Catatan: aksi ubah tahun ajaran dibatasi Superadmin di BE dan FE; pembacaan daftar tahun ajaran tetap terbuka untuk Operator/Guru karena dibutuhkan dropdown kelas dan jadwal.
 
 ---
 
@@ -86,14 +88,14 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Sanitasi HTML konten soal (whitelist tag aman) (`FR-BE-23`).
 - [x] Endpoint unggah media (gambar webp/jpg/png maks 2MB auto-resize, audio maks 10MB) (`FR-BE-24`).
 - [x] Parser dokumen Word (`.docx`) berdasarkan format baku `[SOAL] ... [/SOAL]` (`FR-BE-31`).
-- [ ] Ekstraksi gambar embedded dan konversi rumus Word OMML ke LaTeX KaTeX (`FR-BE-32`, `FR-BE-33`).
+- [x] Ekstraksi gambar embedded dan konversi rumus Word OMML ke LaTeX KaTeX (`FR-BE-32`, `FR-BE-33`). Konversi oleh `OmmlToLatexService` (pecahan, pangkat/indeks, akar, sigma/integral, kurung, fungsi, matriks, aksen); sanitizer kini mempertahankan `<audio>` dari `/storage/` saja.
 - [x] Endpoint pratinjau impor Word + validasi error per butir soal (`FR-BE-35`).
 - [x] Endpoint commit hasil impor Word ke database (single transaction) (`FR-BE-35`).
 - [x] Ekspor bank soal ke `.docx` dengan format template identik (mendukung *round-trip*) (`FR-BE-36`).
 
 #### Frontend
 - [x] Tampilan daftar bank soal dengan filter mapel, tipe soal, dan pencarian kata kunci.
-- [ ] Integrasi Rich Text Editor dengan dukungan gambar, tabel, dan input formula LaTeX/KaTeX (`FR-FE-101`).
+- [x] Integrasi Rich Text Editor dengan dukungan gambar, tabel, dan input formula LaTeX/KaTeX (`FR-FE-101`). TipTap dimuat lazy (chunk `RichEditor` ±141 KB gzip) hanya di halaman Bank Soal, tidak masuk bundle siswa. Dependensi baru: `@tiptap/vue-3`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-{image,table,subscript,superscript}`.
 - [x] Form dinamis pembuatan soal sesuai 5 tipe (`FR-FE-101`).
 - [x] Wizard Impor Soal dari Word (`.docx`): Upload -> Pratinjau Soal & Laporan Error -> Konfirmasi (`FR-FE-111`).
 - [x] Validasi form client-side: blokir commit jika masih ada soal berstatus error (`FR-FE-111`).
@@ -140,14 +142,14 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Halaman Ruang Tunggu siswa: polling/mendengarkan sinyal mulai dari Operator (`FR-FE-10`, `FR-FE-11`).
 - [x] Halaman pengerjaan ujian mobile-first: layout ringkas, nomor grid, touch target minimal 44x44px (`FR-FE-20`, `FR-FE-21`).
 - [x] Komponen input khusus untuk 5 tipe soal (khusus Menjodohkan gunakan dropdown/bottom-sheet, bukan drag-and-drop) (`FR-FE-22`).
-- [ ] Engine autosave lokal dengan antrean IndexedDB dan penanganan retry/offline otomatis (`FR-FE-30`, `FR-FE-32`).
-- [ ] Indikator status koneksi/sinkronisasi: *Tersimpan / Menyimpan... / Offline* (`FR-FE-33`).
+- [x] Engine autosave lokal dengan antrean IndexedDB dan penanganan retry/offline otomatis (`FR-FE-30`, `FR-FE-32`). Payload `items` (satu per soal, versi terbaru), `client_seq` naik terus walau reload, item dihapus hanya setelah server konfirmasi, fallback antrean memori bila IndexedDB tidak tersedia.
+- [x] Indikator status koneksi/sinkronisasi: *Tersimpan / Menyimpan... / Offline* (`FR-FE-33`).
 - [x] Display timer sinkron dengan server + peringatan visual sisa 10 & 5 menit (`FR-FE-41`, `FR-FE-42`).
 - [x] Blokir interaksi browser terlarang: klik kanan, copy, cut, paste, text select (`FR-FE-60`).
 - [x] Modal konfirmasi submit buatan sendiri (menampilkan rekap status terjawab) (`FR-FE-70`).
 - [x] Halaman selesai sederhana ("Ujian selesai") **tanpa skor/nilai** (`FR-FE-72`).
 
-> Temuan audit: commit impor Excel saat ini berjalan sinkron (meski memakai transaksi DB), dan FE mengirim format autosave satu soal sementara endpoint BE meminta payload `items` berbentuk array. Antrean IndexedDB belum memiliki mekanisme kirim ulang yang menyelesaikan perbedaan kontrak tersebut.
+> Perbaikan audit: halaman ujian dan ruang tunggu siswa kini memakai kontrak BE yang sebenarnya (state dibungkus `data`, soal `soal_id`/opsi buram, menjodohkan `kiri`/`kanan`, jawaban Benar/Salah `BENAR`/`SALAH`). Penanda "ragu-ragu" hanya disimpan di sisi klien karena BE belum menyimpannya.
 
 ---
 
@@ -165,12 +167,12 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Pembatasan request endpoint lock (60 request/menit per akun).
 
 #### Frontend
-- [ ] Event listener deteksi pelanggaran di client saat status `mengerjakan`: `visibilitychange`, `pagehide`, `blur`, `fullscreenchange` (`FR-FE-50`).
-- [ ] Pengiriman sinyal lock seketika menggunakan `navigator.sendBeacon` atau `fetch keepalive` (`FR-FE-51`).
-- [ ] Antrean event lock offline: kirim event lock tertunda lebih dulu sebelum jawaban (`FR-FE-52`).
-- [ ] Layar overlay status terkunci ("Ujian terkunci, hubungi pengawas") dengan input dinonaktifkan (`FR-FE-54`).
-- [ ] Pastikan timer tetap berjalan di layar saat terkunci (`FR-FE-44`).
-- [ ] Cek status berkala ke server untuk menerima pembaruan unlock dari pengawas (`FR-FE-54`).
+- [x] Event listener deteksi pelanggaran di client saat status `mengerjakan`: `visibilitychange`, `pagehide`, `blur`, `fullscreenchange` (`FR-FE-50`).
+- [x] Pengiriman sinyal lock seketika menggunakan `navigator.sendBeacon` atau `fetch keepalive` (`FR-FE-51`). Memakai axios adapter `fetch` dengan `keepalive: true`.
+- [x] Antrean event lock offline: kirim event lock tertunda lebih dulu sebelum jawaban (`FR-FE-52`).
+- [x] Layar overlay status terkunci ("Ujian terkunci, hubungi pengawas") dengan input dinonaktifkan (`FR-FE-54`).
+- [x] Pastikan timer tetap berjalan di layar saat terkunci (`FR-FE-44`).
+- [x] Cek status berkala ke server untuk menerima pembaruan unlock dari pengawas (`FR-FE-54`). Tiap 3 detik saat terkunci, tiap 15 detik saat berjalan.
 
 ---
 
@@ -183,13 +185,13 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Otorisasi ketat data monitoring: tidak mengirim jawaban, kunci, maupun nilai kepada pengawas (`FR-BE-100`).
 
 #### Frontend
-- [ ] Halaman Dashboard Monitoring Pengawas (responsif HP/tablet untuk pengawas keliling) (`FR-FE-97`).
-- [ ] Integrasi WebSocket `sesi.{id}` dengan fallback polling otomatis (`FR-FE-95`).
-- [ ] Kartu status siswa realtime (belum login, menunggu, mengerjakan, terkunci, selesai) (`FR-FE-90`).
-- [ ] Auto-pin siswa terkunci ke urutan teratas + notifikasi alert visual/audio (`FR-FE-91`).
-- [ ] Modal Buka Kunci dengan input alasan wajib & opsi alasan cepat ("Layar mati", "Panggilan masuk", dll.) (`FR-FE-92`).
-- [ ] Peringatan jika siswa melebihi ambang batas kunci (`FR-FE-93`).
-- [ ] Aksi Reset Login siswa dari dashboard pengawas (`FR-FE-94`).
+- [x] Halaman Dashboard Monitoring Pengawas (responsif HP/tablet untuk pengawas keliling) (`FR-FE-97`). Rute `/staf/monitoring`; daftar sesi dari `GET /pengawasan/sesi` (guru hanya sesi yang ditugaskan).
+- [x] Integrasi WebSocket `sesi.{id}` dengan fallback polling otomatis (`FR-FE-95`). Polling 5 detik saat tidak terhubung, rekonsiliasi 60 detik saat terhubung.
+- [x] Kartu status siswa realtime (belum login, menunggu, mengerjakan, terkunci, selesai) (`FR-FE-90`).
+- [x] Auto-pin siswa terkunci ke urutan teratas + notifikasi alert visual/audio (`FR-FE-91`). Audio perlu diaktifkan pengawas (batasan autoplay browser).
+- [x] Modal Buka Kunci dengan input alasan wajib & opsi alasan cepat ("Layar mati", "Panggilan masuk", dll.) (`FR-FE-92`).
+- [x] Peringatan jika siswa melebihi ambang batas kunci (`FR-FE-93`). Ambang terbaca untuk Operator/Superadmin; untuk guru peringatan datang dari event `LockThresholdReached`.
+- [x] Aksi Reset Login siswa dari dashboard pengawas (`FR-FE-94`). Reset hanya memutus sesi perangkat; status kunci tetap, buka kunci lewat aksi tersendiri.
 
 ---
 
@@ -202,11 +204,11 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Otorisasi antrean koreksi dan rekap nilai: akses guru dibatasi kelas/mapel/tahun ajaran yang diajarkan.
 
 #### Frontend
-- [ ] Antarmuka antrean koreksi essay: menampilkan soal, kunci panduan, rubrik, dan jawaban siswa (`FR-FE-130`).
-- [ ] Input skor essay dengan validasi batas maksimal skor sesuai bobot soal.
-- [ ] Halaman Rekap Nilai dengan indikator status nilai: *Menunggu Koreksi Essay* vs *Final* (`FR-FE-131`).
+- [x] Antarmuka antrean koreksi essay: menampilkan soal, kunci panduan, rubrik, dan jawaban siswa (`FR-FE-130`). Rute `/staf/koreksi-essay`.
+- [x] Input skor essay dengan validasi batas maksimal skor sesuai bobot soal. Maksimal 2 desimal, koma diterima; jawaban kosong dinilai 0 otomatis oleh server.
+- [x] Halaman Rekap Nilai dengan indikator status nilai: *Menunggu Koreksi Essay* vs *Final* (`FR-FE-131`). Rute `/staf/nilai`.
 
-> Status implementasi backend Fase 2: endpoint lock/unlock, monitoring, reset login, threshold, otorisasi private channel, koreksi essay, rekap nilai, dan event realtime sudah tersedia serta dicakup tes fitur. Frontend Fase 2 masih belum dikerjakan. Uji beban, pengujian operasional Reverb/queue, dan validasi produksi juga belum dilakukan; karena itu Fase 2 secara keseluruhan tetap belum selesai.
+> Status Fase 2: BE dan FE selesai dengan tes otomatis. Aturan akses ditegakkan sesuai spek: pengawas hanya sesi yang ditugaskan (`PengawasSesi`), Mulai Ujian/kehadiran hanya Operator/Superadmin, guru hanya bank soal mapel yang diampu, ubah tahun ajaran hanya Superadmin. Item "Belum diverifikasi" di ringkasan atas masih perlu uji manual; uji beban dan pengujian operasional produksi ada di Fase 3.
 
 ---
 

@@ -258,11 +258,11 @@ class OperatorKontrolController extends Controller
     private function ensureOperatorOrSuperadmin(Request $request): void
     {
         $role = $request->user()->role;
-        if (! in_array($role, ['guru', 'operator', 'superadmin'], true)) {
+        if (! in_array($role, ['operator', 'superadmin'], true)) {
             abort(response()->json([
                 'error' => [
                     'code' => 'FORBIDDEN',
-                    'message' => 'Hanya Guru, Operator, dan Superadmin yang berwenang mengakses kontrol sesi.',
+                    'message' => 'Hanya Operator dan Superadmin yang berwenang memverifikasi kehadiran dan memulai ujian.',
                 ],
             ], 403));
         }

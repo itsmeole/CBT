@@ -30,6 +30,7 @@ Route::prefix('v1')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::middleware('role:operator,superadmin,guru')->group(function () {
             Route::post('auth/reset-login/{userId}', [PengawasanController::class, 'resetLogin']);
+            Route::get('pengawasan/sesi', [PengawasanController::class, 'daftarSesi']);
             Route::get('sesi-ruang/{id}/monitoring', [PengawasanController::class, 'monitoring']);
             Route::post('peserta/{id}/unlock', [PengawasanController::class, 'unlock']);
             Route::get('sesi-ruang/{id}/berita-acara', [AdministrasiUjianController::class, 'beritaAcara']);
@@ -41,6 +42,10 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('role:superadmin')->group(function () {
             Route::get('log-aktivitas', [AdministrasiUjianController::class, 'logAktivitas']);
+            // Tahun ajaran dikelola Superadmin saja; pembacaan terbuka untuk dropdown (lihat grup referensi).
+            Route::post('tahun-ajaran', [MasterDataController::class, 'storeTahunAjaran']);
+            Route::put('tahun-ajaran/{id}', [MasterDataController::class, 'updateTahunAjaran']);
+            Route::delete('tahun-ajaran/{id}', [MasterDataController::class, 'destroyTahunAjaran']);
         });
 
         Route::middleware('role:operator,superadmin')->group(function () {
@@ -56,8 +61,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:guru,operator,superadmin')->group(function () {
             Route::get('nilai', [NilaiController::class, 'index']);
             Route::get('analisis-butir/{jadwalId}', [AnalisisButirController::class, 'show']);
+            // Data referensi bersifat baca-saja untuk dropdown/filter di UI staf.
             Route::get('bobot-tipe', [JadwalController::class, 'getBobotTipe']);
-            Route::put('bobot-tipe', [JadwalController::class, 'updateBobotTipe']);
             Route::get('tahun-ajaran', [MasterDataController::class, 'getTahunAjaran']);
             Route::get('mapel', [MasterDataController::class, 'getMapel']);
             Route::get('kelas', [MasterDataController::class, 'getKelas']);
@@ -65,12 +70,16 @@ Route::prefix('v1')->group(function () {
             Route::get('siswa', [MasterDataController::class, 'getSiswa']);
             Route::get('guru', [MasterDataController::class, 'getGuru']);
             Route::get('jadwal', [JadwalController::class, 'getJadwal']);
+        });
+
+        // Pengaturan ujian dan kontrol sesi: HANYA Operator & Superadmin (403 untuk Guru, FR-BE-61).
+        Route::middleware('role:operator,superadmin')->group(function () {
+            Route::put('bobot-tipe', [JadwalController::class, 'updateBobotTipe']);
             Route::post('jadwal', [JadwalController::class, 'storeJadwal']);
             Route::post('sesi-ruang', [JadwalController::class, 'storeSesiRuang']);
             Route::post('sesi-ruang/{id}/pengawas', [JadwalController::class, 'plotPengawas']);
             Route::post('sesi-ruang/{id}/token/generate', [JadwalController::class, 'generateToken']);
 
-            // Kontrol Sesi Ujian (Guru, Operator, & Superadmin)
             Route::get('sesi-ruang/{id}/peserta', [OperatorKontrolController::class, 'getPeserta']);
             Route::post('sesi-ruang/{id}/kehadiran', [OperatorKontrolController::class, 'setKehadiran']);
             Route::post('sesi-ruang/{id}/mulai', [OperatorKontrolController::class, 'mulaiSesi']);
@@ -90,10 +99,6 @@ Route::prefix('v1')->group(function () {
         // 1. MASTER DATA (Superadmin & Operator)
         // ========================================================
         Route::middleware('role:superadmin,operator')->group(function () {
-            // Tahun Ajaran
-            Route::post('tahun-ajaran', [MasterDataController::class, 'storeTahunAjaran']);
-            Route::put('tahun-ajaran/{id}', [MasterDataController::class, 'updateTahunAjaran']);
-            Route::delete('tahun-ajaran/{id}', [MasterDataController::class, 'destroyTahunAjaran']);
             // Kelas
             Route::post('kelas', [MasterDataController::class, 'storeKelas']);
             Route::put('kelas/{id}', [MasterDataController::class, 'updateKelas']);
@@ -129,6 +134,7 @@ Route::prefix('v1')->group(function () {
             Route::get('export/excel/{jenis}', [ExcelController::class, 'export']);
             Route::post('import/excel/{jenis}/preview', [ExcelController::class, 'preview']);
             Route::post('import/excel/{jenis}/commit', [ExcelController::class, 'commit']);
+            Route::get('import/excel/status/{importId}', [ExcelController::class, 'status']);
         });
 
         // ========================================================

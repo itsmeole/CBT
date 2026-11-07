@@ -13,20 +13,27 @@ class OtorisasiCbtService
 {
     public function bolehKelolaMapel(User $user, int $mapelId): bool
     {
-        if (in_array($user->role, ['superadmin', 'operator', 'guru'], true)) {
-            return true;
-        }
-
-        return false;
+        return $user->role === 'superadmin'
+            || ($user->role === 'guru'
+                && $user->guru
+                && GuruMapel::query()
+                    ->where('guru_id', $user->guru->id)
+                    ->where('mapel_id', $mapelId)
+                    ->exists());
     }
 
     public function bolehAwasiSesi(User $user, int $sesiRuangId): bool
     {
-        if (in_array($user->role, ['operator', 'superadmin', 'guru'], true)) {
+        if (in_array($user->role, ['operator', 'superadmin'], true)) {
             return SesiRuang::whereKey($sesiRuangId)->exists();
         }
 
-        return false;
+        return $user->role === 'guru'
+            && $user->guru
+            && PengawasSesi::query()
+                ->where('sesi_ruang_id', $sesiRuangId)
+                ->where('guru_id', $user->guru->id)
+                ->exists();
     }
 
     public function bolehAksesMapelKelas(User $user, JadwalUjian $jadwal, ?int $kelasId = null): bool
@@ -49,10 +56,18 @@ class OtorisasiCbtService
 
     public function bolehResetSiswa(User $actor, User $target): bool
     {
-        if (in_array($actor->role, ['operator', 'superadmin', 'guru'], true)) {
+        if (in_array($actor->role, ['operator', 'superadmin'], true)) {
             return $target->role === 'siswa';
         }
 
-        return false;
+        if ($actor->role !== 'guru' || ! $actor->guru || $target->role !== 'siswa') {
+            return false;
+        }
+
+        return PesertaUjian::query()
+            ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
+            ->whereHas('siswa', fn ($query) => $query->where('user_id', $target->id))
+            ->whereHas('sesiRuang.pengawasSesi', fn ($query) => $query->where('guru_id', $actor->guru->id))
+            ->exists();
     }
 }

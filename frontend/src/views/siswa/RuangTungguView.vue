@@ -36,13 +36,14 @@ async function handleConfirmedLogout() {
 async function checkState() {
   try {
     const res = await apiClient.get('/ujian/state')
-    examState.value = res.data
-    const status = res.data.status
+    const state = res.data.data ?? {}
+    examState.value = state
+    const status = state.status
 
-    if (res.data.waktu_selesai_ms) {
+    if (state.waktu_selesai_ms) {
       ujianStore.terapkanStateServer({
         status,
-        waktuSelesaiMs: res.data.waktu_selesai_ms
+        waktuSelesaiMs: state.waktu_selesai_ms
       })
     }
 

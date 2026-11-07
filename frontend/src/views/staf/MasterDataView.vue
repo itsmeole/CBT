@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { ambilHalaman } from '@/lib/paginasi'
 import StafLayout from '@/components/StafLayout.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { downloadFileFromApi } from '@/lib/download'
 
-type TabType = 'siswa' | 'guru' | 'kelas' | 'mapel' | 'ruang' | 'tahun_ajaran'
+type TabType = 'siswa' | 'guru' | 'kelas' | 'mapel' | 'ruang' | 'tahun_ajaran' | 'guru_mapel'
+
+const UKURAN_HALAMAN = 25
+const halaman = ref(1)
+const filterKelasId = ref<number | ''>('')
 
 const auth = useAuthStore()
 const isSuperadmin = computed(() => auth.user?.role === 'superadmin')
 const isOperatorOrSuperadmin = computed(() => auth.user?.role === 'superadmin' || auth.user?.role === 'operator')
 
 const activeTab = ref<TabType>('siswa')
+// Tahun ajaran hanya dapat diubah Superadmin; data master lain oleh Operator dan Superadmin.
+const bolehUbahTab = computed(() => (activeTab.value === 'tahun_ajaran' ? isSuperadmin.value : isOperatorOrSuperadmin.value))
 const loading = ref(false)
 const searchQuery = ref('')
 const feedbackMessage = ref('')
@@ -34,6 +41,7 @@ const kelasList = ref<any[]>([])
 const mapelList = ref<any[]>([])
 const ruangList = ref<any[]>([])
 const tahunAjaranList = ref<any[]>([])
+const guruMapelList = ref<any[]>([])
 
 // Modal Form State
 const showFormModal = ref(false)
@@ -49,7 +57,7 @@ const importLoading = ref(false)
 const importStep = ref<1 | 2>(1)
 const importPreviewData = ref<any>(null)
 const importErrors = ref<any[]>([])
-const tempFileKey = ref<string>('')
+const importRows = ref<Record<string, string>[]>([])
 
 async function fetchData() {
   loading.value = true
@@ -72,6 +80,10 @@ async function fetchData() {
     } else if (activeTab.value === 'guru') {
       const res = await apiClient.get('/guru')
       guruList.value = res.data.data || []
+    } else if (activeTab.value === 'guru_mapel') {
+      const [gmRes, guruRes] = await Promise.all([apiClient.get('/guru-mapel'), apiClient.get('/guru')])
+      guruMapelList.value = gmRes.data.data || []
+      guruList.value = guruRes.data.data || []
     }
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal memuat data.'
@@ -83,6 +95,12 @@ async function fetchData() {
 async function handleTabChange(tab: TabType) {
   activeTab.value = tab
   searchQuery.value = ''
+  filterKelasId.value = ''
+  halaman.value = 1
+  if (tab === 'guru_mapel') {
+    await fetchData()
+    return
+  }
   if (tab === 'siswa' && siswaList.value.length === 0) {
     loading.value = true
     const res = await apiClient.get('/siswa')
@@ -100,11 +118,34 @@ async function handleTabChange(tab: TabType) {
 const filteredSiswa = computed(() => {
   const q = searchQuery.value.toLowerCase()
   return siswaList.value.filter(s => {
+    if (filterKelasId.value !== '' && (s.kelas_id ?? s.kelas?.id) !== filterKelasId.value) return false
     const nama = (s.nama || s.user?.name || '').toLowerCase()
     const nis = (s.nis || '').toLowerCase()
     const username = (s.username || s.user?.username || '').toLowerCase()
     return nama.includes(q) || nis.includes(q) || username.includes(q)
   })
+})
+
+const filteredGuruMapel = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  return guruMapelList.value.filter(gm =>
+    (gm.guru?.user?.name || '').toLowerCase().includes(q) || (gm.mapel?.nama || '').toLowerCase().includes(q) || (gm.kelas?.nama || '').toLowerCase().includes(q)
+  )
+})
+
+// Paginasi sisi klien untuk daftar besar (siswa & guru)
+const halamanSiswa = computed(() => ambilHalaman(filteredSiswa.value, halaman.value, UKURAN_HALAMAN))
+const halamanGuru = computed(() => ambilHalaman(filteredGuru.value, halaman.value, UKURAN_HALAMAN))
+const halamanGuruMapel = computed(() => ambilHalaman(filteredGuruMapel.value, halaman.value, UKURAN_HALAMAN))
+const infoHalaman = computed(() => {
+  if (activeTab.value === 'siswa') return halamanSiswa.value
+  if (activeTab.value === 'guru') return halamanGuru.value
+  if (activeTab.value === 'guru_mapel') return halamanGuruMapel.value
+  return null
+})
+
+watch([searchQuery, filterKelasId], () => {
+  halaman.value = 1
 })
 
 const filteredGuru = computed(() => {
@@ -171,6 +212,13 @@ function openCreateModal() {
     formData.value = { kode: '', nama: '', kapasitas: 36 }
   } else if (activeTab.value === 'tahun_ajaran') {
     formData.value = { semester: 1, aktif: true }
+  } else if (activeTab.value === 'guru_mapel') {
+    formData.value = {
+      guru_id: guruList.value[0]?.id || '',
+      mapel_id: mapelList.value[0]?.id || '',
+      kelas_id: kelasList.value[0]?.id || '',
+      tahun_ajaran_id: tahunAjaranList.value.find(t => t.aktif)?.id || tahunAjaranList.value[0]?.id || ''
+    }
   } else {
     formData.value = {}
   }
@@ -260,7 +308,8 @@ function promptDeleteEntity(id: number, label?: string) {
     kelas: 'kelas',
     mapel: 'mata pelajaran',
     ruang: 'ruang ujian',
-    tahun_ajaran: 'tahun ajaran'
+    tahun_ajaran: 'tahun ajaran',
+    guru_mapel: 'pengampu mapel'
   }[activeTab.value] || 'data'
 
   deleteTitle.value = `Hapus Data ${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`
@@ -309,7 +358,7 @@ function openImport(jenis: string) {
   importStep.value = 1
   importPreviewData.value = null
   importErrors.value = []
-  tempFileKey.value = ''
+  importRows.value = []
   showImportModal.value = true
 }
 
@@ -333,7 +382,7 @@ async function previewExcel() {
     })
     importPreviewData.value = res.data.data
     importErrors.value = res.data.data.errors || []
-    tempFileKey.value = res.data.data.temp_key || ''
+    importRows.value = res.data.data.preview || []
     importStep.value = 2
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal memproses pratinjau Excel.'
@@ -342,18 +391,35 @@ async function previewExcel() {
   }
 }
 
+const IMPORT_POLL_MS = 1500
+const IMPORT_MAX_POLL = 400
+
 async function commitExcel() {
+  if (importErrors.value.length > 0 || importRows.value.length === 0) return
   importLoading.value = true
   errorMessage.value = ''
   try {
-    await apiClient.post(`/import/excel/${importJenis.value}/commit`, {
-      temp_key: tempFileKey.value
-    })
-    feedbackMessage.value = `Impor data ${importJenis.value} berhasil disimpan.`
-    showImportModal.value = false
-    await fetchData()
-  } catch (err: any) {
-    errorMessage.value = err.message || 'Gagal menyimpan impor data.'
+    // Tahap 2: BE memproses di antrean (transaksi tunggal), FE memantau statusnya.
+    const res = await apiClient.post(`/import/excel/${importJenis.value}/commit`, { items: importRows.value })
+    const importId: string = res.data.data.import_id
+
+    for (let i = 0; i < IMPORT_MAX_POLL; i++) {
+      await new Promise((resolve) => setTimeout(resolve, IMPORT_POLL_MS))
+      const statusRes = await apiClient.get(`/import/excel/status/${importId}`)
+      const status = statusRes.data.data
+      if (status.status === 'selesai') {
+        feedbackMessage.value = status.message || `Impor data ${importJenis.value} berhasil disimpan.`
+        showImportModal.value = false
+        await fetchData()
+        return
+      }
+      if (status.status === 'gagal') {
+        throw new Error(status.message || 'Impor gagal diproses.')
+      }
+    }
+    throw new Error('Impor belum selesai diproses. Periksa daftar data beberapa saat lagi.')
+  } catch (err) {
+    errorMessage.value = err instanceof Error ? err.message : 'Gagal menyimpan impor data.'
   } finally {
     importLoading.value = false
   }
@@ -371,6 +437,7 @@ const currentListCount = computed(() => {
     case 'mapel': return filteredMapel.value.length
     case 'ruang': return filteredRuang.value.length
     case 'tahun_ajaran': return filteredTahunAjaran.value.length
+    case 'guru_mapel': return filteredGuruMapel.value.length
     default: return 0
   }
 })
@@ -387,7 +454,7 @@ const currentListCount = computed(() => {
 
         <div class="flex flex-wrap items-center gap-2">
           <button
-            v-if="['siswa', 'guru', 'kelas'].includes(activeTab)"
+            v-if="['siswa', 'guru', 'kelas', 'guru_mapel'].includes(activeTab)"
             @click="downloadTemplate(activeTab)"
             :disabled="downloadTemplateLoading"
             class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
@@ -399,7 +466,7 @@ const currentListCount = computed(() => {
             </svg>
             <span>{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
           </button>
-          <span v-if="!isOperatorOrSuperadmin" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
+          <span v-if="!bolehUbahTab" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -407,7 +474,7 @@ const currentListCount = computed(() => {
             <span>Mode Lihat Saja</span>
           </span>
           <button
-            v-if="['siswa', 'guru', 'kelas'].includes(activeTab) && isOperatorOrSuperadmin"
+            v-if="['siswa', 'guru', 'kelas', 'guru_mapel'].includes(activeTab) && isOperatorOrSuperadmin"
             @click="openImport(activeTab)"
             class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
           >
@@ -417,7 +484,7 @@ const currentListCount = computed(() => {
             </svg>
             <span>Impor Data</span>
           </button>
-          <button v-if="isOperatorOrSuperadmin" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+          <button v-if="bolehUbahTab" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
             <!-- Plus SVG -->
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -450,7 +517,8 @@ const currentListCount = computed(() => {
             { id: 'kelas', label: 'Kelas' },
             { id: 'mapel', label: 'Mata Pelajaran' },
             { id: 'ruang', label: 'Ruang Ujian' },
-            { id: 'tahun_ajaran', label: 'Tahun Ajaran' }
+            { id: 'tahun_ajaran', label: 'Tahun Ajaran' },
+            { id: 'guru_mapel', label: 'Pengampu Mapel' }
           ]"
           :key="tab.id"
           @click="handleTabChange(tab.id as TabType)"
@@ -477,6 +545,15 @@ const currentListCount = computed(() => {
               class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-all"
             />
           </div>
+          <select
+            v-if="activeTab === 'siswa'"
+            v-model="filterKelasId"
+            aria-label="Filter kelas"
+            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
+          >
+            <option value="">Semua kelas</option>
+            <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
+          </select>
           <span v-if="loading" class="text-xs text-slate-400 flex items-center gap-1.5">
             <span class="inline-block h-2 w-2 animate-ping rounded-full bg-brand-600"></span>
             Memuat data...
@@ -484,6 +561,42 @@ const currentListCount = computed(() => {
           <span v-else class="text-xs font-bold text-slate-400 font-mono">
             {{ currentListCount }} Data
           </span>
+        </div>
+
+        <!-- 0. Pengampu Mapel (guru - mapel - kelas) -->
+        <div v-if="activeTab === 'guru_mapel'" class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+              <tr>
+                <th class="p-3">Guru</th>
+                <th class="p-3">Mata Pelajaran</th>
+                <th class="p-3">Kelas</th>
+                <th class="p-3">Tahun Ajaran</th>
+                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="item in halamanGuruMapel.item" :key="item.id" class="hover:bg-slate-50">
+                <td class="p-3 font-medium text-slate-900">{{ item.guru?.user?.name || '-' }}</td>
+                <td class="p-3">{{ item.mapel?.nama || '-' }}</td>
+                <td class="p-3">{{ item.kelas?.nama || '-' }}</td>
+                <td class="p-3">{{ item.tahun_ajaran?.nama || item.tahunAjaran?.nama || '-' }}</td>
+                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
+                  <button
+                    type="button"
+                    @click="promptDeleteEntity(item.id, `${item.guru?.user?.name} - ${item.mapel?.nama} (${item.kelas?.nama})`)"
+                    class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                    aria-label="Hapus pengampu mapel"
+                  >
+                    Hapus
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="filteredGuruMapel.length === 0">
+                <td colspan="5" class="p-6 text-center text-slate-400">Belum ada data pengampu mapel.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- 1. Siswa Table -->
@@ -500,7 +613,7 @@ const currentListCount = computed(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in filteredSiswa" :key="item.id" class="hover:bg-slate-50">
+              <tr v-for="item in halamanSiswa.item" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-mono font-medium text-slate-900">{{ item.nis }}</td>
                 <td class="p-3 font-medium text-slate-900">{{ item.nama || item.user?.name }}</td>
                 <td class="p-3">{{ item.kelas?.nama || '-' }}</td>
@@ -561,7 +674,7 @@ const currentListCount = computed(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in filteredGuru" :key="item.id" class="hover:bg-slate-50">
+              <tr v-for="item in halamanGuru.item" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-mono font-medium text-slate-900">{{ item.nip || '-' }}</td>
                 <td class="p-3 font-medium text-slate-900">{{ item.nama || item.user?.name }}</td>
                 <td class="p-3 font-mono text-xs text-slate-700">{{ item.user?.username || '-' }}</td>
@@ -777,7 +890,7 @@ const currentListCount = computed(() => {
                 <th class="p-3">Tahun Ajaran</th>
                 <th class="p-3">Semester</th>
                 <th class="p-3">Status</th>
-                <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
+                <th v-if="isSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -788,7 +901,7 @@ const currentListCount = computed(() => {
                   <span v-if="item.aktif" class="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Aktif</span>
                   <span v-else class="text-xs text-slate-400">Non-aktif</span>
                 </td>
-                <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
+                <td v-if="isSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
@@ -978,6 +1091,34 @@ const currentListCount = computed(() => {
             </div>
           </template>
 
+          <!-- Pengampu Mapel Fields -->
+          <template v-if="activeTab === 'guru_mapel'">
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Guru *</label>
+              <select v-model="formData.guru_id" required class="input !min-h-0 !py-1.5 text-sm">
+                <option v-for="g in guruList" :key="g.id" :value="g.id">{{ g.nama || g.user?.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Mata Pelajaran *</label>
+              <select v-model="formData.mapel_id" required class="input !min-h-0 !py-1.5 text-sm">
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Kelas *</label>
+              <select v-model="formData.kelas_id" required class="input !min-h-0 !py-1.5 text-sm">
+                <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Tahun Ajaran *</label>
+              <select v-model="formData.tahun_ajaran_id" required class="input !min-h-0 !py-1.5 text-sm">
+                <option v-for="ta in tahunAjaranList" :key="ta.id" :value="ta.id">{{ ta.nama }} (Sem {{ ta.semester }})</option>
+              </select>
+            </div>
+          </template>
+
           <!-- Tahun Ajaran Fields -->
           <template v-if="activeTab === 'tahun_ajaran'">
             <div>
@@ -1083,7 +1224,7 @@ const currentListCount = computed(() => {
             <div class="max-h-48 overflow-y-auto text-xs text-red-700 space-y-1">
               <div v-for="(err, idx) in importErrors" :key="idx" class="flex gap-2">
                 <span class="font-bold">Baris {{ err.row }}:</span>
-                <span>{{ err.errors ? err.errors.join(', ') : err.message }}</span>
+                <span>{{ err.column ? `[${err.column}] ` : '' }}{{ err.errors ? err.errors.join(', ') : err.message }}</span>
               </div>
             </div>
             <p class="text-xs text-red-600 mt-2 italic font-semibold">
@@ -1106,13 +1247,23 @@ const currentListCount = computed(() => {
               class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <span v-if="importLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-              <span>{{ importLoading ? 'Menyimpan...' : 'Konfirmasi & Simpan ke Basis Data' }}</span>
+              <span>{{ importLoading ? 'Memproses di antrean...' : 'Konfirmasi & Simpan ke Basis Data' }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
     </div>
+
+    <!-- Paginasi (siswa, guru, pengampu mapel) -->
+    <nav v-if="infoHalaman && infoHalaman.total > 0" class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-600" aria-label="Paginasi">
+      <span>Menampilkan {{ infoHalaman.dari }}-{{ infoHalaman.sampai }} dari {{ infoHalaman.total }}</span>
+      <div class="flex items-center gap-2">
+        <button class="btn-secondary !min-h-0 !py-1.5 text-xs" :disabled="infoHalaman.halaman <= 1" @click="halaman = infoHalaman.halaman - 1">Sebelumnya</button>
+        <span class="font-mono">{{ infoHalaman.halaman }} / {{ infoHalaman.totalHalaman }}</span>
+        <button class="btn-secondary !min-h-0 !py-1.5 text-xs" :disabled="infoHalaman.halaman >= infoHalaman.totalHalaman" @click="halaman = infoHalaman.halaman + 1">Berikutnya</button>
+      </div>
+    </nav>
 
     <!-- Confirm Delete Modal with Custom Styling -->
     <ConfirmDeleteModal

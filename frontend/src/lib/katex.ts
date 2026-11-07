@@ -23,6 +23,14 @@ export function renderLatex(latex: string, displayMode = false): string {
 }
 
 /**
+ * Konten soal disanitasi di BE sehingga `&`, `<`, `>` di dalam rumus tersimpan sebagai entitas HTML.
+ * KaTeX membutuhkan karakter aslinya (mis. `&` pemisah kolom matriks).
+ */
+export function decodeEntitasMath(math: string): string {
+  return math.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+}
+
+/**
  * Render semua rumus math inline ($...$) dan display ($$...$$) di dalam string HTML/teks,
  * serta memastikan path media relatif (/storage/...) mengarah ke backend host.
  */
@@ -39,11 +47,11 @@ export function renderMathInHtml(content: string): string {
 
   // 1. Display math: $$...$$
   result = result.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
-    return renderLatex(math.trim(), true)
+    return renderLatex(decodeEntitasMath(math).trim(), true)
   })
   // 2. Inline math: $...$
   result = result.replace(/(^|[^\\])\$([^\$]+?)\$/g, (_, prefix, math) => {
-    return `${prefix}${renderLatex(math.trim(), false)}`
+    return `${prefix}${renderLatex(decodeEntitasMath(math).trim(), false)}`
   })
   return result
 }

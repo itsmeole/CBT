@@ -10,6 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^3.33.0",
+    "@tiptap/extension-subscript": "^3.33.0",
+    "@tiptap/extension-superscript": "^3.33.0",
+    "@tiptap/extension-table": "^3.33.0",
+    "@tiptap/pm": "^3.33.0",
+    "@tiptap/starter-kit": "^3.33.0",
+    "@tiptap/vue-3": "^3.33.0",
     "axios": "^1.21.0",
     "idb": "^8.0.4",
     "katex": "^0.19.1",

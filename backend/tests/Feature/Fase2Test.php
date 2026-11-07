@@ -132,7 +132,8 @@ class Fase2Test extends TestCase
             ->getJson("/api/v1/sesi-ruang/{$fixture['session']->id}/monitoring")
             ->assertOk()
             ->assertJsonPath('data.peserta.0.status', 'mengerjakan')
-            ->assertJsonPath('data.peserta.0.terjawab', 1);
+            ->assertJsonPath('data.peserta.0.terjawab', 1)
+            ->assertJsonPath('data.peserta.0.user_id', $fixture['participant']->siswa->user_id);
 
         $this->assertArrayNotHasKey('jawaban', $response->json('data.peserta.0'));
         $this->assertArrayNotHasKey('nilai', $response->json('data.peserta.0'));
@@ -141,6 +142,39 @@ class Fase2Test extends TestCase
         $this->actingAs($otherTeacher, 'sanctum')
             ->getJson("/api/v1/sesi-ruang/{$fixture['session']->id}/monitoring")
             ->assertForbidden();
+    }
+
+    public function test_supervision_session_list_only_contains_sessions_the_user_may_supervise(): void
+    {
+        $fixture = $this->createFixture();
+        $otherSession = SesiRuang::create([
+            'jadwal_ujian_id' => $fixture['session']->jadwal_ujian_id,
+            'ruang_id' => $fixture['session']->ruang_id,
+            'sesi_ke' => 2,
+            'jam_mulai' => '10:00',
+            'jam_akhir' => '11:00',
+        ]);
+        $supervisorUser = User::factory()->role('guru')->create();
+        $supervisor = Guru::create(['user_id' => $supervisorUser->id]);
+        PengawasSesi::create(['sesi_ruang_id' => $fixture['session']->id, 'guru_id' => $supervisor->id]);
+        $unassignedTeacher = User::factory()->role('guru')->create();
+
+        $this->actingAs($supervisorUser, 'sanctum')
+            ->getJson('/api/v1/pengawasan/sesi')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $fixture['session']->id);
+
+        $this->actingAs($unassignedTeacher, 'sanctum')
+            ->getJson('/api/v1/pengawasan/sesi')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->actingAs(User::factory()->role('operator')->create(), 'sanctum')
+            ->getJson('/api/v1/pengawasan/sesi')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+        $this->assertNotNull($otherSession->id);
     }
 
     public function test_private_channels_are_limited_to_assigned_supervisors_and_participant_owner(): void

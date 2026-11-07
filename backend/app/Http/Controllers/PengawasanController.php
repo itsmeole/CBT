@@ -158,6 +158,30 @@ class PengawasanController extends Controller
         ]);
     }
 
+    /**
+     * Daftar sesi yang boleh diawasi pengguna: guru hanya sesi yang ditugaskan, operator/superadmin semua.
+     */
+    public function daftarSesi(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $query = SesiRuang::query()->with(['jadwalUjian.mapel', 'ruang'])->latest('id');
+
+        if ($user->role === 'guru') {
+            $query->whereHas('pengawasSesi', fn ($q) => $q->where('guru_id', $user->guru?->id ?? 0));
+        }
+
+        $data = $query->limit(200)->get()->map(fn (SesiRuang $sesi): array => [
+            'id' => $sesi->id,
+            'jadwal' => $sesi->jadwalUjian?->nama,
+            'mapel' => $sesi->jadwalUjian?->mapel?->nama,
+            'ruang' => $sesi->ruang?->nama,
+            'tanggal' => $sesi->jadwalUjian?->tanggal?->toDateString(),
+            'sesi_ke' => $sesi->sesi_ke,
+        ]);
+
+        return response()->json(['data' => $data]);
+    }
+
     public function monitoring(Request $request, int $sesiRuangId): JsonResponse
     {
         if (! $this->otorisasi->bolehAwasiSesi($request->user(), $sesiRuangId)) {
@@ -179,6 +203,7 @@ class PengawasanController extends Controller
 
                 return [
                     'id' => $item->id,
+                    'user_id' => $item->siswa?->user_id,
                     'nama' => $item->siswa?->user?->name,
                     'nis' => $item->siswa?->nis,
                     'kelas' => $item->siswa?->kelas?->nama,
@@ -212,25 +237,14 @@ class PengawasanController extends Controller
         }
 
         $pesertaIds = DB::transaction(function () use ($user, $request): array {
-            $pesertaList = PesertaUjian::query()
+            // Reset login hanya memutus sesi perangkat; status kunci, jawaban, dan waktu ujian tidak berubah.
+            // Membuka kunci tetap lewat aksi unlock (alasan wajib dan tercatat).
+            $pesertaIds = PesertaUjian::query()
                 ->where('siswa_id', $user->siswa->id)
                 ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
-                ->get();
-            $pesertaIds = $pesertaList->pluck('id')->map(fn ($id) => (int) $id)->all();
-
-            foreach ($pesertaList as $p) {
-                if ($p->status === 'terkunci') {
-                    $p->update(['status' => 'mengerjakan']);
-                    LockEvent::query()
-                        ->where('peserta_ujian_id', $p->id)
-                        ->whereNull('waktu_buka')
-                        ->update([
-                            'waktu_buka' => Carbon::now(),
-                            'dibuka_oleh' => $request->user()->id,
-                            'alasan' => 'Reset login sesi oleh pengawas/guru',
-                        ]);
-                }
-            }
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
 
             $user->tokens()->delete();
             $user->deviceSessions()->where('aktif', true)->update(['aktif' => false]);

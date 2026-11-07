@@ -168,6 +168,7 @@ onMounted(() => {
           </RouterLink>
 
           <RouterLink
+            v-if="isOperatorOrSuperadmin"
             to="/staf/kontrol-sesi"
             class="card bg-white p-6 border border-slate-200 hover:border-rose-500 hover:shadow-md transition-all group block rounded-2xl"
           >

@@ -85,8 +85,26 @@ const navItems = computed<NavItem[]>(() => [
   {
     name: 'Kontrol Sesi',
     to: '/staf/kontrol-sesi',
+    visible: isOperatorOrSuperadmin.value,
+    icon: 'control'
+  },
+  {
+    name: 'Monitoring Pengawas',
+    to: '/staf/monitoring',
     visible: true,
     icon: 'control'
+  },
+  {
+    name: 'Koreksi Essay',
+    to: '/staf/koreksi-essay',
+    visible: true,
+    icon: 'book'
+  },
+  {
+    name: 'Rekap Nilai',
+    to: '/staf/nilai',
+    visible: true,
+    icon: 'dashboard'
   }
 ])
 
