@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { apiClient } from '@/api/client'
 
 type TabType = 'bobot' | 'paket' | 'jadwal'
@@ -9,6 +10,17 @@ const activeTab = ref<TabType>('jadwal')
 const loading = ref(false)
 const feedbackMessage = ref('')
 const errorMessage = ref('')
+
+// Action Loading & Confirmation States
+const isSavingBobot = ref(false)
+const isSavingPaket = ref(false)
+const isSavingJadwal = ref(false)
+const isSavingSesi = ref(false)
+const generatingTokenId = ref<number | null>(null)
+const showDeletePaketModal = ref(false)
+const paketIdToDelete = ref<number | null>(null)
+const paketNameToDelete = ref('')
+const isDeletingPaket = ref(false)
 
 // Data
 const bobotList = ref<any[]>([])
@@ -109,6 +121,7 @@ const totalBobot = computed(() => {
 
 async function saveBobot() {
   loading.value = true
+  isSavingBobot.value = true
   errorMessage.value = ''
   feedbackMessage.value = ''
   try {
@@ -119,6 +132,7 @@ async function saveBobot() {
     errorMessage.value = err.message || 'Gagal memperbarui bobot tipe soal.'
   } finally {
     loading.value = false
+    isSavingBobot.value = false
   }
 }
 
@@ -150,6 +164,7 @@ async function savePaketSoal() {
     return
   }
   loading.value = true
+  isSavingPaket.value = true
   errorMessage.value = ''
   try {
     await apiClient.post('/paket-soal', formPaket.value)
@@ -160,20 +175,32 @@ async function savePaketSoal() {
     errorMessage.value = err.message || 'Gagal membuat paket soal.'
   } finally {
     loading.value = false
+    isSavingPaket.value = false
   }
 }
 
-async function deletePaket(id: number) {
-  if (!confirm('Apakah Anda yakin ingin menghapus paket soal ini?')) return
-  loading.value = true
+function promptDeletePaket(id: number, nama: string) {
+  paketIdToDelete.value = id
+  paketNameToDelete.value = nama
+  showDeletePaketModal.value = true
+}
+
+async function confirmDeletePaket() {
+  if (!paketIdToDelete.value) return
+  isDeletingPaket.value = true
+  errorMessage.value = ''
+  feedbackMessage.value = ''
   try {
-    await apiClient.delete(`/paket-soal/${id}`)
+    await apiClient.delete(`/paket-soal/${paketIdToDelete.value}`)
     feedbackMessage.value = 'Paket soal berhasil dihapus.'
+    showDeletePaketModal.value = false
+    paketIdToDelete.value = null
+    paketNameToDelete.value = ''
     await fetchAll()
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal menghapus paket soal.'
   } finally {
-    loading.value = false
+    isDeletingPaket.value = false
   }
 }
 
@@ -196,6 +223,7 @@ const availablePaketForJadwal = computed(() => {
 
 async function saveJadwal() {
   loading.value = true
+  isSavingJadwal.value = true
   errorMessage.value = ''
   try {
     await apiClient.post('/jadwal', formJadwal.value)
@@ -206,6 +234,7 @@ async function saveJadwal() {
     errorMessage.value = err.message || 'Gagal membuat jadwal ujian.'
   } finally {
     loading.value = false
+    isSavingJadwal.value = false
   }
 }
 
@@ -224,6 +253,7 @@ function openCreateSesi(jadwalId: number) {
 
 async function saveSesi() {
   loading.value = true
+  isSavingSesi.value = true
   errorMessage.value = ''
   try {
     await apiClient.post('/sesi-ruang', formSesi.value)
@@ -234,11 +264,12 @@ async function saveSesi() {
     errorMessage.value = err.message || 'Gagal membuat sesi ruang ujian.'
   } finally {
     loading.value = false
+    isSavingSesi.value = false
   }
 }
 
 async function generateToken(sesiId: number) {
-  loading.value = true
+  generatingTokenId.value = sesiId
   try {
     const res = await apiClient.post(`/sesi-ruang/${sesiId}/token/generate`)
     feedbackMessage.value = `Token baru berhasil digenerate: ${res.data.data.kode}`
@@ -246,7 +277,7 @@ async function generateToken(sesiId: number) {
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal mengenerate token.'
   } finally {
-    loading.value = false
+    generatingTokenId.value = null
   }
 }
 
@@ -388,12 +419,14 @@ onMounted(() => {
                     </span>
                     <button
                       @click="generateToken(sesi.id)"
-                      class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1"
+                      :disabled="generatingTokenId === sesi.id"
+                      class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
+                      <span v-if="generatingTokenId === sesi.id" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                       </svg>
-                      <span>Rilis Token Baru</span>
+                      <span>{{ generatingTokenId === sesi.id ? 'Merilis Token...' : 'Rilis Token Baru' }}</span>
                     </button>
                   </div>
                 </div>
@@ -428,7 +461,7 @@ onMounted(() => {
                 </span>
                 <button
                   type="button"
-                  @click="deletePaket(paket.id)"
+                  @click="promptDeletePaket(paket.id, paket.nama)"
                   class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                   title="Hapus Paket Soal"
                   aria-label="Hapus Paket Soal"
@@ -478,8 +511,13 @@ onMounted(() => {
             </div>
 
             <div class="pt-4">
-              <button type="submit" class="btn-primary !min-h-0 !py-2 text-xs" :disabled="loading">
-                {{ loading ? 'Menyimpan...' : 'Simpan Perubahan Bobot' }}
+              <button
+                type="submit"
+                class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                :disabled="isSavingBobot"
+              >
+                <span v-if="isSavingBobot" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                <span>{{ isSavingBobot ? 'Menyimpan Bobot...' : 'Simpan Perubahan Bobot' }}</span>
               </button>
             </div>
           </form>
@@ -538,9 +576,14 @@ onMounted(() => {
           </div>
 
           <div class="flex justify-end gap-2 border-t pt-3">
-            <button type="button" @click="showCreatePaketModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
-            <button type="submit" class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="loading">
-              {{ loading ? 'Menyimpan...' : 'Simpan Paket Soal' }}
+            <button type="button" @click="showCreatePaketModal = false" :disabled="isSavingPaket" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
+            <button
+              type="submit"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              :disabled="isSavingPaket"
+            >
+              <span v-if="isSavingPaket" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ isSavingPaket ? 'Menyimpan...' : 'Simpan Paket Soal' }}</span>
             </button>
           </div>
         </form>
@@ -586,9 +629,14 @@ onMounted(() => {
           </div>
 
           <div class="flex justify-end gap-2 border-t pt-3">
-            <button type="button" @click="showCreateJadwalModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
-            <button type="submit" class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="loading">
-              {{ loading ? 'Menerbitkan...' : 'Terbitkan Jadwal' }}
+            <button type="button" @click="showCreateJadwalModal = false" :disabled="isSavingJadwal" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
+            <button
+              type="submit"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              :disabled="isSavingJadwal"
+            >
+              <span v-if="isSavingJadwal" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ isSavingJadwal ? 'Menerbitkan...' : 'Terbitkan Jadwal' }}</span>
             </button>
           </div>
         </form>
@@ -646,15 +694,31 @@ onMounted(() => {
           </div>
 
           <div class="flex justify-end gap-2 border-t pt-3">
-            <button type="button" @click="showCreateSesiModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
-            <button type="submit" class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="loading">
-              {{ loading ? 'Menyimpan...' : 'Simpan Sesi' }}
+            <button type="button" @click="showCreateSesiModal = false" :disabled="isSavingSesi" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
+            <button
+              type="submit"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              :disabled="isSavingSesi"
+            >
+              <span v-if="isSavingSesi" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ isSavingSesi ? 'Menyimpan...' : 'Simpan Sesi' }}</span>
             </button>
           </div>
         </form>
       </div>
     </div>
     </div>
+
+    <!-- Confirm Delete Modal: Paket Soal -->
+    <ConfirmDeleteModal
+      v-model="showDeletePaketModal"
+      :loading="isDeletingPaket"
+      title="Hapus Paket Soal"
+      :message="`Apakah Anda yakin ingin menghapus paket soal &quot;${paketNameToDelete}&quot;? Tindakan ini bersifat permanen dan tidak dapat dibatalkan.`"
+      confirm-text="Ya, Hapus Paket"
+      cancel-text="Batal"
+      @confirm="confirmDeletePaket"
+    />
   </StafLayout>
 </template>
 

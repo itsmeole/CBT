@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { downloadFileFromApi } from '@/lib/download'
@@ -16,6 +17,15 @@ const loading = ref(false)
 const searchQuery = ref('')
 const feedbackMessage = ref('')
 const errorMessage = ref('')
+
+// Action Loading & Confirmation States
+const saveLoading = ref(false)
+const showDeleteModal = ref(false)
+const entityIdToDelete = ref<number | null>(null)
+const deleteLoading = ref(false)
+const deleteTitle = ref('Hapus Data')
+const deleteMessage = ref('')
+const downloadTemplateLoading = ref(false)
 
 // Data lists
 const siswaList = ref<any[]>([])
@@ -198,6 +208,7 @@ function openEditModal(item: any) {
 
 async function saveEntity() {
   loading.value = true
+  saveLoading.value = true
   feedbackMessage.value = ''
   errorMessage.value = ''
   try {
@@ -237,36 +248,57 @@ async function saveEntity() {
     errorMessage.value = err.message || 'Gagal menyimpan data.'
   } finally {
     loading.value = false
+    saveLoading.value = false
   }
 }
 
-async function deleteEntity(id: number) {
-  if (!confirm('Apakah Anda yakin ingin menghapus data ini?')) return
-  loading.value = true
+function promptDeleteEntity(id: number, label?: string) {
+  entityIdToDelete.value = id
+  const tabName = {
+    siswa: 'siswa',
+    guru: 'guru',
+    kelas: 'kelas',
+    mapel: 'mata pelajaran',
+    ruang: 'ruang ujian',
+    tahun_ajaran: 'tahun ajaran'
+  }[activeTab.value] || 'data'
+
+  deleteTitle.value = `Hapus Data ${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`
+  deleteMessage.value = label
+    ? `Apakah Anda yakin ingin menghapus ${tabName} "${label}"? Tindakan ini bersifat permanen dan tidak dapat dibatalkan.`
+    : `Apakah Anda yakin ingin menghapus data ${tabName} ini? Tindakan ini bersifat permanen dan tidak dapat dibatalkan.`
+  showDeleteModal.value = true
+}
+
+async function confirmDeleteEntity() {
+  if (!entityIdToDelete.value) return
+  deleteLoading.value = true
   feedbackMessage.value = ''
   errorMessage.value = ''
   try {
     const endpoint = activeTab.value.replace('_', '-')
-    await apiClient.delete(`/${endpoint}/${id}`)
+    await apiClient.delete(`/${endpoint}/${entityIdToDelete.value}`)
     feedbackMessage.value = 'Data berhasil dihapus.'
+    showDeleteModal.value = false
+    entityIdToDelete.value = null
     await fetchData()
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal menghapus data.'
   } finally {
-    loading.value = false
+    deleteLoading.value = false
   }
 }
 
 // Download Excel Template
 async function downloadTemplate(jenis: string) {
-  loading.value = true
+  downloadTemplateLoading.value = true
   errorMessage.value = ''
   try {
     await downloadFileFromApi(`/templates/excel/${jenis}`, `template_${jenis}.xlsx`)
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal mengunduh template Excel.'
   } finally {
-    loading.value = false
+    downloadTemplateLoading.value = false
   }
 }
 
@@ -357,13 +389,15 @@ const currentListCount = computed(() => {
           <button
             v-if="['siswa', 'guru', 'kelas'].includes(activeTab)"
             @click="downloadTemplate(activeTab)"
-            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
+            :disabled="downloadTemplateLoading"
+            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
           >
-            <!-- Download SVG -->
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+            <!-- Download SVG with Spinner -->
+            <span v-if="downloadTemplateLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            <span>Unduh Template</span>
+            <span>{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
           </button>
           <span v-if="!isOperatorOrSuperadmin" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500">
@@ -494,7 +528,7 @@ const currentListCount = computed(() => {
                     </button>
                     <button
                       type="button"
-                      @click="deleteEntity(item.id)"
+                      @click="promptDeleteEntity(item.id, item.nama || item.user?.name)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
                       aria-label="Hapus Data"
@@ -568,7 +602,7 @@ const currentListCount = computed(() => {
                     </button>
                     <button
                       type="button"
-                      @click="deleteEntity(item.id)"
+                      @click="promptDeleteEntity(item.id, item.nama || item.user?.name)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
                       aria-label="Hapus Data"
@@ -618,7 +652,7 @@ const currentListCount = computed(() => {
                     </button>
                     <button
                       type="button"
-                      @click="deleteEntity(item.id)"
+                      @click="promptDeleteEntity(item.id, item.nama || item.user?.name)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
                       aria-label="Hapus Data"
@@ -666,7 +700,7 @@ const currentListCount = computed(() => {
                     </button>
                     <button
                       type="button"
-                      @click="deleteEntity(item.id)"
+                      @click="promptDeleteEntity(item.id, item.nama || item.user?.name)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
                       aria-label="Hapus Data"
@@ -716,7 +750,7 @@ const currentListCount = computed(() => {
                     </button>
                     <button
                       type="button"
-                      @click="deleteEntity(item.id)"
+                      @click="promptDeleteEntity(item.id, item.nama || item.user?.name)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
                       aria-label="Hapus Data"
@@ -769,7 +803,7 @@ const currentListCount = computed(() => {
                     </button>
                     <button
                       type="button"
-                      @click="deleteEntity(item.id)"
+                      @click="promptDeleteEntity(item.id, item.nama || item.user?.name)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
                       aria-label="Hapus Data"
@@ -964,9 +998,14 @@ const currentListCount = computed(() => {
           </template>
 
           <div class="flex justify-end gap-2 pt-4">
-            <button type="button" @click="showFormModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
-            <button type="submit" class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="loading">
-              {{ loading ? 'Menyimpan...' : 'Simpan' }}
+            <button type="button" @click="showFormModal = false" :disabled="saveLoading" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
+            <button
+              type="submit"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              :disabled="saveLoading"
+            >
+              <span v-if="saveLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ saveLoading ? 'Menyimpan...' : (isEditing ? 'Simpan Perubahan' : 'Simpan Data') }}</span>
             </button>
           </div>
         </form>
@@ -1060,19 +1099,31 @@ const currentListCount = computed(() => {
           </div>
 
           <div class="flex justify-between items-center pt-2">
-            <button @click="importStep = 1" class="btn-secondary !min-h-0 !py-2 text-xs">← Kembali</button>
+            <button @click="importStep = 1" :disabled="importLoading" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">← Kembali</button>
             <button
               @click="commitExcel"
               :disabled="importErrors.length > 0 || importLoading"
-              class="btn-primary !min-h-0 !py-2 text-xs"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              {{ importLoading ? 'Menyimpan...' : 'Konfirmasi & Simpan ke Basis Data' }}
+              <span v-if="importLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ importLoading ? 'Menyimpan...' : 'Konfirmasi & Simpan ke Basis Data' }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
     </div>
+
+    <!-- Confirm Delete Modal with Custom Styling -->
+    <ConfirmDeleteModal
+      v-model="showDeleteModal"
+      :loading="deleteLoading"
+      :title="deleteTitle"
+      :message="deleteMessage"
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDeleteEntity"
+    />
   </StafLayout>
 </template>
 

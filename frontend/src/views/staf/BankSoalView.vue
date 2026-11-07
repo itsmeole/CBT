@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { renderMathInHtml } from '@/lib/katex'
@@ -46,6 +47,14 @@ const selectedTipe = ref<string>('')
 const searchQuery = ref('')
 const feedbackMessage = ref('')
 const errorMessage = ref('')
+
+// Action Loading & Confirmation States
+const isSavingSoal = ref(false)
+const showDeleteModal = ref(false)
+const soalIdToDelete = ref<number | null>(null)
+const isDeletingSoal = ref(false)
+const downloadTemplateLoading = ref(false)
+const exportLoading = ref(false)
 
 // Form Modal State
 const showModal = ref(false)
@@ -239,6 +248,7 @@ function openEditModal(item: SoalItem) {
 
 async function saveSoal() {
   loading.value = true
+  isSavingSoal.value = true
   errorMessage.value = ''
   feedbackMessage.value = ''
 
@@ -250,6 +260,7 @@ async function saveSoal() {
     if (correctIdx === -1 && formOpsi.value.length > 0) {
       errorMessage.value = 'Silakan pilih satu opsi sebagai kunci jawaban yang benar.'
       loading.value = false
+      isSavingSoal.value = false
       return
     }
     payloadKunci = correctIdx >= 0 ? String.fromCharCode(65 + correctIdx) : 'A'
@@ -261,6 +272,7 @@ async function saveSoal() {
     if (keys.length < 2) {
       errorMessage.value = 'Pilih minimal 2 opsi sebagai kunci jawaban benar untuk tipe PG Kompleks.'
       loading.value = false
+      isSavingSoal.value = false
       return
     }
     payloadKunci = keys
@@ -309,21 +321,30 @@ async function saveSoal() {
     }
   } finally {
     loading.value = false
+    isSavingSoal.value = false
   }
 }
 
-async function deleteSoal(id: number) {
-  if (!confirm('Apakah Anda yakin ingin menghapus butir soal ini?')) return
-  loading.value = true
+function promptDeleteSoal(id: number) {
+  soalIdToDelete.value = id
+  showDeleteModal.value = true
+}
+
+async function confirmDeleteSoal() {
+  if (!soalIdToDelete.value) return
+  isDeletingSoal.value = true
   errorMessage.value = ''
+  feedbackMessage.value = ''
   try {
-    await apiClient.delete(`/bank-soal/${id}`)
-    feedbackMessage.value = 'Soal berhasil dihapus.'
+    await apiClient.delete(`/bank-soal/${soalIdToDelete.value}`)
+    feedbackMessage.value = 'Butir soal berhasil dihapus.'
+    showDeleteModal.value = false
+    soalIdToDelete.value = null
     await fetchSoal()
   } catch (err: any) {
-    errorMessage.value = err.message || 'Gagal menghapus soal.'
+    errorMessage.value = err.message || 'Gagal menghapus butir soal.'
   } finally {
-    loading.value = false
+    isDeletingSoal.value = false
   }
 }
 
@@ -367,10 +388,13 @@ function insertMediaSnippet() {
 // Download Word Template
 async function downloadWordTemplate() {
   errorMessage.value = ''
+  downloadTemplateLoading.value = true
   try {
     await downloadFileFromApi('/templates/word', 'template_soal.docx')
   } catch (err: any) {
     errorMessage.value = err.response?.data?.message || err.message || 'Gagal mengunduh template soal Word.'
+  } finally {
+    downloadTemplateLoading.value = false
   }
 }
 
@@ -381,12 +405,15 @@ async function exportWordSoal() {
     return
   }
   errorMessage.value = ''
+  exportLoading.value = true
   try {
     const selectedObj = mapelList.value.find(m => m.id === selectedMapel.value)
     const filename = `bank_soal_${selectedObj?.kode || selectedMapel.value}.docx`
     await downloadFileFromApi(`/export/word/bank-soal?mapel_id=${selectedMapel.value}`, filename)
   } catch (err: any) {
     errorMessage.value = err.response?.data?.message || err.message || 'Gagal mengekspor soal Word.'
+  } finally {
+    exportLoading.value = false
   }
 }
 
@@ -475,11 +502,17 @@ onMounted(() => {
             </svg>
             <span>Mode Lihat Saja</span>
           </span>
-          <button @click="downloadWordTemplate" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Unduh format template soal .docx">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+          <button
+            @click="downloadWordTemplate"
+            :disabled="downloadTemplateLoading"
+            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            title="Unduh format template soal .docx"
+          >
+            <span v-if="downloadTemplateLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
-            <span>Unduh Template</span>
+            <span>{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
           </button>
           <button v-if="canManageSelectedMapel" @click="openWordImport" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Impor butir soal dari dokumen Word (.docx)">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
@@ -487,11 +520,17 @@ onMounted(() => {
             </svg>
             <span>Impor Soal</span>
           </button>
-          <button @click="exportWordSoal" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Ekspor daftar butir soal ke dokumen Word (.docx)">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+          <button
+            @click="exportWordSoal"
+            :disabled="exportLoading"
+            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            title="Ekspor daftar butir soal ke dokumen Word (.docx)"
+          >
+            <span v-if="exportLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            <span>Ekspor Soal</span>
+            <span>{{ exportLoading ? 'Mengekspor...' : 'Ekspor Soal' }}</span>
           </button>
           <button v-if="canManageSelectedMapel" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5 font-medium shadow-xs">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
@@ -595,7 +634,7 @@ onMounted(() => {
               </button>
               <button
                 type="button"
-                @click="deleteSoal(soal.id)"
+                @click="promptDeleteSoal(soal.id)"
                 class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                 title="Hapus Butir Soal"
                 aria-label="Hapus Butir Soal"
@@ -776,9 +815,14 @@ onMounted(() => {
           </div>
 
           <div class="flex justify-end gap-2 border-t pt-3">
-            <button type="button" @click="showModal = false" class="btn-secondary !min-h-0 !py-1.5 text-xs">Batal</button>
-            <button type="submit" class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="loading">
-              {{ loading ? 'Menyimpan...' : 'Simpan Butir Soal' }}
+            <button type="button" @click="showModal = false" :disabled="isSavingSoal" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
+            <button
+              type="submit"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              :disabled="isSavingSoal"
+            >
+              <span v-if="isSavingSoal" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ isSavingSoal ? 'Menyimpan...' : (isEditing ? 'Simpan Perubahan' : 'Simpan Butir Soal') }}</span>
             </button>
           </div>
         </form>
@@ -930,18 +974,30 @@ onMounted(() => {
           </div>
 
           <div class="flex justify-between items-center pt-2">
-            <button @click="wordImportStep = 1" class="btn-secondary !min-h-0 !py-2 text-xs">← Kembali</button>
+            <button @click="wordImportStep = 1" :disabled="wordImportLoading" class="btn-secondary !min-h-0 !py-2 text-xs">← Kembali</button>
             <button
               @click="commitWord"
               :disabled="wordImportErrors.length > 0 || wordPreviewItems.length === 0 || wordImportLoading"
-              class="btn-primary !min-h-0 !py-2 text-xs"
+              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              {{ wordImportLoading ? 'Menyimpan...' : 'Simpan Soal ke Bank Soal' }}
+              <span v-if="wordImportLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ wordImportLoading ? 'Menyimpan...' : 'Simpan Soal ke Bank Soal' }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
     </div>
+
+    <!-- Confirm Delete Modal with Custom Styling -->
+    <ConfirmDeleteModal
+      v-model="showDeleteModal"
+      :loading="isDeletingSoal"
+      title="Hapus Butir Soal"
+      message="Apakah Anda yakin ingin menghapus butir soal ini? Tindakan ini bersifat permanen dan butir soal tidak dapat dipulihkan."
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDeleteSoal"
+    />
   </StafLayout>
 </template>
