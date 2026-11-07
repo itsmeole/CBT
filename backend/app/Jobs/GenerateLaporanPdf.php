@@ -83,24 +83,71 @@ class GenerateLaporanPdf implements ShouldQueue
         $sesi = SesiRuang::query()->with([
             'ruang',
             'jadwalUjian.mapel',
+            'pengawasSesi.guru.user',
+            'pesertaUjian' => fn ($peserta) => $peserta->orderBy('id'),
             'pesertaUjian.siswa.user',
             'pesertaUjian.siswa.kelas',
         ])->findOrFail($laporan->sesi_ruang_id);
+        $jadwal = $sesi->jadwalUjian;
+        $tanggal = $jadwal?->tanggal?->locale('id')->translatedFormat('l, d F Y') ?? '-';
+        $waktu = substr((string) $sesi->jam_mulai, 0, 5).' - '.substr((string) $sesi->jam_akhir, 0, 5);
+
+        $peserta = $sesi->pesertaUjian->sortBy(fn (PesertaUjian $item): string => ($item->siswa?->kelas?->nama ?? '').'|'.($item->siswa?->user?->name ?? ''))->values();
+        $hadir = $peserta->where('hadir', true)->count();
+
         $rows = '';
-        foreach ($sesi->pesertaUjian as $index => $peserta) {
-            $rows .= '<tr><td>'.($index + 1).'</td><td>'.$this->escape($peserta->siswa?->nis).'</td><td>'.$this->escape($peserta->siswa?->user?->name).'</td><td>'.$this->escape($peserta->siswa?->kelas?->nama).'</td><td>'.($peserta->hadir ? 'Hadir' : 'Tidak hadir').'</td><td></td></tr>';
+        foreach ($peserta as $index => $item) {
+            $rows .= '<tr><td>'.($index + 1).'</td><td>'.$this->escape($item->siswa?->nis).'</td><td>'.$this->escape($item->siswa?->user?->name).'</td><td>'.$this->escape($item->siswa?->kelas?->nama).'</td><td>'.($item->hadir ? 'Hadir' : 'Tidak hadir').'</td><td class="ttd"></td></tr>';
         }
-        $body = '<h1>Daftar Hadir</h1><p>'.$this->escape($sesi->jadwalUjian?->nama).' — '.$this->escape($sesi->jadwalUjian?->mapel?->nama).'</p><p>Ruang '.$this->escape($sesi->ruang?->nama).' / Sesi '.$this->escape($sesi->sesi_ke).'</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Kehadiran</th><th>Tanda tangan</th></tr></thead><tbody>'.$rows.'</tbody></table>';
+
+        $pengawasRows = '';
+        foreach ($sesi->pengawasSesi as $index => $penugasan) {
+            $pengawasRows .= '<tr><td>'.($index + 1).'</td><td>'.$this->escape($penugasan->guru?->user?->name).'</td><td>'.$this->escape($this->penugasanLain($penugasan->guru_id, $sesi)).'</td><td class="ttd"></td></tr>';
+        }
+        if ($pengawasRows === '') {
+            $pengawasRows = '<tr><td colspan="4">Pengawas belum ditetapkan untuk sesi ini.</td></tr>';
+        }
+
+        $body = '<h1>Daftar Hadir Peserta Ujian</h1>'
+            .'<table class="info"><tr><td>Ujian</td><td>'.$this->escape($jadwal?->nama).'</td><td>Ruang</td><td>'.$this->escape($sesi->ruang?->nama).'</td></tr>'
+            .'<tr><td>Mata pelajaran</td><td>'.$this->escape($jadwal?->mapel?->nama).'</td><td>Sesi</td><td>'.$this->escape($sesi->sesi_ke).'</td></tr>'
+            .'<tr><td>Hari / tanggal</td><td>'.$this->escape($tanggal).'</td><td>Waktu</td><td>'.$this->escape($waktu).'</td></tr></table>'
+            .'<h2>Pengawas Ruang</h2><table><thead><tr><th>No</th><th>Nama pengawas</th><th>Penugasan lain pada hari yang sama</th><th>Tanda tangan</th></tr></thead><tbody>'.$pengawasRows.'</tbody></table>'
+            .'<h2>Peserta ('.$peserta->count().' siswa)</h2><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Kehadiran</th><th>Tanda tangan</th></tr></thead><tbody>'.$rows.'</tbody></table>'
+            .'<p>Hadir: '.$hadir.' &nbsp;|&nbsp; Tidak hadir: '.($peserta->count() - $hadir).'</p>';
 
         return $this->document('Daftar Hadir', $body);
     }
 
+    /**
+     * Ringkasan penugasan pengawas yang sama di sesi lain pada tanggal yang sama (pengawas dapat
+     * berpindah ruang antar mata pelajaran dalam satu hari).
+     */
+    private function penugasanLain(int $guruId, SesiRuang $sesi): string
+    {
+        $lain = SesiRuang::query()
+            ->with(['ruang', 'jadwalUjian.mapel'])
+            ->where('id', '!=', $sesi->id)
+            ->whereHas('pengawasSesi', fn ($q) => $q->where('guru_id', $guruId))
+            ->whereHas('jadwalUjian', fn ($q) => $q->whereDate('tanggal', $sesi->jadwalUjian?->tanggal))
+            ->orderBy('jam_mulai')
+            ->get();
+
+        if ($lain->isEmpty()) {
+            return '-';
+        }
+
+        return $lain->map(fn (SesiRuang $item): string => ($item->jadwalUjian?->mapel?->nama ?? '-')
+            .' ('.substr((string) $item->jam_mulai, 0, 5).'-'.substr((string) $item->jam_akhir, 0, 5)
+            .', '.($item->ruang?->nama ?? '-').')')->implode('; ');
+    }
+
     private function beritaAcara(LaporanPdf $laporan): string
     {
-        $sesi = SesiRuang::query()->with(['ruang', 'jadwalUjian.mapel', 'beritaAcara.pengawas'])
+        $sesi = SesiRuang::query()->with(['ruang', 'jadwalUjian.mapel', 'beritaAcara.pengawas', 'pengawasSesi.guru.user'])
             ->findOrFail($laporan->sesi_ruang_id);
         $berita = $sesi->beritaAcara;
-        $body = '<h1>Berita Acara Ujian</h1><p>Ujian: '.$this->escape($sesi->jadwalUjian?->nama).'</p><p>Mapel: '.$this->escape($sesi->jadwalUjian?->mapel?->nama).'</p><p>Ruang: '.$this->escape($sesi->ruang?->nama).' / Sesi '.$this->escape($sesi->sesi_ke).'</p><p>Pengawas: '.$this->escape($berita?->pengawas?->name).'</p><p>Jumlah hadir: '.($berita?->jumlah_hadir ?? 0).' — Tidak hadir: '.($berita?->jumlah_absen ?? 0).'</p><h2>Catatan</h2><p>'.nl2br($this->escape($berita?->isi ?? 'Berita acara belum diisi.')).'</p>';
+        $body = '<h1>Berita Acara Ujian</h1><p>Ujian: '.$this->escape($sesi->jadwalUjian?->nama).'</p><p>Mapel: '.$this->escape($sesi->jadwalUjian?->mapel?->nama).'</p><p>Ruang: '.$this->escape($sesi->ruang?->nama).' / Sesi '.$this->escape($sesi->sesi_ke).'</p><p>Pengawas bertugas: '.$this->escape($sesi->pengawasSesi->map(fn ($p) => $p->guru?->user?->name)->filter()->implode(', ') ?: '-').'</p><p>Pengisi berita acara: '.$this->escape($berita?->pengawas?->name ?? '-').'</p><p>Jumlah hadir: '.($berita?->jumlah_hadir ?? 0).' — Tidak hadir: '.($berita?->jumlah_absen ?? 0).'</p><h2>Catatan</h2><p>'.nl2br($this->escape($berita?->isi ?? 'Berita acara belum diisi.')).'</p>';
 
         return $this->document('Berita Acara Ujian', $body);
     }
@@ -134,7 +181,7 @@ class GenerateLaporanPdf implements ShouldQueue
 
     private function document(string $title, string $body): string
     {
-        return '<!doctype html><html lang="id"><meta charset="utf-8"><title>'.$this->escape($title).'</title><style>body{font-family:DejaVu Sans,sans-serif;font-size:11px;color:#111}h1,h2{margin-bottom:8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:5px;text-align:left}.card{border:1px solid #222;padding:16px;margin:0 0 16px;page-break-inside:avoid}.card:not(:last-child){page-break-after:always}</style><body>'.$body.'</body></html>';
+        return '<!doctype html><html lang="id"><meta charset="utf-8"><title>'.$this->escape($title).'</title><style>body{font-family:DejaVu Sans,sans-serif;font-size:11px;color:#111}h1,h2{margin-bottom:8px}table{width:100%;border-collapse:collapse;margin-bottom:10px}.info td{border:none;padding:2px 5px}.ttd{width:110px}th,td{border:1px solid #444;padding:5px;text-align:left}.card{border:1px solid #222;padding:16px;margin:0 0 16px;page-break-inside:avoid}.card:not(:last-child){page-break-after:always}</style><body>'.$body.'</body></html>';
     }
 
     private function escape(mixed $value): string

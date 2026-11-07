@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
+import FilterJadwal from '@/components/FilterJadwal.vue'
 import { renderMathInHtml } from '@/lib/katex'
 import { normalisasiSkor, skorEssayValid, teksPanduan } from '@/lib/koreksi'
 
-interface JadwalOpsi {
-  id: number
-  nama: string
-  mapel?: { nama: string }
-}
 interface ItemKoreksi {
   jawaban_id: number | null
   peserta_id: number
@@ -25,8 +21,8 @@ interface ItemKoreksi {
   catatan: string | null
 }
 
-const jadwalList = ref<JadwalOpsi[]>([])
 const jadwalId = ref<number | null>(null)
+const kelasId = ref<number | ''>('')
 const antrean = ref<ItemKoreksi[]>([])
 const indeks = ref(0)
 const skorInput = ref('')
@@ -43,22 +39,14 @@ const kosong = computed(() => antrean.value.length - dapatDinilai.value.length)
 const aktif = computed<ItemKoreksi | undefined>(() => dapatDinilai.value[indeks.value])
 const skorOk = computed(() => (aktif.value ? skorEssayValid(skorInput.value, aktif.value.skor_maksimal) : false))
 
-async function muatJadwal() {
-  try {
-    const res = await apiClient.get('/jadwal')
-    jadwalList.value = res.data.data ?? []
-    if (jadwalList.value.length > 0) jadwalId.value = jadwalList.value[0].id
-  } catch (err) {
-    errorMessage.value = err instanceof Error ? err.message : 'Gagal memuat jadwal.'
-  }
-}
-
 async function muatAntrean() {
   if (!jadwalId.value) return
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await apiClient.get('/koreksi/essay', { params: { jadwal_id: jadwalId.value } })
+    const res = await apiClient.get('/koreksi/essay', {
+      params: kelasId.value !== '' ? { jadwal_id: jadwalId.value, kelas_id: kelasId.value } : { jadwal_id: jadwalId.value }
+    })
     antrean.value = res.data.data ?? []
     indeks.value = 0
     siapkanForm()
@@ -106,12 +94,11 @@ function pindah(delta: number) {
   }
 }
 
-watch(jadwalId, () => {
+watch([jadwalId, kelasId], () => {
   selesaiDikoreksi.value = 0
   feedback.value = ''
   void muatAntrean()
 })
-onMounted(muatJadwal)
 </script>
 
 <template>
@@ -125,18 +112,13 @@ onMounted(muatJadwal)
       <div v-if="errorMessage" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{{ errorMessage }}</div>
       <div v-if="feedback" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{{ feedback }}</div>
 
-      <div class="card bg-white p-4">
-        <label class="text-xs font-semibold text-slate-600">
-          Jadwal ujian
-          <select v-model="jadwalId" class="input mt-1">
-            <option v-for="j in jadwalList" :key="j.id" :value="j.id">{{ j.nama }}{{ j.mapel ? ` - ${j.mapel.nama}` : '' }}</option>
-          </select>
-        </label>
-        <p class="mt-2 text-xs text-slate-500">
-          Antrean: <strong>{{ dapatDinilai.length }}</strong> jawaban menunggu - Dikoreksi sesi ini: <strong>{{ selesaiDikoreksi }}</strong>
-          <span v-if="kosong > 0"> - {{ kosong }} jawaban kosong dinilai 0 otomatis</span>
-        </p>
-      </div>
+      <FilterJadwal v-model:jadwal-id="jadwalId" v-model:kelas-id="kelasId" @error="errorMessage = $event">
+        <template #ringkasan>
+          <span class="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">Antrean: <strong>{{ dapatDinilai.length }}</strong> jawaban menunggu</span>
+          <span class="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-800">Dikoreksi sesi ini: <strong>{{ selesaiDikoreksi }}</strong></span>
+          <span v-if="kosong > 0" class="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{{ kosong }} jawaban kosong dinilai 0 otomatis</span>
+        </template>
+      </FilterJadwal>
 
       <p v-if="loading" class="py-6 text-center text-sm text-slate-500">Memuat antrean...</p>
       <div v-else-if="!aktif" class="card bg-white p-8 text-center text-sm text-slate-500">Tidak ada jawaban essay yang perlu dikoreksi.</div>

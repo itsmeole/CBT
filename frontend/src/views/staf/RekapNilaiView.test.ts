@@ -28,7 +28,13 @@ function pasang() {
 describe('RekapNilaiView', () => {
   beforeEach(() => {
     get.mockReset().mockImplementation((url: string) => {
-      if (url === '/jadwal') return Promise.resolve({ data: { data: [{ id: 3, nama: 'UTS IPA', mapel: { nama: 'IPA' } }] } })
+      if (url === '/mapel') return Promise.resolve({ data: { data: [{ id: 1, nama: 'IPA' }, { id: 2, nama: 'Matematika' }] } })
+      if (url === '/kelas') return Promise.resolve({ data: { data: [{ id: 4, nama: 'X-1' }] } })
+      if (url === '/jadwal') {
+        return Promise.resolve({
+          data: { data: [{ id: 3, nama: 'UTS IPA', mapel_id: 1, mapel: { nama: 'IPA' } }, { id: 5, nama: 'UTS MTK', mapel_id: 2, mapel: { nama: 'Matematika' } }] }
+        })
+      }
       if (url === '/nilai') return Promise.resolve({ data: { data: baris } })
       return Promise.reject(new Error(`URL tak terduga: ${url}`))
     })
@@ -54,6 +60,23 @@ describe('RekapNilaiView', () => {
     await wrapper.find('input[placeholder^="Ketik"]').setValue('citra')
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
     expect(wrapper.text()).toContain('Citra')
+    wrapper.unmount()
+  })
+})
+
+describe('RekapNilaiView filter', () => {
+  it('filter mapel dan kelas diteruskan ke permintaan nilai', async () => {
+    const wrapper = pasang()
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/nilai', { params: { jadwal_id: 3 } })
+
+    await wrapper.findAll('select')[0].setValue('2')
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/nilai', { params: { jadwal_id: 5 } })
+
+    await wrapper.findAll('select')[2].setValue('4')
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/nilai', { params: { jadwal_id: 5, kelas_id: 4 } })
     wrapper.unmount()
   })
 })

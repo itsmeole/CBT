@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { statusPilihan, toggleSemua } from '@/lib/pilihSemua'
+import { TAB_JADWAL, tabValid } from '@/lib/navigasi'
 import StafLayout from '@/components/StafLayout.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { apiClient } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+import PenempatanRuangModal from '@/components/PenempatanRuangModal.vue'
+import PengawasSesiModal from '@/components/PengawasSesiModal.vue'
 
 type TabType = 'bobot' | 'paket' | 'jadwal'
 
-const activeTab = ref<TabType>('jadwal')
+const route = useRoute()
+const auth = useAuthStore()
+// Tab dipilih lewat sub-menu sidebar (query `tab`).
+const activeTab = ref<TabType>(tabValid(TAB_JADWAL, route.query.tab) as TabType)
+const judulTab = computed(() => TAB_JADWAL.find((t) => t.tab === activeTab.value)?.nama ?? 'Jadwal & Paket Ujian')
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value = tabValid(TAB_JADWAL, tab) as TabType
+  }
+)
 const loading = ref(false)
 const feedbackMessage = ref('')
 const errorMessage = ref('')
@@ -15,7 +31,6 @@ const errorMessage = ref('')
 const isSavingBobot = ref(false)
 const isSavingPaket = ref(false)
 const isSavingJadwal = ref(false)
-const isSavingSesi = ref(false)
 const generatingTokenId = ref<number | null>(null)
 const showDeletePaketModal = ref(false)
 const paketIdToDelete = ref<number | null>(null)
@@ -28,8 +43,6 @@ const paketList = ref<any[]>([])
 const jadwalList = ref<any[]>([])
 const mapelList = ref<any[]>([])
 const bankSoalList = ref<any[]>([])
-const ruangList = ref<any[]>([])
-const siswaList = ref<any[]>([])
 
 // Bobot Edit State
 const editBobot = ref<Record<string, number>>({})
@@ -53,22 +66,11 @@ const formJadwal = ref({
   durasi_menit: 90
 })
 
-// Create Sesi-Ruang Modal State
-const showCreateSesiModal = ref(false)
-const formSesi = ref({
-  jadwal_ujian_id: null as number | null,
-  ruang_id: null as number | null,
-  sesi_ke: 1,
-  jam_mulai: '08:00',
-  jam_akhir: '09:30',
-  siswa_ids: [] as number[]
-})
-
 async function fetchAll() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [bobotRes, paketRes, jadwalRes, mapelRes, ruangRes, siswaRes] = await Promise.all([
+    const [bobotRes, paketRes, jadwalRes, mapelRes] = await Promise.all([
       apiClient.get('/bobot-tipe').catch(err => {
         console.warn('Gagal memuat bobot-tipe:', err)
         return { data: { data: [] } }
@@ -84,22 +86,12 @@ async function fetchAll() {
       apiClient.get('/mapel').catch(err => {
         console.warn('Gagal memuat mapel:', err)
         return { data: { data: [] } }
-      }),
-      apiClient.get('/ruang').catch(err => {
-        console.warn('Gagal memuat ruang:', err)
-        return { data: { data: [] } }
-      }),
-      apiClient.get('/siswa').catch(err => {
-        console.warn('Gagal memuat siswa:', err)
-        return { data: { data: [] } }
       })
     ])
     bobotList.value = bobotRes.data.data || []
     paketList.value = paketRes.data.data || []
     jadwalList.value = jadwalRes.data.data || []
     mapelList.value = mapelRes.data.data || []
-    ruangList.value = ruangRes.data.data || []
-    siswaList.value = siswaRes.data.data || []
 
     // Populate editBobot
     const bMap: Record<string, number> = {}
@@ -115,6 +107,12 @@ async function fetchAll() {
 }
 
 // Total Bobot Calculation
+const idButir = computed(() => bankSoalList.value.map((s: any) => s.id as number))
+const statusButir = computed(() => statusPilihan(idButir.value, formPaket.value.soal_ids))
+function pilihSemuaButir() {
+  formPaket.value.soal_ids = toggleSemua(idButir.value, formPaket.value.soal_ids)
+}
+
 const totalBobot = computed(() => {
   return Object.values(editBobot.value).reduce((sum, val) => sum + (Number(val) || 0), 0)
 })
@@ -149,6 +147,8 @@ async function openCreatePaket() {
 }
 
 async function onPaketMapelChange() {
+  // Butir yang tercentang milik mapel sebelumnya tidak boleh terbawa.
+  formPaket.value.soal_ids = []
   if (!formPaket.value.mapel_id) return
   try {
     const res = await apiClient.get('/bank-soal', { params: { mapel_id: formPaket.value.mapel_id } })
@@ -238,35 +238,37 @@ async function saveJadwal() {
   }
 }
 
-// Sesi Ruang Actions
-function openCreateSesi(jadwalId: number) {
-  formSesi.value = {
-    jadwal_ujian_id: jadwalId,
-    ruang_id: ruangList.value[0]?.id || null,
-    sesi_ke: 1,
-    jam_mulai: '08:00',
-    jam_akhir: '09:30',
-    siswa_ids: siswaList.value.map(s => s.id) // default select all students
-  }
-  showCreateSesiModal.value = true
+// Sesi Ruang: penempatan peserta & pengawas
+interface JadwalRef { id: number; nama: string; tanggal: string; tahun_ajaran_id: number }
+const jadwalPenempatan = ref<JadwalRef | null>(null)
+const sesiPengawas = ref<{ sesi: { id: number; ruang: string; sesi_ke: number; jam_mulai: string; jam_akhir: string; pengawas_ids: number[] }; judul: string } | null>(null)
+
+function bukaPenempatan(jadwal: any) {
+  jadwalPenempatan.value = { id: jadwal.id, nama: jadwal.nama, tanggal: String(jadwal.tanggal).slice(0, 10), tahun_ajaran_id: jadwal.tahun_ajaran_id }
 }
 
-async function saveSesi() {
-  loading.value = true
-  isSavingSesi.value = true
-  errorMessage.value = ''
-  try {
-    await apiClient.post('/sesi-ruang', formSesi.value)
-    feedbackMessage.value = 'Sesi ruang ujian & token berhasil dibuat.'
-    showCreateSesiModal.value = false
-    await fetchAll()
-  } catch (err: any) {
-    errorMessage.value = err.message || 'Gagal membuat sesi ruang ujian.'
-  } finally {
-    loading.value = false
-    isSavingSesi.value = false
+function bukaPengawas(jadwal: any, sesi: any) {
+  sesiPengawas.value = {
+    judul: `${jadwal.nama} - ${jadwal.mapel?.nama ?? ''}`,
+    sesi: {
+      id: sesi.id,
+      ruang: sesi.ruang?.nama ?? 'Ruang',
+      sesi_ke: sesi.sesi_ke,
+      jam_mulai: String(sesi.jam_mulai).slice(0, 5),
+      jam_akhir: String(sesi.jam_akhir).slice(0, 5),
+      pengawas_ids: (sesi.pengawas_sesi ?? []).map((p: any) => p.guru_id)
+    }
   }
 }
+
+async function setelahTersimpan(pesan: string) {
+  jadwalPenempatan.value = null
+  sesiPengawas.value = null
+  feedbackMessage.value = pesan
+  await fetchAll()
+}
+
+const bolehAtur = computed(() => auth.role === 'operator' || auth.role === 'superadmin')
 
 async function generateToken(sesiId: number) {
   generatingTokenId.value = sesiId
@@ -327,42 +329,9 @@ onMounted(() => {
         <span>{{ errorMessage }}</span>
       </div>
 
-      <!-- Navigation Tabs -->
-      <div class="flex border-b border-slate-200 bg-white px-4 pt-2 rounded-t-2xl overflow-x-auto gap-4 shadow-xs">
-        <button
-          @click="activeTab = 'jadwal'"
-          class="flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition-colors"
-          :class="activeTab === 'jadwal' ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
-          </svg>
-          <span>Jadwal Ujian & Sesi Ruang</span>
-        </button>
-        <button
-          @click="activeTab = 'paket'"
-          class="flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition-colors"
-          :class="activeTab === 'paket' ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-          </svg>
-          <span>Paket Soal</span>
-        </button>
-        <button
-          @click="activeTab = 'bobot'"
-          class="flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition-colors"
-          :class="activeTab === 'bobot' ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
-          </svg>
-          <span>Konfigurasi Bobot Tipe Soal</span>
-        </button>
-      </div>
-
       <!-- Content Area -->
-      <div class="rounded-b-xl border border-t-0 border-slate-200 bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-base font-bold text-slate-900">{{ judulTab }}</h2>
         <!-- 1. Jadwal Ujian List -->
         <div v-if="activeTab === 'jadwal'" class="space-y-6">
           <div v-for="jadwal in jadwalList" :key="jadwal.id" class="card border border-slate-200 p-5">
@@ -379,8 +348,8 @@ onMounted(() => {
                 <span class="rounded bg-brand-50 px-2 py-1 text-xs font-bold text-brand-700">
                   Tanggal: {{ jadwal.tanggal }}
                 </span>
-                <button @click="openCreateSesi(jadwal.id)" class="btn-secondary !min-h-0 !py-1 text-xs">
-                  + Tambah Sesi Ruang
+                <button v-if="bolehAtur" @click="bukaPenempatan(jadwal)" class="btn-primary !min-h-0 !py-1 text-xs">
+                  Atur Penempatan Peserta
                 </button>
               </div>
             </div>
@@ -413,9 +382,16 @@ onMounted(() => {
                     </div>
                   </div>
 
+                  <div class="mt-2 text-[11px] text-slate-600">
+                    <span class="font-semibold text-slate-700">Pengawas:</span>
+                    <span v-if="(sesi.pengawas_sesi ?? []).length > 0">{{ sesi.pengawas_sesi.map((p: any) => p.guru?.user?.name).filter(Boolean).join(', ') }}</span>
+                    <span v-else class="italic text-amber-700">belum ditetapkan</span>
+                    <button v-if="bolehAtur" class="ml-2 font-semibold text-brand-600 hover:underline" @click="bukaPengawas(jadwal, sesi)">Atur pengawas</button>
+                  </div>
+
                   <div class="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
                     <span class="text-[11px] text-slate-500">
-                      Kapasitas: {{ sesi.ruang?.kapasitas || 0 }} Siswa
+                      Peserta: <strong>{{ sesi.peserta_ujian_count ?? 0 }}</strong> / {{ sesi.ruang?.kapasitas || 0 }} kursi
                     </span>
                     <button
                       @click="generateToken(sesi.id)"
@@ -433,7 +409,7 @@ onMounted(() => {
               </div>
 
               <p v-if="!jadwal.sesi_ruang || jadwal.sesi_ruang.length === 0" class="text-xs italic text-slate-400">
-                Belum ada sesi ruang yang dibuat untuk jadwal ini. Klik "+ Tambah Sesi Ruang".
+                Belum ada penempatan peserta untuk jadwal ini. Klik "Atur Penempatan Peserta".
               </p>
             </div>
           </div>
@@ -554,9 +530,22 @@ onMounted(() => {
 
           <!-- Question Selector Checkboxes -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-2">
-              Pilih Butir Soal ({{ formPaket.soal_ids.length }} Terpilih):
-            </label>
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-slate-700">
+                Pilih Butir Soal ({{ formPaket.soal_ids.length }} dari {{ bankSoalList.length }} terpilih):
+              </span>
+              <label v-if="bankSoalList.length > 0" class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                <input
+                  type="checkbox"
+                  class="rounded text-brand-600"
+                  :checked="statusButir === 'semua'"
+                  :indeterminate="statusButir === 'sebagian'"
+                  aria-label="Pilih semua butir soal"
+                  @change="pilihSemuaButir"
+                />
+                <span>{{ statusButir === 'semua' ? 'Kosongkan semua' : 'Pilih semua' }}</span>
+              </label>
+            </div>
             <div class="max-h-56 overflow-y-auto border rounded-lg p-2 space-y-2">
               <label
                 v-for="soal in bankSoalList"
@@ -643,71 +632,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Create Sesi Ruang Modal -->
-    <div v-if="showCreateSesiModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div class="card w-full max-w-lg bg-white max-h-[90vh] overflow-y-auto">
-        <div class="mb-4 flex items-center justify-between border-b pb-3">
-          <h2 class="text-base font-bold text-slate-800">Tambah Sesi Ruang Ujian</h2>
-          <button @click="showCreateSesiModal = false" class="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <form @submit.prevent="saveSesi" class="space-y-3">
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-700">Ruang</label>
-              <select v-model="formSesi.ruang_id" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="r in ruangList" :key="r.id" :value="r.id">{{ r.kode }} - {{ r.nama }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700">Sesi Ke</label>
-              <input v-model.number="formSesi.sesi_ke" type="number" min="1" required class="input !min-h-0 !py-1.5 text-sm" />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-700">Jam Mulai</label>
-              <input v-model="formSesi.jam_mulai" type="time" required class="input !min-h-0 !py-1.5 text-sm" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700">Jam Selesai</label>
-              <input v-model="formSesi.jam_akhir" type="time" required class="input !min-h-0 !py-1.5 text-sm" />
-            </div>
-          </div>
-
-          <!-- Siswa Plotting -->
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">
-              Pilih Peserta Ujian ({{ formSesi.siswa_ids.length }} Siswa):
-            </label>
-            <div class="max-h-40 overflow-y-auto border rounded p-2 text-xs space-y-1">
-              <label v-for="s in siswaList" :key="s.id" class="flex items-center gap-2 p-1 hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" :value="s.id" v-model="formSesi.siswa_ids" class="rounded text-brand-600" />
-                <span>{{ s.nis }} - {{ s.nama }} ({{ s.kelas?.nama }})</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-2 border-t pt-3">
-            <button type="button" @click="showCreateSesiModal = false" :disabled="isSavingSesi" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
-            <button
-              type="submit"
-              class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              :disabled="isSavingSesi"
-            >
-              <span v-if="isSavingSesi" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-              <span>{{ isSavingSesi ? 'Menyimpan...' : 'Simpan Sesi' }}</span>
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
-    </div>
+
+    <PenempatanRuangModal v-if="jadwalPenempatan" :jadwal="jadwalPenempatan" @close="jadwalPenempatan = null" @saved="setelahTersimpan('Penempatan peserta ke ruang berhasil disimpan.')" />
+    <PengawasSesiModal v-if="sesiPengawas" :sesi="sesiPengawas.sesi" :judul="sesiPengawas.judul" @close="sesiPengawas = null" @saved="setelahTersimpan('Pengawas sesi berhasil disimpan.')" />
 
     <!-- Confirm Delete Modal: Paket Soal -->
     <ConfirmDeleteModal

@@ -107,7 +107,7 @@ class OmmlToLatexService
     {
         return (string) preg_replace_callback(
             '/<m:oMathPara\b[\s\S]*?<\/m:oMathPara>|<m:oMath\b[\s\S]*?<\/m:oMath>/u',
-            fn (array $cocok): string => ' '.$this->konversiBlok($cocok[0]).' ',
+            fn (array $cocok): string => ' '.htmlspecialchars($this->konversiBlok($cocok[0]), ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8').' ',
             $xml
         );
     }

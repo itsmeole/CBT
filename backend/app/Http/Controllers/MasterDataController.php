@@ -144,9 +144,18 @@ class MasterDataController extends Controller
     // ==========================================
     // KELAS
     // ==========================================
-    public function getKelas(): JsonResponse
+    /**
+     * Guru hanya melihat kelas yang diampunya; Operator/Superadmin melihat semua kelas.
+     */
+    public function getKelas(Request $request): JsonResponse
     {
-        return response()->json(['data' => Kelas::with('tahunAjaran')->orderBy('nama')->get()]);
+        $query = Kelas::with('tahunAjaran')->orderBy('nama');
+        $user = $request->user();
+        if ($user->role === 'guru') {
+            $query->whereIn('id', GuruMapel::where('guru_id', $user->guru?->id ?? 0)->whereNotNull('kelas_id')->select('kelas_id'));
+        }
+
+        return response()->json(['data' => $query->get()]);
     }
 
     public function storeKelas(Request $request): JsonResponse
@@ -388,9 +397,18 @@ class MasterDataController extends Controller
     // ==========================================
     // MAPEL
     // ==========================================
-    public function getMapel(): JsonResponse
+    /**
+     * Guru hanya melihat mapel yang diampunya; Operator/Superadmin melihat semua mapel.
+     */
+    public function getMapel(Request $request): JsonResponse
     {
-        return response()->json(['data' => Mapel::orderBy('nama')->get()]);
+        $query = Mapel::orderBy('nama');
+        $user = $request->user();
+        if ($user->role === 'guru') {
+            $query->whereIn('id', GuruMapel::where('guru_id', $user->guru?->id ?? 0)->select('mapel_id'));
+        }
+
+        return response()->json(['data' => $query->get()]);
     }
 
     public function storeMapel(Request $request): JsonResponse

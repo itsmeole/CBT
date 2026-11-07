@@ -11,6 +11,7 @@ use App\Http\Controllers\LaporanPdfController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\NilaiController;
 use App\Http\Controllers\OperatorKontrolController;
+use App\Http\Controllers\PenempatanController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\PengawasanController;
 use App\Http\Controllers\UjianController;
@@ -77,6 +78,9 @@ Route::prefix('v1')->group(function () {
             Route::put('bobot-tipe', [JadwalController::class, 'updateBobotTipe']);
             Route::post('jadwal', [JadwalController::class, 'storeJadwal']);
             Route::post('sesi-ruang', [JadwalController::class, 'storeSesiRuang']);
+            Route::get('jadwal/{id}/penempatan', [PenempatanController::class, 'show']);
+            Route::post('jadwal/{id}/penempatan', [PenempatanController::class, 'store']);
+            Route::delete('jadwal/{id}/penempatan', [PenempatanController::class, 'destroy']);
             Route::post('sesi-ruang/{id}/pengawas', [JadwalController::class, 'plotPengawas']);
             Route::post('sesi-ruang/{id}/token/generate', [JadwalController::class, 'generateToken']);
 

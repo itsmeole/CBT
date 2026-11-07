@@ -37,7 +37,13 @@ function pasang() {
 describe('KoreksiEssayView', () => {
   beforeEach(() => {
     get.mockReset().mockImplementation((url: string) => {
-      if (url === '/jadwal') return Promise.resolve({ data: { data: [{ id: 3, nama: 'UTS IPA', mapel: { nama: 'IPA' } }] } })
+      if (url === '/mapel') return Promise.resolve({ data: { data: [{ id: 1, nama: 'IPA' }, { id: 2, nama: 'Matematika' }] } })
+      if (url === '/kelas') return Promise.resolve({ data: { data: [{ id: 4, nama: 'X-1' }] } })
+      if (url === '/jadwal') {
+        return Promise.resolve({
+          data: { data: [{ id: 3, nama: 'UTS IPA', mapel_id: 1, mapel: { nama: 'IPA' } }, { id: 5, nama: 'UTS MTK', mapel_id: 2, mapel: { nama: 'Matematika' } }] }
+        })
+      }
       if (url === '/koreksi/essay') return Promise.resolve({ data: { data: antrean } })
       return Promise.reject(new Error(`URL tak terduga: ${url}`))
     })
@@ -75,6 +81,44 @@ describe('KoreksiEssayView', () => {
 
     expect(put).toHaveBeenCalledWith('/koreksi/essay/50', { skor: '7.5', catatan: 'Bagus' })
     expect(wrapper.text()).toContain('Tidak ada jawaban essay yang perlu dikoreksi')
+    wrapper.unmount()
+  })
+})
+
+describe('KoreksiEssayView filter', () => {
+  beforeEach(() => {
+    get.mockReset().mockImplementation((url: string) => {
+      if (url === '/mapel') return Promise.resolve({ data: { data: [{ id: 1, nama: 'IPA' }, { id: 2, nama: 'Matematika' }] } })
+      if (url === '/kelas') return Promise.resolve({ data: { data: [{ id: 4, nama: 'X-1' }] } })
+      if (url === '/jadwal') {
+        return Promise.resolve({
+          data: { data: [{ id: 3, nama: 'UTS IPA', mapel_id: 1, mapel: { nama: 'IPA' } }, { id: 5, nama: 'UTS MTK', mapel_id: 2, mapel: { nama: 'Matematika' } }] }
+        })
+      }
+      if (url === '/koreksi/essay') return Promise.resolve({ data: { data: [] } })
+      return Promise.reject(new Error(`URL tak terduga: ${url}`))
+    })
+  })
+
+  it('memilih mapel menyaring pilihan jadwal dan memuat ulang antrean', async () => {
+    const wrapper = pasang()
+    await flushPromises()
+    const [mapel, jadwal] = wrapper.findAll('select')
+    expect(jadwal.findAll('option').map((o) => o.text())).toEqual(['UTS IPA - IPA', 'UTS MTK - Matematika'])
+
+    await mapel.setValue('2')
+    await flushPromises()
+    expect(jadwal.findAll('option').map((o) => o.text())).toEqual(['UTS MTK - Matematika'])
+    expect(get).toHaveBeenLastCalledWith('/koreksi/essay', { params: { jadwal_id: 5 } })
+    wrapper.unmount()
+  })
+
+  it('memilih kelas mengirim kelas_id ke server', async () => {
+    const wrapper = pasang()
+    await flushPromises()
+    await wrapper.findAll('select')[2].setValue('4')
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/koreksi/essay', { params: { jadwal_id: 3, kelas_id: 4 } })
     wrapper.unmount()
   })
 })

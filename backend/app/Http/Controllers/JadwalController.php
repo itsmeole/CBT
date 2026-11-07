@@ -15,6 +15,7 @@ use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\TokenUjian;
 use App\Services\OtorisasiCbtService;
+use App\Services\TokenUjianService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -99,8 +100,12 @@ class JadwalController extends Controller
             }
             $guruId = $user->guru->id;
         } else {
-            $request->validate(['guru_id' => 'required|exists:guru,id']);
-            $guruId = (int) $request->input('guru_id');
+            // Operator/Superadmin tidak punya data guru. Pemilik paket diambil dari guru pemilik soal
+            // (atau dari `guru_id` bila dikirim eksplisit), sehingga form tidak perlu memintanya.
+            $request->validate(['guru_id' => 'nullable|exists:guru,id']);
+            $guruId = $request->filled('guru_id')
+                ? (int) $request->input('guru_id')
+                : (int) BankSoal::query()->whereIn('id', $validated['soal_ids'])->orderBy('id')->value('guru_id');
         }
 
         return DB::transaction(function () use ($validated, $guruId) {
@@ -148,11 +153,24 @@ class JadwalController extends Controller
     // ==========================================
     // JADWAL UJIAN (Operator & Superadmin)
     // ==========================================
-    public function getJadwal(): JsonResponse
+    public function getJadwal(Request $request): JsonResponse
     {
-        return response()->json([
-            'data' => JadwalUjian::with(['mapel', 'paketSoal.items', 'tahunAjaran', 'sesiRuang.ruang', 'sesiRuang.tokenUjian'])->latest()->get(),
-        ]);
+        $query = JadwalUjian::with([
+            'mapel',
+            'paketSoal.items',
+            'tahunAjaran',
+            'sesiRuang' => fn ($sesi) => $sesi->withCount('pesertaUjian')->orderBy('sesi_ke')->orderBy('id'),
+            'sesiRuang.ruang',
+            'sesiRuang.tokenUjian',
+            'sesiRuang.pengawasSesi.guru.user:id,name',
+        ])->latest();
+
+        $user = $request->user();
+        if ($user->role === 'guru') {
+            $query->whereIn('mapel_id', GuruMapel::where('guru_id', $user->guru?->id ?? 0)->select('mapel_id'));
+        }
+
+        return response()->json(['data' => $query->get()]);
     }
 
     public function storeJadwal(Request $request): JsonResponse
@@ -276,7 +294,27 @@ class JadwalController extends Controller
             'guru_ids.*' => 'exists:guru,id',
         ]);
 
-        $sesi = SesiRuang::findOrFail($sesiRuangId);
+        $sesi = SesiRuang::with('jadwalUjian')->findOrFail($sesiRuangId);
+
+        // Seorang guru tidak boleh mengawas dua ruang pada tanggal dan jam yang bertabrakan.
+        $bentrok = PengawasSesi::query()
+            ->with(['guru.user:id,name', 'sesiRuang.ruang', 'sesiRuang.jadwalUjian.mapel'])
+            ->whereIn('guru_id', $validated['guru_ids'])
+            ->where('sesi_ruang_id', '!=', $sesi->id)
+            ->whereHas('sesiRuang', fn ($lain) => $lain
+                ->whereHas('jadwalUjian', fn ($j) => $j->whereDate('tanggal', $sesi->jadwalUjian->tanggal))
+                ->where('jam_mulai', '<', $sesi->jam_akhir)
+                ->where('jam_akhir', '>', $sesi->jam_mulai))
+            ->first();
+        if ($bentrok) {
+            $lain = $bentrok->sesiRuang;
+
+            return response()->json(['error' => [
+                'code' => 'SUPERVISOR_CONFLICT',
+                'message' => 'Pengawas '.($bentrok->guru?->user?->name ?? '-').' sudah bertugas di '.($lain->ruang?->nama ?? 'ruang lain')
+                    .' ('.($lain->jadwalUjian?->mapel?->nama ?? '-').', '.substr((string) $lain->jam_mulai, 0, 5).'-'.substr((string) $lain->jam_akhir, 0, 5).') pada waktu yang bertabrakan.',
+            ]], 422);
+        }
 
         PengawasSesi::where('sesi_ruang_id', $sesi->id)->delete();
         foreach ($validated['guru_ids'] as $guruId) {
@@ -314,14 +352,6 @@ class JadwalController extends Controller
      */
     private function generateUniqueToken(): string
     {
-        $chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-        do {
-            $token = '';
-            for ($i = 0; $i < 6; $i++) {
-                $token .= $chars[random_int(0, strlen($chars) - 1)];
-            }
-        } while (TokenUjian::where('kode', $token)->where('aktif', true)->exists());
-
-        return $token;
+        return app(TokenUjianService::class)->kodeUnik();
     }
 }

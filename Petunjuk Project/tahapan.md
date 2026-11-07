@@ -122,6 +122,21 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Tombol **Mulai Ujian** (per sesi atau per siswa) dengan dialog konfirmasi (`FR-FE-82`).
 - [x] Pastikan menu dan tombol kontrol mulai ujian disembunyikan total dari role Guru (`FR-FE-83`).
 
+#### Penyempurnaan 7 Nov 2026 (penempatan ruang & navigasi)
+- [x] Perbaikan bug: operator gagal membuat paket soal (BE mewajibkan `guru_id` yang tidak dikirim form). Kini pemilik paket otomatis diambil dari guru pemilik soal.
+- [x] Penempatan peserta ke ruang (`POST/GET/DELETE /jadwal/{id}/penempatan`): pilih kelas dan ruang, **acak** otomatis (merata, tidak melebihi kapasitas) atau **manual** per siswa/massal. Server memvalidasi kapasitas, tahun ajaran, siswa ganda, serta bentrok ruang dan jadwal siswa pada tanggal/jam yang sama. Reset hanya bila ujian belum berjalan.
+- [x] Penugasan pengawas per sesi ruang (UI baru "Atur pengawas"). Server menolak bila guru bentrok jam/tanggal dengan sesi lain, sehingga pengawas bisa berpindah ruang antar mata pelajaran dalam sehari.
+- [x] Daftar hadir PDF diperdetail: hari/tanggal, jam, ruang, sesi, tabel pengawas dengan tanda tangan beserta penugasan lain pengawas di hari yang sama, peserta terurut per kelas, dan rekap hadir. Berita acara PDF mencantumkan semua pengawas bertugas.
+- [x] Sidebar: **Master Data** dan **Jadwal & Paket Ujian** menjadi dropdown dengan sub-opsi (tab dipindah dari dalam halaman ke sidebar, dipilih lewat query `?tab=`).
+- [x] Tombol hapus Pengampu Mapel memakai ikon seragam dengan tabel lain.
+- [x] Koreksi Essay dan Rekap Nilai memiliki filter Mapel dan Kelas. `GET /mapel`, `/kelas`, `/jadwal` untuk guru hanya mengembalikan mapel/kelas/jadwal yang diampunya.
+
+#### Penyempurnaan lanjutan 7 Nov 2026 (tata letak & template Word)
+- [x] Tata letak filter dirapikan: toolbar tabel Master Data (pencarian + filter kelas sejajar, jumlah data sebagai lencana, paginasi satu kartu) dan filter Rekap Nilai/Koreksi Essay (Mapel, Jadwal, Kelas, Cari dalam satu baris, ringkasan sebagai lencana).
+- [x] Paket soal: kotak "Pilih semua" (tiga keadaan: kosong/sebagian/semua) dan penghitung "n dari m terpilih". Butir tercentang kini direset saat mapel diganti.
+- [x] Sub-opsi dropdown sidebar memiliki ikon SVG masing-masing (data ikon di `lib/navigasi.ts`, diuji agar tiap sub-opsi pasti punya ikon unik).
+- [x] **Template dan ekspor soal Word berbentuk tabel** (satu soal satu tabel dua kolom: label tetap di kiri, isian di kanan). Meminimalkan salah ketik penanda: kunci berupa huruf/angka yang dipetakan otomatis, baris opsi kosong dilewati dan huruf disusun ulang, awalan "A." yang tak sengaja diketik dibersihkan, BENAR/SALAH menerima alias B/S, dan tiap kesalahan dilaporkan per soal dengan pesan jelas. Tiap tabel soal ditahan utuh dalam satu halaman. Dokumen format lama (`[SOAL]...[/SOAL]`) tetap bisa diimpor. Rumus, gambar, dan teks Arab di dalam sel didukung; ekspor bank soal/paket memakai format yang sama (round-trip teruji untuk kelima tipe).
+
 ---
 
 ### 1.5 Pengerjaan Ujian Siswa (Mobile-First) & Penilaian Otomatis

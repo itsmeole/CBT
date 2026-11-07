@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { TAB_MASTER, tabValid } from '@/lib/navigasi'
 import { ambilHalaman } from '@/lib/paginasi'
 import StafLayout from '@/components/StafLayout.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
@@ -17,7 +19,10 @@ const auth = useAuthStore()
 const isSuperadmin = computed(() => auth.user?.role === 'superadmin')
 const isOperatorOrSuperadmin = computed(() => auth.user?.role === 'superadmin' || auth.user?.role === 'operator')
 
-const activeTab = ref<TabType>('siswa')
+const route = useRoute()
+// Tab dipilih lewat sub-menu sidebar (query `tab`).
+const activeTab = ref<TabType>(tabValid(TAB_MASTER, route.query.tab) as TabType)
+const judulTab = computed(() => TAB_MASTER.find((t) => t.tab === activeTab.value)?.nama ?? 'Master Data')
 // Tahun ajaran hanya dapat diubah Superadmin; data master lain oleh Operator dan Superadmin.
 const bolehUbahTab = computed(() => (activeTab.value === 'tahun_ajaran' ? isSuperadmin.value : isOperatorOrSuperadmin.value))
 const loading = ref(false)
@@ -429,6 +434,14 @@ onMounted(() => {
   fetchData()
 })
 
+watch(
+  () => route.query.tab,
+  (tab) => {
+    const baru = tabValid(TAB_MASTER, tab) as TabType
+    if (baru !== activeTab.value) void handleTabChange(baru)
+  }
+)
+
 const currentListCount = computed(() => {
   switch (activeTab.value) {
     case 'siswa': return filteredSiswa.value.length
@@ -508,31 +521,12 @@ const currentListCount = computed(() => {
         <span>{{ errorMessage }}</span>
       </div>
 
-      <!-- Tabs Navigation -->
-      <div class="flex border-b border-slate-200 bg-white px-4 pt-2 rounded-t-xl overflow-x-auto gap-4">
-        <button
-          v-for="tab in [
-            { id: 'siswa', label: 'Siswa' },
-            { id: 'guru', label: 'Guru' },
-            { id: 'kelas', label: 'Kelas' },
-            { id: 'mapel', label: 'Mata Pelajaran' },
-            { id: 'ruang', label: 'Ruang Ujian' },
-            { id: 'tahun_ajaran', label: 'Tahun Ajaran' },
-            { id: 'guru_mapel', label: 'Pengampu Mapel' }
-          ]"
-          :key="tab.id"
-          @click="handleTabChange(tab.id as TabType)"
-          class="border-b-2 py-3 px-2 text-sm font-medium transition-colors"
-          :class="activeTab === tab.id ? 'border-brand-600 font-bold text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-
       <!-- Content Area -->
-      <div class="rounded-b-2xl border border-t-0 border-slate-200 bg-white p-5 shadow-xs">
-        <div class="mb-4 flex items-center justify-between gap-4">
-          <div class="relative w-full max-w-xs">
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <h2 class="mb-3 text-base font-bold text-slate-900">{{ judulTab }}</h2>
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div class="relative w-full sm:max-w-xs">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -549,16 +543,17 @@ const currentListCount = computed(() => {
             v-if="activeTab === 'siswa'"
             v-model="filterKelasId"
             aria-label="Filter kelas"
-            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800"
+            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 sm:w-44"
           >
             <option value="">Semua kelas</option>
             <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
           </select>
-          <span v-if="loading" class="text-xs text-slate-400 flex items-center gap-1.5">
+          </div>
+          <span v-if="loading" class="text-xs text-slate-400 flex items-center gap-1.5 sm:ml-auto">
             <span class="inline-block h-2 w-2 animate-ping rounded-full bg-brand-600"></span>
             Memuat data...
           </span>
-          <span v-else class="text-xs font-bold text-slate-400 font-mono">
+          <span v-else class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 sm:ml-auto">
             {{ currentListCount }} Data
           </span>
         </div>
@@ -582,14 +577,19 @@ const currentListCount = computed(() => {
                 <td class="p-3">{{ item.kelas?.nama || '-' }}</td>
                 <td class="p-3">{{ item.tahun_ajaran?.nama || item.tahunAjaran?.nama || '-' }}</td>
                 <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
-                  <button
-                    type="button"
-                    @click="promptDeleteEntity(item.id, `${item.guru?.user?.name} - ${item.mapel?.nama} (${item.kelas?.nama})`)"
-                    class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-                    aria-label="Hapus pengampu mapel"
-                  >
-                    Hapus
-                  </button>
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      @click="promptDeleteEntity(item.id, `${item.guru?.user?.name} - ${item.mapel?.nama} (${item.kelas?.nama})`)"
+                      class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      title="Hapus Data"
+                      aria-label="Hapus Data"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="filteredGuruMapel.length === 0">
@@ -1256,7 +1256,7 @@ const currentListCount = computed(() => {
     </div>
 
     <!-- Paginasi (siswa, guru, pengampu mapel) -->
-    <nav v-if="infoHalaman && infoHalaman.total > 0" class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-600" aria-label="Paginasi">
+    <nav v-if="infoHalaman && infoHalaman.total > 0" class="mt-3 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between" aria-label="Paginasi">
       <span>Menampilkan {{ infoHalaman.dari }}-{{ infoHalaman.sampai }} dari {{ infoHalaman.total }}</span>
       <div class="flex items-center gap-2">
         <button class="btn-secondary !min-h-0 !py-1.5 text-xs" :disabled="infoHalaman.halaman <= 1" @click="halaman = infoHalaman.halaman - 1">Sebelumnya</button>

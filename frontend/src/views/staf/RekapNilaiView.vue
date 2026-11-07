@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
+import FilterJadwal from '@/components/FilterJadwal.vue'
 import { labelStatusNilai } from '@/lib/koreksi'
 
-interface JadwalOpsi {
-  id: number
-  nama: string
-  mapel?: { nama: string }
-}
 interface BarisNilai {
   peserta_id: number
   nama_siswa: string
@@ -21,8 +17,8 @@ interface BarisNilai {
   nilai_akhir: string | null
 }
 
-const jadwalList = ref<JadwalOpsi[]>([])
 const jadwalId = ref<number | null>(null)
+const kelasId = ref<number | ''>('')
 const baris = ref<BarisNilai[]>([])
 const keyword = ref('')
 const loading = ref(false)
@@ -35,22 +31,14 @@ const tampil = computed(() => {
 const menunggu = computed(() => baris.value.filter((b) => b.status_peserta === 'selesai' && b.nilai_status !== 'final').length)
 const final = computed(() => baris.value.filter((b) => b.nilai_status === 'final').length)
 
-async function muatJadwal() {
-  try {
-    const res = await apiClient.get('/jadwal')
-    jadwalList.value = res.data.data ?? []
-    if (jadwalList.value.length > 0) jadwalId.value = jadwalList.value[0].id
-  } catch (err) {
-    errorMessage.value = err instanceof Error ? err.message : 'Gagal memuat jadwal.'
-  }
-}
-
 async function muatNilai() {
   if (!jadwalId.value) return
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await apiClient.get('/nilai', { params: { jadwal_id: jadwalId.value } })
+    const res = await apiClient.get('/nilai', {
+      params: kelasId.value !== '' ? { jadwal_id: jadwalId.value, kelas_id: kelasId.value } : { jadwal_id: jadwalId.value }
+    })
     baris.value = res.data.data ?? []
   } catch (err) {
     baris.value = []
@@ -60,8 +48,7 @@ async function muatNilai() {
   }
 }
 
-watch(jadwalId, muatNilai)
-onMounted(muatJadwal)
+watch([jadwalId, kelasId], muatNilai)
 </script>
 
 <template>
@@ -73,21 +60,17 @@ onMounted(muatJadwal)
       </div>
       <div v-if="errorMessage" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{{ errorMessage }}</div>
 
-      <div class="card grid gap-3 bg-white p-4 sm:grid-cols-2">
-        <label class="text-xs font-semibold text-slate-600">
-          Jadwal ujian
-          <select v-model="jadwalId" class="input mt-1">
-            <option v-for="j in jadwalList" :key="j.id" :value="j.id">{{ j.nama }}{{ j.mapel ? ` - ${j.mapel.nama}` : '' }}</option>
-          </select>
-        </label>
-        <label class="text-xs font-semibold text-slate-600">
+      <FilterJadwal v-model:jadwal-id="jadwalId" v-model:kelas-id="kelasId" @error="errorMessage = $event">
+        <label class="min-w-0 text-xs font-semibold text-slate-600">
           Cari nama / NIS
-          <input v-model="keyword" class="input mt-1" placeholder="Ketik untuk mencari..." />
+          <input v-model="keyword" class="input mt-1 !min-h-0 !py-2 text-sm" placeholder="Ketik untuk mencari..." />
         </label>
-        <p class="text-xs text-slate-500 sm:col-span-2">
-          Final: <strong>{{ final }}</strong> - Menunggu koreksi essay: <strong>{{ menunggu }}</strong> - Total peserta: <strong>{{ baris.length }}</strong>
-        </p>
-      </div>
+        <template #ringkasan>
+          <span class="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-800">Final: <strong>{{ final }}</strong></span>
+          <span class="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">Menunggu koreksi essay: <strong>{{ menunggu }}</strong></span>
+          <span class="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">Total peserta: <strong>{{ baris.length }}</strong></span>
+        </template>
+      </FilterJadwal>
 
       <p v-if="loading" class="py-6 text-center text-sm text-slate-500">Memuat nilai...</p>
       <div v-else class="card overflow-x-auto bg-white">

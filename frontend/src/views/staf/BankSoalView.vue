@@ -887,7 +887,7 @@ onMounted(() => {
         <!-- Step 1: Upload Word Document -->
         <div v-if="wordImportStep === 1" class="space-y-4">
           <p class="text-sm text-slate-600">
-            Unggah dokumen Microsoft Word (.docx) dengan tag format baku [SOAL]...[/SOAL].
+            Unggah dokumen Microsoft Word (.docx) berisi tabel soal sesuai template resmi (satu soal satu tabel; isi hanya kolom kanan).
           </p>
 
           <div>
