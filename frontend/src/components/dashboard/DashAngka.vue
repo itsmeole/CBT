@@ -18,11 +18,11 @@ const props = withDefaults(
 const aksen = computed(
   () =>
     ({
-      netral: 'border-slate-200',
-      info: 'border-sky-200',
-      baik: 'border-emerald-200',
-      peringatan: 'border-amber-300 bg-amber-50/60',
-      bahaya: 'border-red-300 bg-red-50/60'
+      netral: 'border-l-slate-300',
+      info: 'border-l-brand-500',
+      baik: 'border-l-emerald-500',
+      peringatan: 'border-l-amber-500 bg-amber-50',
+      bahaya: 'border-l-red-600 bg-red-50'
     })[props.nada]
 )
 const warnaAngka = computed(
@@ -41,10 +41,10 @@ const warnaAngka = computed(
   <component
     :is="tautan ? RouterLink : 'div'"
     :to="tautan"
-    class="block rounded-2xl border bg-white p-4 transition-shadow"
-    :class="[aksen, tautan ? 'hover:shadow-md focus-visible:outline-2 focus-visible:outline-brand-600' : '']"
+    class="block rounded-xl border-l-4 bg-white p-4 ring-1 ring-slate-900/[0.07] transition-shadow"
+    :class="[aksen, tautan ? 'hover:shadow-md active:scale-[0.99]' : '']"
   >
-    <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">{{ label }}</p>
+    <p class="text-xs font-semibold text-slate-500">{{ label }}</p>
     <!-- Nilai teks (mis. "Belum ada backup", "3 jam lalu") memakai huruf lebih kecil agar tidak terpotong. -->
     <p class="mt-1 font-extrabold tabular-nums" :class="[typeof nilai === 'string' ? 'text-xl leading-9' : 'text-3xl', warnaAngka]">{{ nilai ?? '-' }}</p>
     <p v-if="keterangan" class="mt-0.5 text-xs text-slate-500">{{ keterangan }}</p>

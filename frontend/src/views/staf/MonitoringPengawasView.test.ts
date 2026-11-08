@@ -91,15 +91,15 @@ describe('MonitoringPengawasView', () => {
     const wrapper = pasang()
     await flushPromises()
     expect(wrapper.text()).toContain('Menyambung...')
-    expect(wrapper.text()).not.toContain('Realtime')
+    expect(wrapper.text()).not.toContain('Langsung')
 
     ;(handlers.__subscribed as unknown as () => void)()
     await flushPromises()
-    expect(wrapper.text()).toContain('Realtime')
+    expect(wrapper.text()).toContain('Langsung')
 
     ;(handlers.__error as unknown as () => void)()
     await flushPromises()
-    expect(wrapper.text()).toContain('Polling (offline)')
+    expect(wrapper.text()).toContain('Pembaruan berkala')
     wrapper.unmount()
   })
 

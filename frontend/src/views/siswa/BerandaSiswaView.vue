@@ -129,7 +129,7 @@ async function handleConfirmedLogout() {
     <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3 sm:px-6 shadow-xs">
       <div class="mx-auto flex max-w-2xl items-center justify-between">
         <div class="flex items-center gap-3">
-          <img src="/favicon.svg" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
+          <img src="/logo.webp" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
           <div>
             <h1 class="text-sm font-extrabold text-slate-900 leading-tight">ICBT Siswa</h1>
             <p class="text-xs text-slate-500 font-medium">
@@ -159,7 +159,7 @@ async function handleConfirmedLogout() {
       <!-- ======================================================== -->
       <section v-if="!selectedSesi" class="space-y-5 animate-fade-in">
         <div>
-          <span class="inline-block rounded-lg bg-brand-50 border border-brand-200 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-brand-700 mb-1.5">
+          <span class="inline-block text-xs font-semibold text-brand-700 mb-1">
             Langkah 1 dari 2
           </span>
           <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -184,11 +184,15 @@ async function handleConfirmedLogout() {
             v-for="sesi in sesiList"
             :key="sesi.sesi_ruang_id"
             @click="selectSesi(sesi)"
-            class="card bg-white p-5 rounded-2xl border transition-all duration-200 text-left group"
+            class="card bg-white p-4 sm:p-5 rounded-xl border-l-4 transition-all duration-200 text-left group"
             :class="[
               sesi.status === 'selesai'
-                ? 'opacity-60 border-slate-200 cursor-not-allowed bg-slate-50/50'
-                : 'border-slate-200/90 hover:border-brand-500 hover:shadow-md cursor-pointer active:scale-[0.99]'
+                ? 'opacity-60 border-l-slate-300 cursor-not-allowed bg-slate-50/50'
+                : sesi.status === 'mengerjakan'
+                  ? 'border-l-brand-600 ring-brand-600/30 cursor-pointer hover:shadow-md active:scale-[0.99]'
+                  : sesi.status === 'menunggu'
+                    ? 'border-l-amber-500 cursor-pointer hover:shadow-md active:scale-[0.99]'
+                    : 'border-l-transparent cursor-pointer hover:border-l-brand-500 hover:shadow-md active:scale-[0.99]'
             ]"
           >
             <div class="flex items-start justify-between gap-3">
@@ -244,7 +248,7 @@ async function handleConfirmedLogout() {
               <div class="shrink-0 flex items-center gap-2">
                 <span
                   v-if="sesi.status === 'selesai'"
-                  class="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-bold text-emerald-700 flex items-center gap-1"
+                  class="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 flex items-center gap-1"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -253,7 +257,7 @@ async function handleConfirmedLogout() {
                 </span>
                 <span
                   v-else-if="sesi.status === 'mengerjakan'"
-                  class="rounded-lg bg-brand-50 border border-brand-200 px-2.5 py-1 text-xs font-bold text-brand-700 animate-pulse flex items-center gap-1"
+                  class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-bold text-white flex items-center gap-1"
                 >
                   Lanjutkan
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5">
@@ -262,7 +266,7 @@ async function handleConfirmedLogout() {
                 </span>
                 <span
                   v-else-if="sesi.status === 'menunggu'"
-                  class="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700 flex items-center gap-1"
+                  class="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 flex items-center gap-1"
                 >
                   Ruang Tunggu
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5">
@@ -283,7 +287,7 @@ async function handleConfirmedLogout() {
         </div>
 
         <!-- Empty State -->
-        <div v-else class="card bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-3">
+        <div v-else class="card bg-white p-8 rounded-2xl text-center space-y-3">
           <div class="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-7 w-7">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
@@ -323,7 +327,7 @@ async function handleConfirmedLogout() {
             </svg>
             <span>Pilih Mata Pelajaran Lain</span>
           </button>
-          <span class="inline-block rounded-lg bg-brand-50 border border-brand-200 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-brand-700">
+          <span class="inline-block text-xs font-semibold text-brand-700">
             Langkah 2 dari 2
           </span>
         </div>
@@ -337,7 +341,7 @@ async function handleConfirmedLogout() {
               </svg>
             </div>
             <div>
-              <p class="text-xs font-semibold text-brand-700 uppercase tracking-wider">Mata Pelajaran Terpilih</p>
+              <p class="text-xs font-semibold text-brand-700">Mata Pelajaran Terpilih</p>
               <h3 class="text-base font-extrabold text-slate-900 leading-tight">
                 {{ selectedSesi.nama_mapel }}
               </h3>
@@ -347,7 +351,7 @@ async function handleConfirmedLogout() {
         </div>
 
         <!-- Token Entry Card -->
-        <div class="card bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-sm space-y-6">
+        <div class="card bg-white p-6 sm:p-8 rounded-2xl space-y-6">
           <div class="text-center">
             <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-brand-600 shadow-xs">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-7 w-7">
@@ -372,7 +376,7 @@ async function handleConfirmedLogout() {
                 autocomplete="off"
                 autofocus
                 required
-                class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3.5 text-center font-mono text-3xl font-black tracking-widest text-slate-900 uppercase transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100 placeholder:text-slate-300 placeholder:text-xl placeholder:font-sans placeholder:font-normal placeholder:tracking-normal !min-h-[60px]"
+                class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3.5 text-center font-mono text-3xl font-black tracking-widest text-slate-900 transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100 placeholder:text-slate-300 placeholder:text-xl placeholder:font-sans placeholder:font-normal placeholder:tracking-normal !min-h-[60px]"
               />
             </div>
 
@@ -390,7 +394,7 @@ async function handleConfirmedLogout() {
             <button
               type="submit"
               :disabled="token.length < 6 || loadingJoin"
-              class="btn-primary w-full text-base font-bold !min-h-[52px] rounded-2xl shadow-lg shadow-brand-500/20 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              class="btn-primary w-full text-base font-bold !min-h-[52px] rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
             >
               <span>{{ loadingJoin ? 'Memeriksa Token...' : 'Masuk Ruang Ujian' }}</span>
               <svg v-if="!loadingJoin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
@@ -404,7 +408,7 @@ async function handleConfirmedLogout() {
 
     <!-- Footer -->
     <footer class="py-4 text-center text-xs text-slate-400">
-      <p>© {{ new Date().getFullYear() }} ICBT • Terstandar & Terpadu</p>
+      <p>© {{ new Date().getFullYear() }} ICBT</p>
     </footer>
 
     <!-- Confirm Logout Dialog -->

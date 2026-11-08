@@ -78,7 +78,7 @@ onUnmounted(() => {
         style="background-image: url('/banner.svg'); background-size: cover; background-position: center;"
       >
         <div class="relative z-10 max-w-3xl">
-          <span class="mb-2 inline-block rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-xs">
+          <span class="mb-2 inline-block rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-xs">
             Panel {{ labelPeran }}
           </span>
           <h1 class="text-2xl font-extrabold tracking-tight sm:text-3xl">{{ jamSapaan }}, {{ nama }}</h1>
@@ -111,11 +111,11 @@ onUnmounted(() => {
       <template v-else-if="data">
         <!-- Superadmin: operasional ujian di atas (kerja harian), kesehatan sistem di bawahnya. -->
         <template v-if="data.operator">
-          <h2 v-if="data.sistem" class="text-xs font-bold uppercase tracking-wider text-slate-500">Operasional ujian</h2>
+          <h2 v-if="data.sistem" class="text-xs font-bold text-slate-500">Operasional ujian</h2>
           <DashboardOperator :data="data.operator" :hari-ini="data.tanggal" />
         </template>
         <template v-if="data.sistem">
-          <h2 class="pt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Sistem dan data</h2>
+          <h2 class="pt-2 text-xs font-bold text-slate-500">Sistem dan data</h2>
           <DashboardSistem :data="data.sistem" />
         </template>
         <DashboardGuru v-if="data.guru" :data="data.guru" :hari-ini="data.tanggal" />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TabelMemuat from '@/components/TabelMemuat.vue'
 import { onMounted, ref, watch } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
@@ -92,7 +93,9 @@ onMounted(muatPilihan)
         </label>
       </div>
 
-      <p v-if="loading" class="py-6 text-center text-sm text-slate-500">Menghitung analisis...</p>
+      <div v-if="loading" class="card overflow-x-auto bg-white">
+        <table class="w-full min-w-[640px] text-left text-sm"><tbody><TabelMemuat :kolom="6" :baris="6" /></tbody></table>
+      </div>
 
       <template v-else-if="hasil">
         <p class="text-xs text-slate-500">
@@ -102,7 +105,7 @@ onMounted(muatPilihan)
 
         <div class="card overflow-x-auto bg-white">
           <table class="w-full min-w-[640px] text-left text-sm">
-            <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+            <thead class="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th class="px-3 py-2">No</th>
                 <th class="px-3 py-2">Tipe</th>

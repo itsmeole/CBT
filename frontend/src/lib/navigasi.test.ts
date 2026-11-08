@@ -12,18 +12,18 @@ describe('navigasi staf', () => {
     expect(jadwal.anak?.map((a) => a.tab)).toEqual(['jadwal', 'paket', 'bobot'])
   })
 
-  it('guru tidak melihat Master Data, Kontrol Sesi, dan Audit Log', () => {
+  it('guru tidak melihat Master Data, Kontrol Sesi, dan Riwayat Aktivitas', () => {
     const nama = buatMenu('guru').map((m) => m.nama)
     expect(nama).not.toContain('Master Data')
     expect(nama).not.toContain('Kontrol Sesi')
-    expect(nama).not.toContain('Audit Log')
+    expect(nama).not.toContain('Riwayat Aktivitas')
     expect(nama).toContain('Jadwal & Paket Ujian')
     expect(nama).toContain('Analisis Butir')
   })
 
-  it('operator tidak melihat Analisis Butir; superadmin melihat Audit Log', () => {
+  it('operator tidak melihat Analisis Butir; superadmin melihat Riwayat Aktivitas', () => {
     expect(buatMenu('operator').map((m) => m.nama)).not.toContain('Analisis Butir')
-    expect(buatMenu('superadmin').map((m) => m.nama)).toContain('Audit Log')
+    expect(buatMenu('superadmin').map((m) => m.nama)).toContain('Riwayat Aktivitas')
   })
 
   it('menentukan item dan sub-menu aktif dari path dan query tab', () => {

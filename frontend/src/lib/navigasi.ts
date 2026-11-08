@@ -90,7 +90,7 @@ export function buatMenu(role: Role | null): MenuItem[] {
     { nama: 'Analisis Butir', to: '/staf/analisis-butir', ikon: 'book', visible: guruAtauSuperadmin },
     { nama: 'Berita Acara', to: '/staf/berita-acara', ikon: 'control', visible: true },
     { nama: 'Cetak Dokumen', to: '/staf/cetak', ikon: 'dashboard', visible: true },
-    { nama: 'Audit Log', to: '/staf/audit-log', ikon: 'users', visible: role === 'superadmin' }
+    { nama: 'Riwayat Aktivitas', to: '/staf/audit-log', ikon: 'users', visible: role === 'superadmin' }
   ].filter((item) => item.visible) as MenuItem[]
 }
 

@@ -67,7 +67,7 @@ async function simpan() {
     const url = `/sesi-ruang/${sesiId.value}/berita-acara`
     const res = sudahAda ? await apiClient.put(url, { isi: isi.value.trim() }) : await apiClient.post(url, { isi: isi.value.trim() })
     tersimpan.value = res.data.data
-    feedback.value = 'Berita acara tersimpan. Jumlah hadir dan absen dihitung otomatis oleh server.'
+    feedback.value = 'Berita acara tersimpan. Jumlah hadir dan absen dihitung otomatis oleh sistem.'
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : 'Gagal menyimpan berita acara.'
   } finally {

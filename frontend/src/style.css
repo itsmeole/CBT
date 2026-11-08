@@ -1,22 +1,39 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/geist';
 
 /*
  * Desain sistem dasar (mobile-first untuk halaman siswa).
  * Aturan: font dasar minimal 16 px, target sentuh minimal 44x44 px (NFR-FE-21, FR-FE-20).
  */
 @theme {
-  --font-sans: 'Inter', 'Traditional Arabic', 'Amiri', 'Geeza Pro', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Geist Variable', 'Traditional Arabic', 'Amiri', 'Geeza Pro', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  --color-brand-50: #eff6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
+  /* Satu aksen (biru tinta) selaras dengan banner; netral memakai keluarga slate yang sama. */
+  --color-brand-50: #f1f4ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c3cffb;
+  --color-brand-500: #4560e0;
+  --color-brand-600: #2c47cc;
+  --color-brand-700: #2338a6;
+  --color-brand-800: #1d2e82;
 
   --color-status-ok: #15803d;
   --color-status-warn: #b45309;
   --color-status-danger: #b91c1c;
-  --color-status-info: #1d4ed8;
+  --color-status-info: #2338a6;
+
+  /* Radius bertingkat: elemen dalam lebih rapat, wadah lebih lembut. */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.375rem;
+
+  /* Bayangan bertinta biru-abu, satu arah cahaya (dari atas). */
+  --shadow-xs: 0 1px 1px rgb(24 32 72 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(24 32 72 / 0.06), 0 1px 1px rgb(24 32 72 / 0.04);
+  --shadow-md: 0 4px 10px -2px rgb(24 32 72 / 0.10), 0 2px 4px -2px rgb(24 32 72 / 0.06);
+  --shadow-lg: 0 12px 24px -6px rgb(24 32 72 / 0.14), 0 4px 8px -4px rgb(24 32 72 / 0.08);
+  --shadow-2xl: 0 24px 48px -12px rgb(24 32 72 / 0.28);
 
   --spacing-touch: 2.75rem; /* 44px */
 }
@@ -31,29 +48,78 @@
     @apply bg-slate-50 font-sans text-slate-900 antialiased;
     margin: 0;
     min-height: 100dvh;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Angka sejajar pada tabel dan penghitung. */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tabel: satu baris data = satu baris teks. Teks panjang dipotong "..." (lengkapnya tampil saat ubah / ditahan kursor). */
+  td, th {
+    white-space: nowrap;
+  }
+  td {
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  td.sel-lebar, th.sel-lebar {
+    white-space: normal;
+    max-width: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @utility btn {
-  @apply inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-lg px-4 py-2 text-base font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex whitespace-nowrap min-h-touch min-w-touch items-center justify-center gap-2 rounded-lg px-4 py-2 text-[15px] font-semibold transition-[background-color,border-color,color,transform] duration-150 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 active:translate-y-px active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 disabled:active:translate-y-0;
 }
 
 @utility btn-primary {
-  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  @apply btn bg-brand-600 text-white shadow-xs hover:bg-brand-700;
 }
 
 @utility btn-secondary {
-  @apply btn border border-slate-300 bg-white text-slate-800 hover:bg-slate-100;
+  @apply btn border border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50;
 }
 
 @utility btn-danger {
-  @apply btn bg-status-danger text-white hover:opacity-90;
+  @apply btn bg-status-danger text-white hover:bg-red-800;
 }
 
 @utility input {
-  @apply min-h-touch w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-brand-600;
+  @apply min-h-touch w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base transition-colors placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-brand-600 focus-visible:outline-2 focus-visible:outline-brand-600/30 focus-visible:outline-offset-0;
 }
 
+/* Kartu datar: pemisah cukup dengan cincin tipis, tanpa bayangan. */
 @utility card {
-  @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm;
+  @apply rounded-xl bg-white p-4 ring-1 ring-slate-900/[0.07];
 }

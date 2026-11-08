@@ -499,7 +499,7 @@ onMounted(() => {
         <div>
           <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Bank Soal</h1>
           <p class="text-sm text-slate-500">
-            Kelola butir soal 5 tipe, visualisasi formula KaTeX, dan berkas ujian.
+            Kelola butir soal 5 tipe, rumus matematika, dan berkas ujian.
           </p>
         </div>
 
@@ -521,13 +521,13 @@ onMounted(() => {
             <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
-            <span>{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
+            <span class="hidden sm:inline">{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
           </button>
-          <button v-if="canManageSelectedMapel" @click="openWordImport" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Impor butir soal dari dokumen Word (.docx)">
+          <button v-if="canManageSelectedMapel" @click="openWordImport" aria-label="Impor soal" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5" title="Impor butir soal dari dokumen Word (.docx)">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
-            <span>Impor Soal</span>
+            <span class="hidden sm:inline">Impor Soal</span>
           </button>
           <button
             @click="exportWordSoal"
@@ -539,13 +539,13 @@ onMounted(() => {
             <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            <span>{{ exportLoading ? 'Mengekspor...' : 'Ekspor Soal' }}</span>
+            <span class="hidden sm:inline">{{ exportLoading ? 'Mengekspor...' : 'Ekspor Soal' }}</span>
           </button>
           <button v-if="canManageSelectedMapel" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5 font-medium shadow-xs">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            <span>Tambah Soal</span>
+            <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Soal</span>
           </button>
         </div>
       </div>
@@ -565,20 +565,20 @@ onMounted(() => {
       </div>
 
       <!-- Filters Toolbar -->
-      <div class="card bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <label class="text-xs font-semibold text-slate-600">Mapel:</label>
-            <select v-model="selectedMapel" @change="fetchSoal" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-colors">
+      <div class="card bg-white p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:gap-3">
+          <div class="col-span-2 flex items-center gap-2 sm:col-span-1">
+            <label class="hidden text-xs font-semibold text-slate-600 sm:block">Mapel:</label>
+            <select v-model="selectedMapel" aria-label="Mapel" @change="fetchSoal" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-colors">
               <option v-for="m in mapelList" :key="m.id" :value="m.id">
                 {{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
               </option>
             </select>
           </div>
 
-          <div class="flex items-center gap-2">
-            <label class="text-xs font-semibold text-slate-600">Tipe:</label>
-            <select v-model="selectedTipe" @change="fetchSoal" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-colors">
+          <div class="col-span-2 flex items-center gap-2 sm:col-span-1">
+            <label class="hidden text-xs font-semibold text-slate-600 sm:block">Tipe:</label>
+            <select v-model="selectedTipe" aria-label="Tipe soal" @change="fetchSoal" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-colors">
               <option value="">Semua Tipe Soal</option>
               <option value="pg">Pilihan Ganda (PG)</option>
               <option value="pg_kompleks">PG Kompleks</option>
@@ -623,9 +623,6 @@ onMounted(() => {
               </span>
               <span class="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 uppercase">
                 {{ soal.tipe.replace('_', ' ') }}
-              </span>
-              <span class="text-xs font-medium text-slate-400">
-                {{ soal.mapel?.nama }}
               </span>
             </div>
 
@@ -735,7 +732,7 @@ onMounted(() => {
 
             <!-- Live KaTeX Preview -->
             <div v-if="formKonten" class="mt-2 rounded bg-slate-50 border p-3">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pratinjau Rumus Math (KaTeX):</p>
+              <p class="text-[10px] font-bold text-slate-400 mb-1">Pratinjau rumus:</p>
               <div class="text-sm text-slate-800" dir="auto" v-html="renderMathInHtml(formKonten)"></div>
             </div>
           </div>
