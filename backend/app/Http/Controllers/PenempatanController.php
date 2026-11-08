@@ -45,7 +45,7 @@ class PenempatanController extends Controller
                 'sesi_ke' => $sesi->sesi_ke,
                 'jam_mulai' => substr((string) $sesi->jam_mulai, 0, 5),
                 'jam_akhir' => substr((string) $sesi->jam_akhir, 0, 5),
-                'token' => $sesi->tokenUjian->firstWhere('aktif', true)?->kode,
+                'token' => $sesi->tokenUjian?->kode,
                 'pengawas' => $sesi->pengawasSesi->map(fn ($p): array => ['guru_id' => $p->guru_id, 'nama' => $p->guru?->user?->name])->values(),
                 'peserta' => $sesi->pesertaUjian->map(fn (PesertaUjian $p): array => [
                     'id' => $p->id,

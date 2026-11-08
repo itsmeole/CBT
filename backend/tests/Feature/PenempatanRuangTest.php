@@ -259,6 +259,37 @@ class PenempatanRuangTest extends TestCase
         $this->assertStringContainsString('Hadir: 1', $html);
     }
 
+    public function test_schedule_and_placement_show_the_active_token_not_a_stale_one_after_regeneration(): void
+    {
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $sesi = SesiRuang::create(['jadwal_ujian_id' => $this->jadwal->id, 'ruang_id' => $ruang->id, 'sesi_ke' => 1, 'jam_mulai' => '08:00', 'jam_akhir' => '09:00']);
+        TokenUjian::create(['sesi_ruang_id' => $sesi->id, 'kode' => 'LAMA22', 'aktif' => true, 'dibuat_oleh' => $this->operator->id]);
+
+        $baru = $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/sesi-ruang/{$sesi->id}/token/generate")
+            ->assertOk()
+            ->json('data.kode');
+
+        $this->assertNotSame('LAMA22', $baru);
+        $this->actingAs($this->operator, 'sanctum')->getJson('/api/v1/jadwal')
+            ->assertOk()
+            ->assertJsonPath('data.0.sesi_ruang.0.token_ujian.kode', $baru);
+        $this->actingAs($this->operator, 'sanctum')->getJson("/api/v1/jadwal/{$this->jadwal->id}/penempatan")
+            ->assertOk()
+            ->assertJsonPath('data.sesi.0.token', $baru);
+    }
+
+    public function test_session_without_an_active_token_has_no_token(): void
+    {
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $sesi = SesiRuang::create(['jadwal_ujian_id' => $this->jadwal->id, 'ruang_id' => $ruang->id, 'sesi_ke' => 1, 'jam_mulai' => '08:00', 'jam_akhir' => '09:00']);
+        TokenUjian::create(['sesi_ruang_id' => $sesi->id, 'kode' => 'MATI22', 'aktif' => false, 'dibuat_oleh' => $this->operator->id]);
+
+        $this->actingAs($this->operator, 'sanctum')->getJson("/api/v1/jadwal/{$this->jadwal->id}/penempatan")
+            ->assertOk()
+            ->assertJsonPath('data.sesi.0.token', null);
+    }
+
     public function test_operator_can_create_a_question_package_without_sending_a_teacher_id(): void
     {
         $soal = BankSoal::create(['guru_id' => $this->guru->id, 'mapel_id' => $this->mapel->id, 'tipe' => 'essay', 'konten' => 'q', 'kunci' => 'k', 'rubrik' => 'r']);

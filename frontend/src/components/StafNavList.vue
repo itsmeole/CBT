@@ -91,7 +91,14 @@ const kelasItem = (aktif: boolean, collapsed: boolean) => [
           </svg>
         </button>
 
-        <ul v-show="terbuka[item.to]" :id="idSubmenu(item)" class="ml-5 mt-1 space-y-0.5 border-l border-slate-200 pl-2.5">
+        <!-- Animasi buka/tutup: tinggi bertransisi 0fr -> 1fr; saat tertutup konten disembunyikan dari fokus & pembaca layar. -->
+        <div
+          class="grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none"
+          :class="terbuka[item.to] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+          :inert="!terbuka[item.to]"
+          :data-terbuka="!!terbuka[item.to]"
+        >
+        <ul :id="idSubmenu(item)" class="ml-5 mt-1 min-h-0 space-y-0.5 overflow-hidden border-l border-slate-200 pl-2.5">
           <li v-for="anak in item.anak" :key="anak.tab">
             <RouterLink
               :to="{ path: item.to, query: { tab: anak.tab } }"
@@ -111,6 +118,7 @@ const kelasItem = (aktif: boolean, collapsed: boolean) => [
             </RouterLink>
           </li>
         </ul>
+        </div>
       </div>
     </template>
   </nav>

@@ -137,6 +137,16 @@ Aturan kerja agen AI wajib mematuhi [`BE/Rules BE.md`](./BE/Rules%20BE.md) dan [
 - [x] Sub-opsi dropdown sidebar memiliki ikon SVG masing-masing (data ikon di `lib/navigasi.ts`, diuji agar tiap sub-opsi pasti punya ikon unik).
 - [x] **Template dan ekspor soal Word berbentuk satu tabel kisi-kisi** (kolom No, Elemen, Tujuan Pembelajaran, Indikator Soal, Level Kognitif, Soal, Catatan Pemeriksa; orientasi landscape). Soal ditulis fleksibel dengan tag di kolom Soal (satu baris tabel = satu soal; boleh juga di luar tabel). **Sistem hanya membaca teks yang diapit tag soal**; kolom administrasi dan teks lain diabaikan, sehingga dokumen yang sama dipakai panitia untuk pemeriksaan sekaligus diimpor tanpa diubah. Parser menoleransi variasi penulisan tag (spasi, huruf kecil, "OPSI BENAR", NBSP), melaporkan soal yang lupa ditutup tanpa menelan soal berikutnya, dan membaca isi sel tabel (tab antar sel). Ekspor bank soal/paket memakai format yang sama (round-trip teruji untuk kelima tipe). Format satu-tabel-per-soal yang sempat dibuat dihapus.
 
+#### Dashboard staf berbasis tindakan (8 Nov 2026)
+- [x] Dashboard dirancang ulang per peran, menjawab "apa yang perlu diurus sekarang" (bukan angka total). Endpoint `GET /dashboard` sadar peran dengan jumlah query tetap (teruji tidak N+1) dan "hari ini" menurut zona waktu sekolah (`APP_TIMEZONE_SEKOLAH`, default Asia/Jakarta).
+- [x] **Operator:** angka langsung (sesi hari ini/berjalan, mengerjakan, terkunci, selesai), jadwal hari ini (jam, ruang, token, pengawas, bar progres, status), daftar *perlu tindakan* (kehadiran belum diverifikasi, siswa terkunci/melewati ambang, PDF gagal), dan *kesiapan ujian* 14 hari ke depan (tanpa penempatan, sesi tanpa pengawas/peserta/token, siswa kelas pengampu yang belum ditempatkan).
+- [x] **Guru:** antrean koreksi essay per jadwal (hanya kelas/mapel yang diampu), tugas pengawasan beserta berita acara tertunggak, ujian mapel saya (menandai paket tanpa butir), dan hasil terbaru (final, menunggu koreksi, rata-rata).
+- [x] **Superadmin:** kesehatan sistem (antrean, job gagal, PDF gagal, backup terakhir), feed aktivitas audit dengan penanda tindakan sensitif, kualitas data master (guru/mapel tanpa pengampu, kelas tanpa siswa, akun nonaktif, tahun ajaran aktif), jumlah pengguna per peran, ditambah panel operasional ujian.
+- [x] Penataan: pada superadmin panel *Operasional ujian* berada di atas, *Sistem dan data* di bawahnya. Pada guru, kartu *Ujian mapel saya* di kolom kiri dan *Antrean koreksi essay* di kolom kanan. *Antrean koreksi* dan *Hasil ujian terbaru* hanya menampilkan 5 data terbaru (total tetap dihitung penuh; ada keterangan "Menampilkan 5 jadwal terbaru dari N").
+- [x] Pembaruan otomatis tiap 30 detik (dijeda saat tab tersembunyi); bila pembaruan gagal, data terakhir tetap tampil dengan pesan galat.
+- [x] Perbaikan bug yang ditemukan saat membangun dashboard: relasi `SesiRuang::tokenUjian` mengembalikan token pertama (bisa token lama yang sudah nonaktif) sehingga setelah "Rilis Token Baru" halaman Jadwal dapat menampilkan token yang sudah mati. Kini relasi mengembalikan token aktif terbaru (teruji).
+- Belum termasuk: butir soal bermasalah (daya pembeda negatif) di dashboard guru karena perhitungannya berat; tetap tersedia di halaman Analisis Butir.
+
 ---
 
 ### 1.5 Pengerjaan Ujian Siswa (Mobile-First) & Penilaian Otomatis

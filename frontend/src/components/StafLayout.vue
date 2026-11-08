@@ -202,9 +202,29 @@ const navItems = computed(() => buatMenu(role.value ?? null))
               <p class="text-[11px] text-slate-400 font-medium">Panel Staf</p>
             </div>
           </div>
-          <div v-else class="flex items-center justify-center">
-            <img src="/favicon.svg" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
-          </div>
+          <!-- Saat diciutkan: logo = tombol perluas. Hover/fokus -> logo memudar, panah kanan muncul. -->
+          <button
+            v-else
+            type="button"
+            @click="toggleCollapse"
+            class="group relative flex h-10 w-10 items-center justify-center rounded-xl focus-visible:outline-2 focus-visible:outline-brand-600"
+            title="Perluas Sidebar"
+            aria-label="Perluas Sidebar"
+          >
+            <img
+              src="/favicon.svg"
+              alt=""
+              class="absolute h-10 w-10 object-contain rounded-xl transition-opacity duration-300 group-hover:opacity-0 group-focus-visible:opacity-0"
+            />
+            <span
+              class="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"
+              aria-hidden="true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </span>
+          </button>
 
           <!-- Collapse Button -->
           <button
@@ -218,22 +238,6 @@ const navItems = computed(() => buatMenu(role.value ?? null))
             <!-- Chevron Left SVG -->
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- If collapsed, show expand button below logo -->
-        <div v-if="isCollapsed" class="flex justify-center pt-2">
-          <button
-            type="button"
-            @click="toggleCollapse"
-            class="rounded-xl p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-            title="Perluas Sidebar"
-            aria-label="Perluas Sidebar"
-          >
-            <!-- Chevron Right SVG -->
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
-              <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
           </button>
         </div>

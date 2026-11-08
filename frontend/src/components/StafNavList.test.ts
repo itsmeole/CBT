@@ -40,7 +40,7 @@ describe('StafNavList', () => {
     const { wrapper } = await pasang('/staf/bank-soal')
     const tombol = grup(wrapper, 'Master Data')
     expect(tombol.attributes('aria-expanded')).toBe('false')
-    expect(wrapper.find('#submenu-staf-master').attributes('style')).toContain('display: none')
+    expect(wrapper.find('#submenu-staf-master').element.parentElement?.getAttribute('data-terbuka')).toBe('false')
 
     await tombol.trigger('click')
     expect(tombol.attributes('aria-expanded')).toBe('true')

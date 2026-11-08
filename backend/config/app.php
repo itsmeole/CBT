@@ -68,6 +68,12 @@ return [
     'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*
+    | Zona waktu sekolah untuk menentukan "hari ini" (jadwal ujian, dashboard).
+    | Data waktu di database tetap UTC.
+    */
+    'timezone_sekolah' => env('APP_TIMEZONE_SEKOLAH', 'Asia/Jakarta'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

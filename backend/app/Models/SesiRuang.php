@@ -42,9 +42,15 @@ class SesiRuang extends Model
         return $this->hasMany(PengawasSesi::class);
     }
 
+    /**
+     * Token AKTIF terbaru sesi ini (null bila belum ada). Token lama yang sudah dinonaktifkan
+     * (mis. setelah rilis token baru) tidak boleh ikut tampil.
+     */
     public function tokenUjian()
     {
-        return $this->hasOne(TokenUjian::class);
+        return $this->hasOne(TokenUjian::class)->ofMany(['id' => 'max'], function ($query): void {
+            $query->where('aktif', true);
+        });
     }
 
     public function pesertaUjian()
