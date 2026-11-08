@@ -89,40 +89,58 @@ class WordTemplateTest extends TestCase
         return collect($hasil['errors'])->pluck('message')->implode(' | ');
     }
 
-    public function test_template_is_one_landscape_table_with_administrative_columns(): void
+    public function test_template_has_school_header_landscape_kisi_table_and_35_empty_slots(): void
     {
         $path = (new WordSoalService)->generateTemplate();
         $xml = $this->xmlDokumen($path);
         unlink($path);
 
-        $this->assertSame(1, substr_count($xml, '<w:tbl>'), 'Template hanya memiliki satu tabel.');
         $this->assertStringContainsString('w:orient="landscape"', $xml);
+        foreach (['FORMAT TEMPLATE SOAL', 'SMPS 2 AL-MUHAJIRIN PURWAKARTA', 'Satuan Pendidikan', 'Alokasi Waktu'] as $kop) {
+            $this->assertStringContainsString($kop, $xml, "Kop {$kop}");
+        }
+        $this->assertStringNotContainsString('Cara mengisi', $xml, 'Template tidak memuat petunjuk pengisian.');
         foreach (['No', 'Elemen', 'Tujuan Pembelajaran', 'Indikator Soal', 'Level Kognitif', 'Soal', 'Catatan Pemeriksa'] as $kolom) {
             $this->assertStringContainsString('>'.$kolom.'<', $xml, "Kolom {$kolom}");
         }
+        $this->assertSame(35, substr_count($xml, '>[SOAL]<'), 'PG 15 + PG_KOMPLEKS 10 + BENAR_SALAH 5 + MENJODOHKAN 3 + ESSAY 2.');
+        $this->assertSame(15, substr_count($xml, 'TIPE: PG<'));
+        $this->assertSame(10, substr_count($xml, 'TIPE: PG_KOMPLEKS<'));
+        $this->assertSame(5, substr_count($xml, 'TIPE: BENAR_SALAH<'));
+        $this->assertSame(3, substr_count($xml, 'TIPE: MENJODOHKAN<'));
+        $this->assertSame(2, substr_count($xml, 'TIPE: ESSAY<'));
     }
 
-    public function test_template_previews_exactly_five_questions_and_ignores_all_administrative_text(): void
+    public function test_template_reads_only_the_five_examples_and_skips_empty_slots(): void
     {
         $path = (new WordSoalService)->generateTemplate();
         $hasil = $this->preview(new UploadedFile($path, 't.docx', self::MIME, null, true));
 
-        $this->assertSame(5, $hasil['total_soal'], 'Petunjuk dan kolom administrasi tidak boleh terbaca sebagai soal.');
+        $this->assertSame(5, $hasil['total_soal'], 'Slot kosong dan kop dokumen tidak boleh terbaca sebagai soal.');
         $this->assertSame(0, $hasil['error_count'], $this->pesan($hasil));
         $this->assertSame(['pg', 'pg_kompleks', 'benar_salah', 'menjodohkan', 'essay'], array_column($hasil['items'], 'tipe'));
         [$pg, $kompleks, $bs, $jodoh, $essay] = $hasil['items'];
 
-        $this->assertSame('C', $pg['kunci']);
+        $this->assertSame('B', $pg['kunci']);
         $this->assertSame(['A', 'C'], $kompleks['kunci']);
+        $this->assertStringContainsString('الْعَزْمِ', $kompleks['teks'], 'Soal berbahasa Arab terbaca utuh.');
         $this->assertSame(['1' => 'B', '2' => 'S'], $bs['kunci']);
+        $this->assertStringContainsString('<img', $bs['teks'], 'Gambar di dalam kolom Soal dipertahankan.');
         $this->assertSame(['1' => 'b', '2' => 'a'], $jodoh['kunci']);
         $this->assertStringContainsString('klorofil', (string) $essay['kunci']);
-        $this->assertStringContainsString('<img', $kompleks['teks'], 'Gambar di dalam kolom Soal dipertahankan.');
 
         $semua = json_encode($hasil['items'], JSON_UNESCAPED_UNICODE);
-        foreach (['Bahasa Arab', 'Peserta didik mampu', 'Disajikan', 'Level Kognitif', 'Catatan Pemeriksa', 'Cara mengisi'] as $admin) {
+        foreach (['Level Kognitif', 'Catatan Pemeriksa', 'Satuan Pendidikan', 'CAPAIAN', 'SMPS 2'] as $admin) {
             $this->assertStringNotContainsString($admin, (string) $semua, "Teks administrasi \"{$admin}\" tidak boleh ikut terbaca.");
         }
+    }
+
+    public function test_template_with_only_empty_slots_reports_that_nothing_was_filled(): void
+    {
+        $hasil = $this->preview($this->dokumenKisi([['soal' => ['[SOAL]', 'TIPE: PG', 'TEKS:', '[OPSI]', '[OPSI]', '[/SOAL]']]]));
+
+        $this->assertSame(0, $hasil['total_soal']);
+        $this->assertStringContainsString('masih kosong', $this->pesan($hasil));
     }
 
     public function test_only_the_soal_column_is_read_even_when_other_cells_look_like_tags(): void
