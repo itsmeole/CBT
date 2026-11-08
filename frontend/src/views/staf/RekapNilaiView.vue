@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TabelMemuat from '@/components/TabelMemuat.vue'
 import { computed, ref, watch } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
@@ -72,10 +73,9 @@ watch([jadwalId, kelasId], muatNilai)
         </template>
       </FilterJadwal>
 
-      <p v-if="loading" class="py-6 text-center text-sm text-slate-500">Memuat nilai...</p>
-      <div v-else class="card overflow-x-auto bg-white">
+      <div class="card overflow-x-auto bg-white">
         <table class="w-full min-w-[640px] text-left text-sm">
-          <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead class="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
             <tr>
               <th class="px-3 py-2">Nama</th>
               <th class="px-3 py-2">NIS</th>
@@ -98,7 +98,8 @@ watch([jadwalId, kelasId], muatNilai)
                 </span>
               </td>
             </tr>
-            <tr v-if="tampil.length === 0">
+            <TabelMemuat v-if="loading && tampil.length === 0" :kolom="6" />
+            <tr v-if="!loading && tampil.length === 0">
               <td colspan="6" class="px-3 py-8 text-center text-slate-500">Belum ada data nilai.</td>
             </tr>
           </tbody>

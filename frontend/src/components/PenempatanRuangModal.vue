@@ -243,7 +243,7 @@ onMounted(muat)
 
         <div class="grid gap-4 md:grid-cols-2">
           <section aria-label="Pilih kelas">
-            <h3 class="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">1. Kelas peserta</h3>
+            <h3 class="mb-1 text-xs font-bold text-slate-500">1. Kelas peserta</h3>
             <div class="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
               <label v-for="k in kelasTahunIni" :key="k.id" class="flex cursor-pointer items-center gap-2 rounded p-1 text-sm hover:bg-slate-50">
                 <input v-model="kelasDipilih" type="checkbox" :value="k.id" class="h-4 w-4 rounded text-brand-600" />
@@ -254,7 +254,7 @@ onMounted(muat)
             </div>
           </section>
           <section aria-label="Pilih ruang">
-            <h3 class="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">2. Ruang yang dipakai</h3>
+            <h3 class="mb-1 text-xs font-bold text-slate-500">2. Ruang yang dipakai</h3>
             <div class="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
               <label v-for="r in ruangList" :key="r.id" class="flex cursor-pointer items-center gap-2 rounded p-1 text-sm hover:bg-slate-50">
                 <input v-model="ruangDipilih" type="checkbox" :value="r.id" class="h-4 w-4 rounded text-brand-600" />
@@ -267,7 +267,7 @@ onMounted(muat)
 
         <section aria-label="Penempatan" class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500">3. Penempatan ({{ kandidat.length }} siswa, {{ totalKursi }} kursi)</h3>
+            <h3 class="text-xs font-bold text-slate-500">3. Penempatan ({{ kandidat.length }} siswa, {{ totalKursi }} kursi)</h3>
             <div class="flex flex-wrap gap-2">
               <button class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="kandidat.length === 0 || ruangTerpilih.length === 0" @click="acak">🎲 Acak Penempatan</button>
               <button class="btn-secondary !min-h-0 !py-1.5 text-xs" :disabled="Object.keys(peta).length === 0" @click="kosongkan">Kosongkan</button>
@@ -301,7 +301,7 @@ onMounted(muat)
 
             <div class="max-h-80 overflow-auto rounded-xl border border-slate-200">
               <table class="w-full text-left text-sm">
-                <thead class="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
+                <thead class="sticky top-0 bg-slate-50 text-xs text-slate-500">
                   <tr>
                     <th class="px-3 py-2">NIS</th>
                     <th class="px-3 py-2">Nama</th>

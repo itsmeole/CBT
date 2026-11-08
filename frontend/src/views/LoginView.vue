@@ -43,7 +43,7 @@ async function submit() {
       <!-- Left: 3D Illustration of Books & Graduation Cap (Stationary) -->
       <div class="flex-1 flex items-center justify-center p-6 lg:p-12 select-none pointer-events-none">
         <img
-          src="/illustration_books.png"
+          src="/illustration_books.webp"
           alt="3D Buku dan Topi Wisuda"
           class="max-w-[420px] lg:max-w-[540px] xl:max-w-[620px] w-full h-auto drop-shadow-2xl"
         />
@@ -157,7 +157,7 @@ async function submit() {
               <button
                 type="submit"
                 :disabled="loading"
-                class="w-full rounded-2xl bg-gradient-to-r from-[#598bfc] to-[#7ba7fc] hover:from-[#497df5] hover:to-[#6b9af7] text-white font-bold py-3.5 text-base shadow-lg shadow-blue-500/25 active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                class="w-full rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] transition text-white font-bold py-3.5 text-base  disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {{ loading ? 'Memproses…' : 'Login' }}
               </button>
@@ -191,7 +191,7 @@ async function submit() {
       <!-- 1/3 Bagian Atas: Area Icon Buku & Toga (Stationary, Tanpa Animasi Melayang) -->
       <div class="h-[34vh] w-full flex items-center justify-center p-4 select-none pointer-events-none">
         <img
-          src="/illustration_books.png"
+          src="/illustration_books.webp"
           alt="3D Buku dan Topi Wisuda"
           class="max-h-[26vh] max-w-[260px] w-auto h-auto object-contain drop-shadow-xl"
         />
@@ -313,7 +313,7 @@ async function submit() {
                 <button
                   type="submit"
                   :disabled="loading"
-                  class="w-full min-h-touch rounded-2xl bg-gradient-to-r from-[#598bfc] to-[#7ba7fc] hover:from-[#497df5] hover:to-[#6b9af7] text-white font-bold py-3.5 text-base shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
+                  class="w-full min-h-touch rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] transition text-white font-bold py-3.5 text-base active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
                 >
                   {{ loading ? 'Memproses…' : 'Login' }}
                 </button>

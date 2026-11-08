@@ -72,7 +72,7 @@ watch(
 
 onBeforeUnmount(() => editor.value?.destroy())
 
-// ---------- Rumus LaTeX dengan pratinjau KaTeX ----------
+// ---------- Rumus dengan pratinjau KaTeX ----------
 const tampilRumus = ref(false)
 const rumus = ref('')
 const rumusDisplay = ref(false)
@@ -141,7 +141,7 @@ function jalankan(aksi: (typeof tombol)[number]['aksi']) {
 
     <div v-if="tampilRumus" class="space-y-2 border-b border-slate-200 bg-brand-50/40 p-3">
       <label class="block text-xs font-semibold text-slate-700">
-        Rumus LaTeX
+        Rumus
         <input v-model="rumus" class="input mt-1 font-mono text-sm" placeholder="contoh: \frac{a}{b} + \sqrt{x^2}" @keydown.enter.prevent="sisipkanRumus" />
       </label>
       <label class="flex items-center gap-2 text-xs text-slate-700">

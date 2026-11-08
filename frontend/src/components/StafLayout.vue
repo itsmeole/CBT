@@ -71,13 +71,13 @@ const navItems = computed(() => buatMenu(role.value ?? null))
           </svg>
         </button>
         <div class="flex items-center gap-2">
-          <img src="/favicon.svg" alt="ICBT" class="h-8 w-8 shrink-0 object-contain rounded-lg" />
+          <img src="/logo.webp" alt="ICBT" class="h-8 w-8 shrink-0 object-contain rounded-lg" />
           <span class="text-sm font-bold text-slate-900 tracking-tight">ICBT</span>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="rounded-md bg-brand-50 border border-brand-200 px-2 py-0.5 text-[11px] font-bold uppercase text-brand-700">
+        <span class="rounded-md bg-brand-50 border border-brand-200 px-2 py-0.5 text-[11px] font-bold capitalize text-brand-700">
           {{ role }}
         </span>
         <button
@@ -130,7 +130,7 @@ const navItems = computed(() => buatMenu(role.value ?? null))
           <!-- Drawer Header -->
           <div class="flex items-center justify-between border-b border-slate-100 p-4">
             <div class="flex items-center gap-2.5">
-              <img src="/favicon.svg" alt="ICBT" class="h-9 w-9 shrink-0 object-contain rounded-xl" />
+              <img src="/logo.webp" alt="ICBT" class="h-9 w-9 shrink-0 object-contain rounded-xl" />
               <div>
                 <h2 class="text-sm font-bold text-slate-900 leading-tight">ICBT</h2>
                 <p class="text-[11px] text-slate-500">Panel Manajemen Staf</p>
@@ -162,7 +162,7 @@ const navItems = computed(() => buatMenu(role.value ?? null))
               </div>
               <div class="overflow-hidden">
                 <p class="text-xs font-semibold text-slate-800 truncate">{{ auth.user?.nama || auth.user?.username }}</p>
-                <span class="inline-block rounded bg-brand-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-brand-700">
+                <span class="inline-block rounded bg-brand-100 px-1.5 py-0.2 text-[10px] font-bold capitalize text-brand-700">
                   {{ role }}
                 </span>
               </div>
@@ -196,7 +196,7 @@ const navItems = computed(() => buatMenu(role.value ?? null))
         <div class="flex items-center border-b border-slate-100 px-4 py-4" :class="isCollapsed ? 'justify-center' : 'justify-between'">
           <!-- Brand -->
           <div v-if="!isCollapsed" class="flex items-center gap-3 overflow-hidden">
-            <img src="/favicon.svg" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
+            <img src="/logo.webp" alt="ICBT" class="h-10 w-10 shrink-0 object-contain rounded-xl" />
             <div class="truncate">
               <h1 class="text-sm font-extrabold text-slate-900 leading-tight">ICBT</h1>
               <p class="text-[11px] text-slate-400 font-medium">Panel Staf</p>
@@ -212,7 +212,7 @@ const navItems = computed(() => buatMenu(role.value ?? null))
             aria-label="Perluas Sidebar"
           >
             <img
-              src="/favicon.svg"
+              src="/logo.webp"
               alt=""
               class="absolute h-10 w-10 object-contain rounded-xl transition-opacity duration-300 group-hover:opacity-0 group-focus-visible:opacity-0"
             />
@@ -256,7 +256,7 @@ const navItems = computed(() => buatMenu(role.value ?? null))
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-800 truncate">{{ auth.user?.nama || auth.user?.username }}</p>
-              <span class="inline-block rounded bg-brand-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-brand-700">
+              <span class="inline-block rounded bg-brand-100 px-1.5 py-0.2 text-[10px] font-bold capitalize text-brand-700">
                 {{ role }}
               </span>
             </div>

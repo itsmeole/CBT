@@ -304,13 +304,13 @@ onMounted(() => {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            <span>Buat Paket Soal Baru</span>
+            <span class="sm:hidden">Paket baru</span><span class="hidden sm:inline">Buat Paket Soal Baru</span>
           </button>
           <button v-if="activeTab === 'jadwal'" @click="openCreateJadwal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            <span>Terbitkan Jadwal Ujian</span>
+            <span class="sm:hidden">Terbitkan</span><span class="hidden sm:inline">Terbitkan Jadwal Ujian</span>
           </button>
         </div>
       </div>
@@ -334,7 +334,7 @@ onMounted(() => {
         <h2 class="mb-4 text-base font-bold text-slate-900">{{ judulTab }}</h2>
         <!-- 1. Jadwal Ujian List -->
         <div v-if="activeTab === 'jadwal'" class="space-y-6">
-          <div v-for="jadwal in jadwalList" :key="jadwal.id" class="card border border-slate-200 p-5">
+          <div v-for="jadwal in jadwalList" :key="jadwal.id" class="card p-5">
             <div class="flex flex-col justify-between gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
               <div>
                 <h3 class="text-base font-bold text-slate-900">{{ jadwal.nama }}</h3>
@@ -349,14 +349,14 @@ onMounted(() => {
                   Tanggal: {{ jadwal.tanggal }}
                 </span>
                 <button v-if="bolehAtur" @click="bukaPenempatan(jadwal)" class="btn-primary !min-h-0 !py-1 text-xs">
-                  Atur Penempatan Peserta
+                  <span class="sm:hidden">Penempatan</span><span class="hidden sm:inline">Atur Penempatan Peserta</span>
                 </button>
               </div>
             </div>
 
             <!-- Sesi Ruang List inside Jadwal -->
             <div class="mt-4">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Sesi Ruang & Token Ujian:</h4>
+              <h4 class="text-xs font-bold text-slate-500 mb-2">Sesi Ruang & Token Ujian:</h4>
               <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div
                   v-for="sesi in jadwal.sesi_ruang"
@@ -375,7 +375,7 @@ onMounted(() => {
 
                     <!-- Token Display -->
                     <div class="text-right">
-                      <p class="text-[10px] text-slate-400 font-bold uppercase">Token Ujian</p>
+                      <p class="text-[10px] text-slate-400 font-bold">Token Ujian</p>
                       <span class="font-mono text-base font-extrabold tracking-widest text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
                         {{ sesi.token_ujian?.kode || 'BELUM ADA' }}
                       </span>
@@ -402,7 +402,7 @@ onMounted(() => {
                       <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                       </svg>
-                      <span>{{ generatingTokenId === sesi.id ? 'Merilis Token...' : 'Rilis Token Baru' }}</span>
+                      <span>{{ generatingTokenId === sesi.id ? 'Merilis...' : 'Token baru' }}</span>
                     </button>
                   </div>
                 </div>
@@ -421,7 +421,7 @@ onMounted(() => {
 
         <!-- 2. Paket Soal List -->
         <div v-if="activeTab === 'paket'" class="space-y-4">
-          <div v-for="paket in paketList" :key="paket.id" class="card border border-slate-200 p-4">
+          <div v-for="paket in paketList" :key="paket.id" class="card p-4">
             <div class="flex items-start justify-between">
               <div>
                 <h3 class="text-sm font-bold text-slate-800">{{ paket.nama }}</h3>

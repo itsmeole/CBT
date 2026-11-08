@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TabelMemuat from '@/components/TabelMemuat.vue'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { TAB_MASTER, tabValid } from '@/lib/navigasi'
@@ -477,7 +478,7 @@ const currentListCount = computed(() => {
             <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            <span>{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
+            <span class="hidden sm:inline">{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
           </button>
           <span v-if="!bolehUbahTab" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500">
@@ -489,20 +490,21 @@ const currentListCount = computed(() => {
           <button
             v-if="['siswa', 'guru', 'kelas', 'guru_mapel'].includes(activeTab) && isOperatorOrSuperadmin"
             @click="openImport(activeTab)"
+            aria-label="Impor data" title="Impor data dari Excel"
             class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
           >
             <!-- Upload SVG -->
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
-            <span>Impor Data</span>
+            <span class="hidden sm:inline">Impor Data</span>
           </button>
           <button v-if="bolehUbahTab" @click="openCreateModal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
             <!-- Plus SVG -->
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            <span>Tambah Data</span>
+            <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Data</span>
           </button>
         </div>
       </div>
@@ -549,11 +551,7 @@ const currentListCount = computed(() => {
             <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
           </select>
           </div>
-          <span v-if="loading" class="text-xs text-slate-400 flex items-center gap-1.5 sm:ml-auto">
-            <span class="inline-block h-2 w-2 animate-ping rounded-full bg-brand-600"></span>
-            Memuat data...
-          </span>
-          <span v-else class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 sm:ml-auto">
+          <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 sm:ml-auto">
             {{ currentListCount }} Data
           </span>
         </div>
@@ -561,7 +559,7 @@ const currentListCount = computed(() => {
         <!-- 0. Pengampu Mapel (guru - mapel - kelas) -->
         <div v-if="activeTab === 'guru_mapel'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">Guru</th>
                 <th class="p-3">Mata Pelajaran</th>
@@ -592,8 +590,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredGuruMapel.length === 0">
-                <td colspan="5" class="p-6 text-center text-slate-400">Belum ada data pengampu mapel.</td>
+              <TabelMemuat v-if="loading && filteredGuruMapel.length === 0" :kolom="5" />
+              <tr v-if="!loading && filteredGuruMapel.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data pengampu mapel.</td>
               </tr>
             </tbody>
           </table>
@@ -602,7 +601,7 @@ const currentListCount = computed(() => {
         <!-- 1. Siswa Table -->
         <div v-if="activeTab === 'siswa'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">NIS</th>
                 <th class="p-3">Nama Siswa</th>
@@ -653,8 +652,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredSiswa.length === 0">
-                <td colspan="6" class="p-6 text-center text-slate-400">Belum ada data siswa.</td>
+              <TabelMemuat v-if="loading && filteredSiswa.length === 0" :kolom="6" />
+              <tr v-if="!loading && filteredSiswa.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data siswa.</td>
               </tr>
             </tbody>
           </table>
@@ -663,7 +663,7 @@ const currentListCount = computed(() => {
         <!-- 2. Guru Table -->
         <div v-if="activeTab === 'guru'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">NIP / NIY</th>
                 <th class="p-3">Nama Guru</th>
@@ -727,8 +727,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredGuru.length === 0">
-                <td :colspan="isSuperadmin ? 6 : 5" class="p-6 text-center text-slate-400">Belum ada data guru.</td>
+              <TabelMemuat v-if="loading && filteredGuru.length === 0" :kolom="6" />
+              <tr v-if="!loading && filteredGuru.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data guru.</td>
               </tr>
             </tbody>
           </table>
@@ -737,7 +738,7 @@ const currentListCount = computed(() => {
         <!-- 3. Kelas Table -->
         <div v-if="activeTab === 'kelas'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">Nama Kelas</th>
                 <th class="p-3">Tingkat</th>
@@ -777,8 +778,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredKelas.length === 0">
-                <td colspan="4" class="p-6 text-center text-slate-400">Belum ada data kelas.</td>
+              <TabelMemuat v-if="loading && filteredKelas.length === 0" :kolom="4" />
+              <tr v-if="!loading && filteredKelas.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data kelas.</td>
               </tr>
             </tbody>
           </table>
@@ -787,7 +789,7 @@ const currentListCount = computed(() => {
         <!-- 4. Mapel Table -->
         <div v-if="activeTab === 'mapel'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">Kode</th>
                 <th class="p-3">Nama Mata Pelajaran</th>
@@ -825,8 +827,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredMapel.length === 0">
-                <td colspan="3" class="p-6 text-center text-slate-400">Belum ada data mata pelajaran.</td>
+              <TabelMemuat v-if="loading && filteredMapel.length === 0" :kolom="3" />
+              <tr v-if="!loading && filteredMapel.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data mata pelajaran.</td>
               </tr>
             </tbody>
           </table>
@@ -835,7 +838,7 @@ const currentListCount = computed(() => {
         <!-- 5. Ruang Table -->
         <div v-if="activeTab === 'ruang'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">Kode Ruang</th>
                 <th class="p-3">Nama Ruang</th>
@@ -875,8 +878,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredRuang.length === 0">
-                <td colspan="4" class="p-6 text-center text-slate-400">Belum ada data ruang.</td>
+              <TabelMemuat v-if="loading && filteredRuang.length === 0" :kolom="4" />
+              <tr v-if="!loading && filteredRuang.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data ruang.</td>
               </tr>
             </tbody>
           </table>
@@ -885,7 +889,7 @@ const currentListCount = computed(() => {
         <!-- 6. Tahun Ajaran Table -->
         <div v-if="activeTab === 'tahun_ajaran'" class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+            <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
               <tr>
                 <th class="p-3">Tahun Ajaran</th>
                 <th class="p-3">Semester</th>
@@ -928,8 +932,9 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredTahunAjaran.length === 0">
-                <td colspan="4" class="p-6 text-center text-slate-400">Belum ada data tahun ajaran.</td>
+              <TabelMemuat v-if="loading && filteredTahunAjaran.length === 0" :kolom="4" />
+              <tr v-if="!loading && filteredTahunAjaran.length === 0">
+                <td class="p-6 text-center text-slate-400">Belum ada data tahun ajaran.</td>
               </tr>
             </tbody>
           </table>

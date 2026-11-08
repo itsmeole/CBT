@@ -41,13 +41,13 @@ const ROLE: [keyof PanelSistem['pengguna'], string][] = [
         :keterangan="antrean === null ? 'tidak dapat dibaca' : 'impor Excel & PDF'"
         :nada="antrean !== null && antrean > 50 ? 'peringatan' : 'netral'"
       />
-      <DashAngka label="Job gagal" :nilai="data.kesehatan.job_gagal" keterangan="perlu diperiksa di log" :nada="data.kesehatan.job_gagal > 0 ? 'bahaya' : 'baik'" />
+      <DashAngka label="Tugas gagal" :nilai="data.kesehatan.job_gagal" keterangan="perlu diperiksa" :nada="data.kesehatan.job_gagal > 0 ? 'bahaya' : 'baik'" />
       <DashAngka label="PDF gagal (7 hari)" :nilai="data.kesehatan.pdf_gagal_7_hari" :nada="data.kesehatan.pdf_gagal_7_hari > 0 ? 'peringatan' : 'baik'" tautan="/staf/cetak" />
       <DashAngka label="Backup terakhir" :nilai="backup.teks" :nada="backup.nada" keterangan="dijadwalkan harian 02:00 WIB" />
     </div>
 
     <div class="grid gap-4 xl:grid-cols-3">
-      <DashKartu class="xl:col-span-2" judul="Aktivitas terbaru" keterangan="Tindakan sensitif ditandai." tautan="/staf/audit-log" label-tautan="Audit log lengkap">
+      <DashKartu class="xl:col-span-2" judul="Aktivitas terbaru" keterangan="Tindakan sensitif ditandai." tautan="/staf/audit-log" label-tautan="Riwayat lengkap">
         <p v-if="data.aktivitas.length === 0" class="text-sm text-slate-500">Belum ada aktivitas tercatat.</p>
         <ul v-else class="divide-y divide-slate-100">
           <li v-for="a in data.aktivitas" :key="a.id" class="flex items-center justify-between gap-3 py-2.5">
@@ -81,7 +81,7 @@ const ROLE: [keyof PanelSistem['pengguna'], string][] = [
           <ul class="grid grid-cols-2 gap-2">
             <li v-for="[kunci, label] in ROLE" :key="kunci" class="rounded-xl bg-slate-50 p-2.5 text-center">
               <p class="text-lg font-extrabold tabular-nums text-slate-900">{{ data.pengguna[kunci] }}</p>
-              <p class="text-[11px] font-semibold uppercase text-slate-500">{{ label }}</p>
+              <p class="text-[11px] font-semibold text-slate-500">{{ label }}</p>
             </li>
           </ul>
         </DashKartu>

@@ -112,7 +112,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Exam Info Card -->
-      <div v-if="examState" class="card bg-white p-5 text-left space-y-2.5 border border-slate-200/80 rounded-2xl shadow-xs">
+      <div v-if="examState" class="card bg-white p-5 text-left space-y-2.5 rounded-2xl">
         <div class="flex justify-between border-b border-slate-100 pb-2 text-xs">
           <span class="text-slate-400 font-medium">Mata Pelajaran:</span>
           <span class="font-bold text-slate-800">{{ examState.mapel || 'Ujian Sekolah' }}</span>
@@ -134,7 +134,7 @@ onUnmounted(() => {
           </svg>
           <span>Petunjuk Pengerjaan:</span>
         </p>
-        <p>• Waktu pengerjaan akan dihitung otomatis oleh server setelah dimulai.</p>
+        <p>• Waktu pengerjaan akan dihitung otomatis oleh sistem setelah dimulai.</p>
         <p>• Dilarang menekan tombol kembali, membuka aplikasi lain, atau mematikan layar HP.</p>
       </div>
     </div>

@@ -89,7 +89,7 @@ describe('PengerjaanUjianView', () => {
     put.mockRejectedValueOnce(new ApiError('NETWORK_ERROR', 'Tidak ada koneksi', null))
     const wrapper = await pasang()
     await wrapper.findAll('div.cursor-pointer')[0].trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('Offline'), { timeout: 2000 })
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Tanpa koneksi'), { timeout: 2000 })
 
     window.dispatchEvent(new Event('online'))
     await vi.waitFor(() => expect(put).toHaveBeenCalledTimes(2), { timeout: 2000 })

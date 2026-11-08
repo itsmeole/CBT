@@ -51,7 +51,7 @@ const timerWarningClass = computed(() => {
   const s = ujianStore.sisaWaktuDetik
   if (s <= 300) return 'bg-red-600 text-white animate-pulse'
   if (s <= 600) return 'bg-amber-500 text-white'
-  return 'bg-slate-800 text-white'
+  return 'bg-slate-100 text-slate-800'
 })
 
 const totalSoalCount = computed(() => soalList.value.length)
@@ -356,31 +356,45 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-slate-100 pb-24 text-slate-800 select-none">
-    <header class="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 shadow-sm">
-      <button
-        @click="showNavDrawer = true"
-        class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-800 min-h-touch min-w-touch"
-      >
-        <span>No. {{ currentIndex + 1 }} / {{ soalList.length }}</span>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 text-slate-500">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-        </svg>
-      </button>
+    <header class="sticky top-0 z-40 border-b border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-xl items-center justify-between gap-2 px-3 py-2">
+        <button
+          @click="showNavDrawer = true"
+          class="flex min-h-touch items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-800 transition-colors hover:bg-slate-100 active:scale-[0.98]"
+          aria-label="Daftar nomor soal"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 text-slate-500" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+          <span class="tabular-nums">No. {{ currentIndex + 1 }}<span class="font-medium text-slate-400"> / {{ soalList.length }}</span></span>
+        </button>
 
-      <div class="flex items-center gap-1.5 text-xs font-medium" role="status" aria-live="polite">
-        <span v-if="syncStatus === 'saving'" class="flex items-center gap-1 text-brand-600">
-          <span class="inline-block h-2 w-2 animate-ping rounded-full bg-brand-600"></span>
-          Menyimpan...
-        </span>
-        <span v-else-if="syncStatus === 'saved'" class="flex items-center gap-1 text-status-ok font-semibold">Tersimpan</span>
-        <span v-else class="flex items-center gap-1 text-status-danger font-semibold">Offline (Tersimpan Lokal)</span>
+        <div class="min-w-0 flex-1 text-center text-xs font-medium" role="status" aria-live="polite">
+          <span v-if="syncStatus === 'saving'" class="inline-flex items-center gap-1.5 text-slate-500">
+            <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-600"></span>
+            <span class="hidden min-[380px]:inline">Menyimpan...</span>
+          </span>
+          <span v-else-if="syncStatus === 'saved'" class="inline-flex items-center gap-1.5 font-semibold text-status-ok">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.4" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+            Tersimpan
+          </span>
+          <span v-else class="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1 font-semibold text-status-danger">
+            <span class="inline-block h-2 w-2 rounded-full bg-status-danger"></span>
+            <span class="truncate">Tanpa koneksi, jawaban aman di perangkat</span>
+          </span>
+        </div>
+
+        <div
+          class="flex min-h-touch items-center rounded-lg px-3 text-base font-extrabold tabular-nums tracking-wide transition-colors"
+          :class="timerWarningClass"
+          aria-label="Sisa waktu"
+        >
+          <span>{{ formattedTimer }}</span>
+        </div>
       </div>
-
-      <div
-        class="flex items-center gap-1.5 rounded-xl px-2.5 py-1 font-mono text-xs font-bold tracking-wider transition-colors min-h-touch"
-        :class="timerWarningClass"
-      >
-        <span>{{ formattedTimer }}</span>
+      <!-- Kemajuan pengerjaan: butir yang sudah terjawab -->
+      <div class="h-1 bg-slate-100" role="progressbar" :aria-valuenow="terjawabCount" aria-valuemin="0" :aria-valuemax="totalSoalCount" aria-label="Soal terjawab">
+        <div class="h-full bg-brand-600 transition-[width] duration-300" :style="{ width: totalSoalCount ? (terjawabCount / totalSoalCount) * 100 + '%' : '0%' }"></div>
       </div>
     </header>
 
@@ -391,10 +405,10 @@ onUnmounted(() => {
     </div>
 
     <main v-else-if="currentSoal" class="mx-auto max-w-xl p-4 sm:p-6">
-      <div class="card bg-white p-5 shadow-sm space-y-4">
+      <div class="card bg-white p-4 sm:p-5 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-2">
-            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 font-bold text-xs text-white">
+            <span class="flex h-7 min-w-7 items-center justify-center rounded-md bg-brand-600 px-1.5 font-bold text-xs text-white tabular-nums">
               {{ currentIndex + 1 }}
             </span>
             <span class="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold uppercase text-slate-700">
@@ -420,7 +434,7 @@ onUnmounted(() => {
             :class="sama(answers[currentSoal.soalId], opsi.id) ? 'border-brand-600 bg-brand-50/70 font-semibold' : 'border-slate-200 bg-white hover:bg-slate-50'"
           >
             <div
-              class="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold shrink-0"
+              class="flex h-7 w-7 items-center justify-center rounded-md border text-xs font-bold shrink-0"
               :class="sama(answers[currentSoal.soalId], opsi.id) ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-600'"
             >
               {{ String.fromCharCode(65 + oIdx) }}
@@ -514,18 +528,28 @@ onUnmounted(() => {
       </div>
     </main>
 
-    <footer class="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white p-3 shadow-lg">
+    <footer class="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
       <div class="mx-auto flex max-w-xl items-center justify-between gap-2">
-        <button @click="prevQuestion" :disabled="currentIndex === 0" class="btn-secondary flex-1 !min-h-touch text-xs font-bold">← Sebelumnya</button>
+        <button @click="prevQuestion" :disabled="currentIndex === 0" class="btn-secondary flex-1 !min-h-touch gap-1.5 text-sm" aria-label="Soal sebelumnya">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+          <span>Sebelumnya</span>
+        </button>
         <button
           @click="toggleRagu"
-          class="btn-secondary !min-h-touch !px-3 text-xs font-bold"
-          :class="currentSoal && raguMap[currentSoal.soalId] ? '!bg-amber-100 !border-amber-300 text-amber-800' : ''"
+          class="btn-secondary !min-h-touch !px-3.5 text-sm"
+          :class="currentSoal && raguMap[currentSoal.soalId] ? '!border-amber-400 !bg-amber-100 !text-amber-800' : ''"
+          :aria-pressed="!!(currentSoal && raguMap[currentSoal.soalId])"
+          aria-label="Tandai ragu-ragu"
+          title="Tandai ragu-ragu"
         >
-          Flag Ragu
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" /></svg>
+          <span class="hidden min-[420px]:inline">Ragu</span>
         </button>
-        <button v-if="currentIndex < soalList.length - 1" @click="nextQuestion" class="btn-primary flex-1 !min-h-touch text-xs font-bold">Selanjutnya →</button>
-        <button v-else @click="showSubmitModal = true" class="btn-primary flex-1 !min-h-touch text-xs font-bold bg-emerald-600 hover:bg-emerald-700">Selesai Ujian</button>
+        <button v-if="currentIndex < soalList.length - 1" @click="nextQuestion" class="btn-primary flex-1 !min-h-touch gap-1.5 text-sm" aria-label="Soal berikutnya">
+          <span>Selanjutnya</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+        </button>
+        <button v-else @click="showSubmitModal = true" class="btn-primary flex-1 !min-h-touch text-sm !bg-emerald-600 hover:!bg-emerald-700">Selesai</button>
       </div>
     </footer>
 

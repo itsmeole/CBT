@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TabelMemuat from '@/components/TabelMemuat.vue'
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import StafLayout from '@/components/StafLayout.vue'
@@ -317,13 +318,13 @@ onUnmounted(() => {
           </p>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
-          <button @click="fetchSesiDetail" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60" :disabled="loading">
+        <div class="flex items-center gap-2">
+          <button @click="fetchSesiDetail" aria-label="Segarkan" title="Segarkan" class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60" :disabled="loading">
             <span v-if="loading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
             <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            <span>{{ loading ? 'Menyegarkan...' : 'Segarkan' }}</span>
+            <span class="hidden sm:inline">{{ loading ? 'Menyegarkan...' : 'Segarkan' }}</span>
           </button>
           <button
             @click="promptResetSemuaLoginSesi"
@@ -334,7 +335,7 @@ onUnmounted(() => {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            <span>Reset Semua Login</span>
+            <span class="sm:hidden">Reset login</span><span class="hidden sm:inline">Reset Semua Login</span>
           </button>
           <button
             @click="showMulaiModal = true"
@@ -344,7 +345,7 @@ onUnmounted(() => {
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
               <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
             </svg>
-            <span>Mulai Ujian Sesi Ini</span>
+            <span class="sm:hidden">Mulai ujian</span><span class="hidden sm:inline">Mulai Ujian Sesi Ini</span>
           </button>
         </div>
       </div>
@@ -364,10 +365,10 @@ onUnmounted(() => {
       </div>
 
       <!-- Sesi Selector Bar -->
-      <div class="card mb-6 bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs rounded-2xl">
+      <div class="card mb-6 bg-white p-4 sm:p-5 rounded-2xl">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
-            <label for="select-sesi-ruang" class="text-xs font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap flex items-center gap-1.5 shrink-0">
+            <label for="select-sesi-ruang" class="text-xs font-bold text-slate-600 whitespace-nowrap flex items-center gap-1.5 shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 text-brand-600">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
@@ -501,7 +502,7 @@ onUnmounted(() => {
 
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-600">
-              <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-700">
+              <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
                 <tr>
                   <th class="p-3 w-12 text-center">Hadir</th>
                   <th class="p-3">NIS</th>
@@ -568,7 +569,8 @@ onUnmounted(() => {
                     </div>
                   </td>
                 </tr>
-                <tr v-if="filteredPeserta.length === 0">
+                <TabelMemuat v-if="loading && filteredPeserta.length === 0" :kolom="6" />
+                <tr v-if="!loading && filteredPeserta.length === 0">
                   <td colspan="6" class="p-6 text-center text-slate-400">
                     {{ searchKeyword ? 'Tidak ada peserta yang cocok dengan pencarian.' : 'Belum ada siswa yang diplot ke sesi ruang ini.' }}
                   </td>

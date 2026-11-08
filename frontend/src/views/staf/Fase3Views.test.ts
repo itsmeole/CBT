@@ -72,7 +72,7 @@ describe('BeritaAcaraView', () => {
 
     expect(post).toHaveBeenCalledWith('/sesi-ruang/7/berita-acara', { isi: 'Ujian tertib' })
     expect(wrapper.text()).toContain('30')
-    expect(wrapper.text()).toContain('dihitung otomatis oleh server')
+    expect(wrapper.text()).toContain('dihitung otomatis oleh sistem')
     expect(tombol('Cetak PDF').attributes('disabled')).toBeUndefined()
 
     await wrapper.find('textarea').setValue('Ujian tertib sekali')

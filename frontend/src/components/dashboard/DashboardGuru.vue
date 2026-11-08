@@ -72,7 +72,7 @@ const keteranganKoreksi = computed(() => {
                   <p class="text-xs text-slate-500">{{ h.mapel }} - {{ labelHari(h.tanggal, hariIni) }}</p>
                 </div>
                 <div class="shrink-0 text-right">
-                  <p class="text-[10px] font-bold uppercase text-slate-500">Rata-rata</p>
+                  <p class="text-[10px] font-bold text-slate-500">Rata-rata</p>
                   <p class="text-xl font-extrabold tabular-nums text-slate-900">{{ h.rata_rata ?? '-' }}</p>
                 </div>
               </div>

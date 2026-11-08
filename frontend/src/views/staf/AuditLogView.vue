@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TabelMemuat from '@/components/TabelMemuat.vue'
 import { onMounted, ref, watch } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
@@ -61,7 +62,7 @@ async function muat() {
     total.value = res.data.total ?? baris.value.length
   } catch (err) {
     baris.value = []
-    errorMessage.value = err instanceof Error ? err.message : 'Gagal memuat audit log.'
+    errorMessage.value = err instanceof Error ? err.message : 'Gagal memuat riwayat aktivitas.'
   } finally {
     loading.value = false
   }
@@ -95,7 +96,7 @@ onMounted(muat)
   <StafLayout>
     <div class="space-y-4">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900">Audit Log</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900">Riwayat Aktivitas</h1>
         <p class="text-sm text-slate-500">Catatan aktivitas kritikal sistem. Hanya dapat dibaca, tidak dapat diubah atau dihapus.</p>
       </div>
 
@@ -125,7 +126,7 @@ onMounted(muat)
 
       <div class="card overflow-x-auto bg-white">
         <table class="w-full min-w-[760px] text-left text-sm">
-          <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead class="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
             <tr>
               <th class="px-3 py-2">Waktu</th>
               <th class="px-3 py-2">Aktor</th>
@@ -151,9 +152,7 @@ onMounted(muat)
             <tr v-if="!loading && baris.length === 0">
               <td colspan="5" class="px-3 py-8 text-center text-slate-500">Tidak ada catatan yang cocok.</td>
             </tr>
-            <tr v-if="loading">
-              <td colspan="5" class="px-3 py-8 text-center text-slate-500">Memuat...</td>
-            </tr>
+            <TabelMemuat v-if="loading && baris.length === 0" :kolom="5" />
           </tbody>
         </table>
       </div>

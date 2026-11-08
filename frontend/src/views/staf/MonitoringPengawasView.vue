@@ -210,7 +210,7 @@ async function resetLogin() {
   if (!p) return
   const userId = userIdPeserta.value[p.id]
   if (!userId) {
-    errorMessage.value = 'ID akun siswa tidak tersedia.'
+    errorMessage.value = 'Akun siswa tidak ditemukan.'
     return
   }
   aksiLoading.value = true
@@ -281,7 +281,7 @@ onUnmounted(() => {
             :class="store.koneksi === 'terhubung' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'"
             role="status"
           >
-            {{ store.koneksi === 'terhubung' ? 'Realtime' : store.koneksi === 'menyambung' ? 'Menyambung...' : 'Polling (offline)' }}
+            {{ store.koneksi === 'terhubung' ? 'Langsung' : store.koneksi === 'menyambung' ? 'Menyambung...' : 'Pembaruan berkala' }}
           </span>
           <button class="btn-secondary !min-h-0 !py-1.5 text-xs" @click="aktifkanSuara">
             {{ suaraAktif ? 'Suara alert: aktif' : 'Aktifkan suara alert' }}
@@ -364,7 +364,7 @@ onUnmounted(() => {
     <div v-if="target" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="judul-buka">
       <div class="card w-full max-w-md space-y-3 bg-white p-5">
         <h2 id="judul-buka" class="text-base font-bold text-slate-900">Buka kunci: {{ target.nama }}</h2>
-        <p class="text-xs text-slate-500">Alasan wajib diisi (minimal 5 karakter) dan tercatat di audit log.</p>
+        <p class="text-xs text-slate-500">Alasan wajib diisi (minimal 5 karakter) dan tercatat dalam riwayat aktivitas.</p>
         <div class="flex flex-wrap gap-1.5">
           <button v-for="a in ALASAN_CEPAT" :key="a" type="button" class="rounded-full border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-100" @click="alasan = a">{{ a }}</button>
         </div>

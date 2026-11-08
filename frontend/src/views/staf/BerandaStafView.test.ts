@@ -206,7 +206,7 @@ describe('Dashboard superadmin', () => {
     const teks = wrapper.text()
 
     expect(teks).toContain('Panel Superadmin')
-    expect(teks).toContain('Job gagal')
+    expect(teks).toContain('Tugas gagal')
     expect(teks).toContain('Membuka kunci siswa')
     expect(teks).toContain('Pak Budi')
     expect(teks).toContain('2 menit lalu')
@@ -295,7 +295,7 @@ describe('Urutan dan pembatasan tampilan', () => {
     expect(teks.indexOf('Operasional ujian')).toBeGreaterThan(-1)
     expect(teks.indexOf('Operasional ujian')).toBeLessThan(teks.indexOf('Sistem dan data'))
     expect(teks.indexOf('Jadwal hari ini')).toBeLessThan(teks.indexOf('Aktivitas terbaru'))
-    expect(teks.indexOf('Sedang mengerjakan')).toBeLessThan(teks.indexOf('Job gagal'))
+    expect(teks.indexOf('Sedang mengerjakan')).toBeLessThan(teks.indexOf('Tugas gagal'))
     wrapper.unmount()
   })
 
