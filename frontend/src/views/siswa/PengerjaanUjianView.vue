@@ -521,7 +521,7 @@ onUnmounted(() => {
         </button>
         <button
           @click="toggleRagu"
-          class="btn-secondary !min-h-touch !px-3.5 text-sm"
+          class="btn-secondary !min-h-touch !px-3.5 text-sm max-sm:!hidden"
           :class="currentSoal && raguMap[currentSoal.soalId] ? '!border-amber-400 !bg-amber-100 !text-amber-800' : ''"
           :aria-pressed="!!(currentSoal && raguMap[currentSoal.soalId])"
           aria-label="Tandai ragu-ragu"

@@ -269,12 +269,12 @@ class Fase1Test extends TestCase
             ->postJson("/api/v1/sesi-ruang/{$sesi->id}/mulai")
             ->assertStatus(403);
 
-        // 2. OPERATOR MENCOBA TEKAN MULAI -> HARUS 200 OK!
+        // 2. OPERATOR TANPA PESERTA YANG HADIR -> DITOLAK DENGAN PESAN JELAS; SETELAH PRESENSI -> 200 OK!
         $operatorUser = User::factory()->role('operator')->create();
         $this->actingAs($operatorUser, 'sanctum')
             ->postJson("/api/v1/sesi-ruang/{$sesi->id}/mulai")
-            ->assertOk()
-            ->assertJsonPath('message', 'Ujian berhasil dimulai untuk 0 peserta.');
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'NO_PARTICIPANT_READY');
         $this->assertDatabaseHas('peserta_ujian', ['id' => $peserta->id, 'status' => 'menunggu']);
 
         $this->actingAs($operatorUser, 'sanctum')

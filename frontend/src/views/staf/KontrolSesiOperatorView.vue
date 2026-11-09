@@ -112,6 +112,31 @@ const statusCounts = computed(() => {
   return counts
 })
 
+/** Ringkasan kesiapan sesi untuk dialog Mulai: hanya yang hadir (tersimpan) dan di ruang tunggu yang dimulai. */
+const kesiapan = computed(() => {
+  const daftar: any[] = sesiData.value?.peserta_ujian ?? []
+  const siap = daftar.filter((p) => p.status === 'menunggu' && p.hadir).length
+  const perluVerifikasi = daftar.filter((p) => p.status === 'menunggu' && !p.hadir).length
+  const belumMasuk = daftar.filter((p) => p.status === 'belum_login').length
+  const belumDisimpan = daftar.some((p) => Boolean(presensiState.value[p.id]) !== Boolean(p.hadir))
+  return { siap, perluVerifikasi, belumMasuk, belumDisimpan }
+})
+
+/** Kotak "centang semua" di kepala tabel: berlaku untuk siswa yang sedang tampil (sesuai pencarian). */
+const semuaDicentang = computed(() => filteredPeserta.value.length > 0 && filteredPeserta.value.every((p: any) => presensiState.value[p.id]))
+const sebagianDicentang = computed(() => !semuaDicentang.value && filteredPeserta.value.some((p: any) => presensiState.value[p.id]))
+
+function centangSemua(centang: boolean) {
+  for (const p of filteredPeserta.value) presensiState.value[p.id] = centang
+}
+
+/** Centang Hadir untuk semua siswa yang sudah berada di ruang tunggu (belum disimpan sampai tombol Simpan ditekan). */
+function hadirkanYangDiRuangTunggu() {
+  for (const p of sesiData.value?.peserta_ujian ?? []) {
+    if (p.status === 'menunggu') presensiState.value[p.id] = true
+  }
+}
+
 async function saveKehadiran() {
   if (!selectedSesiId.value) return
   actionLoading.value = true
@@ -487,6 +512,16 @@ onUnmounted(() => {
                 class="input !min-h-0 !py-1 text-xs w-56"
               />
             </div>
+            <div class="flex items-center gap-2">
+            <button
+              v-if="statusCounts.menunggu > 0"
+              type="button"
+              @click="hadirkanYangDiRuangTunggu"
+              class="btn-secondary !min-h-0 !py-2 text-xs"
+              title="Centang Hadir untuk semua siswa yang sudah di ruang tunggu"
+            >
+              <span class="sm:hidden">Hadirkan semua</span><span class="hidden sm:inline">Hadirkan semua di ruang tunggu</span>
+            </button>
             <button
               @click="saveKehadiran"
               :disabled="actionLoading"
@@ -498,13 +533,27 @@ onUnmounted(() => {
               </svg>
               <span>{{ actionLoading ? 'Menyimpan Presensi...' : 'Simpan Status Presensi' }}</span>
             </button>
+            </div>
           </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-600">
               <thead class="bg-slate-50 text-xs font-semibold text-slate-700">
                 <tr>
-                  <th class="p-3 w-12 text-center">Hadir</th>
+                  <th class="p-3 w-12 text-center">
+                    <label class="flex cursor-pointer flex-col items-center gap-1" title="Centang atau batalkan semua siswa yang tampil">
+                      <span>Hadir</span>
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 cursor-pointer rounded text-brand-600"
+                        aria-label="Centang semua kehadiran"
+                        :checked="semuaDicentang"
+                        :indeterminate.prop="sebagianDicentang"
+                        :disabled="filteredPeserta.length === 0"
+                        @change="centangSemua(($event.target as HTMLInputElement).checked)"
+                      />
+                    </label>
+                  </th>
                   <th class="p-3">NIS</th>
                   <th class="p-3">Nama Siswa</th>
                   <th class="p-3">Kelas</th>
@@ -598,6 +647,18 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <ul class="space-y-1 rounded-xl bg-slate-50 p-3 text-xs text-slate-700" aria-label="Kesiapan peserta">
+            <li class="flex justify-between"><span>Siap dimulai (hadir dan di ruang tunggu)</span><strong :class="kesiapan.siap > 0 ? 'text-emerald-700' : 'text-red-700'">{{ kesiapan.siap }}</strong></li>
+            <li class="flex justify-between"><span>Di ruang tunggu, belum diverifikasi hadir</span><strong :class="kesiapan.perluVerifikasi > 0 ? 'text-amber-700' : ''">{{ kesiapan.perluVerifikasi }}</strong></li>
+            <li class="flex justify-between"><span>Belum masuk ruang tunggu</span><strong>{{ kesiapan.belumMasuk }}</strong></li>
+          </ul>
+          <p v-if="kesiapan.belumDisimpan" class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+            Ada centang Hadir yang belum disimpan. Tutup dialog ini lalu klik "Simpan Status Presensi" agar siswa ikut dimulai.
+          </p>
+          <p v-else-if="kesiapan.siap === 0" class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+            Belum ada siswa yang siap. Siswa harus memasukkan token (masuk ruang tunggu), lalu dicentang Hadir dan disimpan.
+          </p>
+
           <div class="rounded-xl bg-amber-50 border border-amber-200/80 p-3 text-xs text-amber-800 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-amber-600">
               <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
@@ -609,7 +670,7 @@ onUnmounted(() => {
             <button @click="showMulaiModal = false" :disabled="actionLoading" class="btn-secondary !min-h-0 !py-2 text-xs cursor-pointer">Batal</button>
             <button
               @click="mulaiSesiUjian"
-              :disabled="actionLoading"
+              :disabled="actionLoading || kesiapan.siap === 0"
               class="btn-primary !min-h-0 !py-2 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <span v-if="actionLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>

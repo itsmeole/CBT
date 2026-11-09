@@ -11,12 +11,14 @@
 .EXAMPLE
   .\jalankan-lan.ps1            # mulai
   .\jalankan-lan.ps1 -Ip 192.168.1.20
+  .\jalankan-lan.ps1 -Cepat    # frontend hasil build (jauh lebih cepat dimuat di HP daripada mode dev)
   .\jalankan-lan.ps1 -HanyaCek  # hanya menampilkan rencana, tanpa menjalankan apa pun
   .\jalankan-lan.ps1 -Bersihkan # hentikan proses, hapus .env.local dan aturan firewall
 #>
 param(
     [string]$Ip,
     [switch]$HanyaCek,
+    [switch]$Cepat,
     [switch]$Bersihkan
 )
 
@@ -130,10 +132,31 @@ $proses = @()
 $proses += Start-Jendela 'CBT API' $backend "& '$php' artisan serve --host=0.0.0.0 --port=$portApi"
 $proses += Start-Jendela 'CBT Antrean' $backend "& '$php' artisan queue:work --queue=default,reports"
 $proses += Start-Jendela 'CBT Reverb' $backend "& '$php' artisan reverb:start --host=0.0.0.0 --port=$portReverb"
-$proses += Start-Jendela 'CBT Frontend' $frontend 'npm run dev -- --host'
+if ($Cepat) {
+    $proses += Start-Jendela 'CBT Frontend' $frontend "npm run build; if (`$?) { npm run preview -- --host --port $portFrontend --strictPort }"
+}
+else {
+    $proses += Start-Jendela 'CBT Frontend' $frontend 'npm run dev -- --host'
+}
 $proses | ForEach-Object { $_.Id } | Set-Content -Path $berkasPid
+
+# Pemeriksaan mandiri: apakah frontend dan API terjangkau lewat IP LAN?
+Write-Host ''
+Write-Host 'Menunggu server siap (maks. 90 dtk)...'
+$batas = (Get-Date).AddSeconds(90)
+$hasil = @{}
+while ((Get-Date) -lt $batas -and $hasil.Count -lt 2) {
+    foreach ($cek in @(@('Frontend', $urlFrontend), @('API', "http://${Ip}:$portApi/api/v1/time"))) {
+        if (-not $hasil.ContainsKey($cek[0])) {
+            try { Invoke-WebRequest $cek[1] -UseBasicParsing -TimeoutSec 3 | Out-Null; $hasil[$cek[0]] = $true; Write-Host "  OK    $($cek[0]): $($cek[1])" } catch { }
+        }
+    }
+    Start-Sleep -Seconds 2
+}
+foreach ($nama in 'Frontend', 'API') { if (-not $hasil.ContainsKey($nama)) { Write-Warning "$nama belum merespons lewat IP LAN. Lihat jendela 'CBT $nama' untuk pesan galat." } }
 
 Write-Host ''
 Write-Host "Selesai. Buka $urlFrontend di perangkat lain (satu jaringan Wi-Fi)."
 Write-Host 'Di laptop ini, buka juga lewat alamat tersebut atau http://127.0.0.1:5173 (bukan localhost).'
+Write-Host "Cek API dari HP: buka http://${Ip}:$portApi/api/v1/time (harus tampil angka waktu)."
 Write-Host 'Berhenti dan bersihkan: .\jalankan-lan.ps1 -Bersihkan'

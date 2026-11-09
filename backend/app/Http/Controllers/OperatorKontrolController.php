@@ -98,6 +98,21 @@ class OperatorKontrolController extends Controller
             return response()->json(['error' => ['code' => 'TIME_UP', 'message' => 'Batas waktu sesi ujian telah lewat.']], 422);
         }
 
+        $semua = $sesi->pesertaUjian;
+        $siap = $semua->where('status', 'menunggu')->where('hadir', true)->count();
+        if ($siap === 0) {
+            $menungguVerifikasi = $semua->where('status', 'menunggu')->where('hadir', false)->count();
+            $belumMasuk = $semua->where('status', 'belum_login')->count();
+            $petunjuk = $menungguVerifikasi > 0
+                ? "{$menungguVerifikasi} siswa sudah di ruang tunggu tetapi kehadirannya belum diverifikasi: centang Hadir lalu klik Simpan Status Presensi."
+                : ($belumMasuk > 0 ? "{$belumMasuk} siswa belum masuk ruang tunggu (belum memasukkan token)." : 'Belum ada siswa yang dapat dimulai.');
+
+            return response()->json(['error' => [
+                'code' => 'NO_PARTICIPANT_READY',
+                'message' => 'Belum ada siswa yang siap dimulai (harus hadir dan berada di ruang tunggu). '.$petunjuk,
+            ]], 422);
+        }
+
         $startedCount = 0;
         $startedPeserta = [];
 
