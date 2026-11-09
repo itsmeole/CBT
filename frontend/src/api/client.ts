@@ -68,7 +68,9 @@ export function normalizeError(error: unknown): ApiError {
     const { status, data } = axiosError.response
     const code = data?.error?.code ?? kodeDariStatus(status)
     // Pesan dari server dipakai bila ada, jika tidak pakai pesan baku bahasa Indonesia.
-    const message = data?.error?.message ?? pesanError(code)
+    // Untuk galat validasi, tampilkan alasan pertama yang spesifik agar pengguna tahu apa yang perlu diperbaiki.
+    const alasan = code === 'VALIDATION_ERROR' ? Object.values(data?.error?.details ?? {}).flat()[0] : undefined
+    const message = alasan ?? data?.error?.message ?? pesanError(code)
     return new ApiError(code, message, status, data?.error?.details)
   }
 

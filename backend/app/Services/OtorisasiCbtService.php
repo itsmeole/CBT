@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Guru;
 use App\Models\GuruMapel;
 use App\Models\JadwalUjian;
 use App\Models\PengawasSesi;
 use App\Models\PesertaUjian;
 use App\Models\SesiRuang;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
 
 class OtorisasiCbtService
 {
@@ -20,6 +22,28 @@ class OtorisasiCbtService
                     ->where('guru_id', $user->guru->id)
                     ->where('mapel_id', $mapelId)
                     ->exists());
+    }
+
+    /**
+     * Pemilik soal baru yang dibuat Operator/Superadmin (keduanya tidak punya data guru): guru yang dipilih
+     * secara eksplisit, atau guru pengampu mapel tersebut.
+     */
+    public function guruPemilikSoal(?int $guruIdDiminta, int $mapelId): int
+    {
+        if ($guruIdDiminta !== null) {
+            if (! Guru::whereKey($guruIdDiminta)->exists()) {
+                throw ValidationException::withMessages(['guru_id' => 'Guru tidak ditemukan.']);
+            }
+
+            return $guruIdDiminta;
+        }
+
+        $guruId = GuruMapel::query()->where('mapel_id', $mapelId)->orderBy('id')->value('guru_id');
+        if (! $guruId) {
+            throw ValidationException::withMessages(['mapel_id' => 'Mapel ini belum memiliki guru pengampu. Tetapkan pengampu di Master Data terlebih dahulu.']);
+        }
+
+        return (int) $guruId;
     }
 
     public function bolehAwasiSesi(User $user, int $sesiRuangId): bool

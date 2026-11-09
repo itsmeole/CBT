@@ -86,8 +86,8 @@ class BankSoalController extends Controller
             }
             $guruId = $user->guru->id;
         } else {
-            $request->validate(['guru_id' => 'required|exists:guru,id']);
-            $guruId = (int) $request->input('guru_id');
+            $request->validate(['guru_id' => 'nullable|exists:guru,id']);
+            $guruId = $this->otorisasi->guruPemilikSoal($request->filled('guru_id') ? (int) $request->input('guru_id') : null, (int) $validated['mapel_id']);
         }
 
         return DB::transaction(function () use ($validated, $guruId) {
