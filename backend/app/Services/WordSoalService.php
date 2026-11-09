@@ -51,67 +51,65 @@ class WordSoalService
         }
 
         $arab = ['name' => 'Traditional Arabic', 'size' => 14];
+        // Setiap baris: [tag, isi, nilai, label]. Tag di kolom 1, isi soal di kolom 2, 1/0 (benar/salah) di kolom 3.
         $contoh = [
             'PG' => [
-                '[SOAL]',
-                'TIPE: PG',
-                'TEKS: Apa ibu kota negara Indonesia?',
-                '[OPSI] Bandung',
-                '[OPSI_BENAR] Jakarta',
-                '[OPSI] Surabaya',
-                '[OPSI] Medan',
-                '[/SOAL]',
+                ['[SOAL]'],
+                ['TIPE', 'A', '', 'PG'],
+                ['TEKS', 'Apa ibu kota negara Indonesia?'],
+                ['OPSI', 'Bandung', '0'],
+                ['OPSI', 'Jakarta', '1'],
+                ['OPSI', 'Surabaya', '0'],
+                ['OPSI', 'Medan', '0'],
+                ['[/SOAL]'],
             ],
             'PG_KOMPLEKS' => [
-                '[SOAL]',
-                'TIPE: PG_KOMPLEKS',
-                ['runs' => [['TEKS: ', []], ['مَنْ هُمْ أُولُو الْعَزْمِ مِنَ الرُّسُلِ عَلَيْهِمُ السَّلَامُ؟', $arab], [' (Siapakah Rasul Ulul Azmi?)', []]]],
-                ['runs' => [['[OPSI_BENAR] ', []], ['نُوحٌ عَلَيْهِ السَّلَامُ', $arab]]],
-                ['runs' => [['[OPSI] ', []], ['هَارُونُ عَلَيْهِ السَّلَامُ', $arab]]],
-                ['runs' => [['[OPSI_BENAR] ', []], ['إِبْرَاهِيمُ عَلَيْهِ السَّلَامُ', $arab]]],
-                ['runs' => [['[OPSI] ', []], ['يَحْيَى عَلَيْهِ السَّلَامُ', $arab]]],
-                '[/SOAL]',
+                ['[SOAL]'],
+                ['TIPE', 'B', '', 'PG_KOMPLEKS'],
+                ['TEKS', ['runs' => [['مَنْ هُمْ أُولُو الْعَزْمِ مِنَ الرُّسُلِ عَلَيْهِمُ السَّلَامُ؟', $arab], [' (Siapakah Rasul Ulul Azmi?)', []]]]],
+                ['OPSI', ['runs' => [['نُوحٌ عَلَيْهِ السَّلَامُ', $arab]]], '1'],
+                ['OPSI', ['runs' => [['هَارُونُ عَلَيْهِ السَّلَامُ', $arab]]], '0'],
+                ['OPSI', ['runs' => [['إِبْرَاهِيمُ عَلَيْهِ السَّلَامُ', $arab]]], '1'],
+                ['OPSI', ['runs' => [['يَحْيَى عَلَيْهِ السَّلَامُ', $arab]]], '0'],
+                ['[/SOAL]'],
             ],
             'BENAR_SALAH' => [
-                '[SOAL]',
-                'TIPE: BENAR_SALAH',
-                'TEKS: Perhatikan gambar berikut!',
-                ['gambar' => $tempImgPath],
-                'Tentukan benar (B) atau salah (S) pernyataan di bawah ini.',
-                'Gambar di atas berbentuk persegi panjang. | B',
-                'Gambar di atas berwarna merah. | S',
-                '[/SOAL]',
+                ['[SOAL]'],
+                ['TIPE', 'C', '', 'BENAR_SALAH'],
+                ['TEKS', 'Perhatikan gambar berikut! Tentukan pernyataan di bawah ini benar atau salah.'],
+                ['TEKS', ['gambar' => $tempImgPath]],
+                ['OPSI', 'Gambar di atas berbentuk persegi panjang.', '1'],
+                ['OPSI', 'Gambar di atas berwarna merah.', '0'],
+                ['[/SOAL]'],
             ],
             'MENJODOHKAN' => [
-                '[SOAL]',
-                'TIPE: MENJODOHKAN',
-                'TEKS: Jodohkan nama negara dengan ibu kotanya.',
-                'KIRI:',
-                '1. Jepang',
-                '2. Prancis',
-                'KANAN:',
-                'a. Paris',
-                'b. Tokyo',
-                'KUNCI: 1-b, 2-a',
-                '[/SOAL]',
+                ['[SOAL]'],
+                ['TIPE', 'D', '', 'MENJODOHKAN'],
+                ['TEKS', 'Jodohkan nama negara dengan ibu kotanya.'],
+                ['KIRI 1', 'Jepang'],
+                ['KIRI 2', 'Prancis'],
+                ['KANAN a', 'Paris'],
+                ['KANAN b', 'Tokyo'],
+                ['KUNCI', '1-b, 2-a'],
+                ['[/SOAL]'],
             ],
             'ESSAY' => [
-                '[SOAL]',
-                'TIPE: ESSAY',
-                'TEKS: Jelaskan secara singkat proses fotosintesis pada tumbuhan hijau.',
-                'KUNCI: Tumbuhan menyerap air dan CO2 dengan bantuan klorofil dan cahaya matahari untuk menghasilkan glukosa dan oksigen.',
-                'RUBRIK: Skor maksimal 5 jika menyebutkan klorofil, air, CO2, dan oksigen.',
-                '[/SOAL]',
+                ['[SOAL]'],
+                ['TIPE', 'E', '', 'ESSAY'],
+                ['TEKS', 'Jelaskan secara singkat proses fotosintesis pada tumbuhan hijau.'],
+                ['KUNCI', 'Tumbuhan menyerap air dan CO2 dengan bantuan klorofil dan cahaya matahari untuk menghasilkan glukosa dan oksigen.'],
+                ['RUBRIK', 'Skor maksimal 5 jika menyebutkan klorofil, air, CO2, dan oksigen.'],
+                ['[/SOAL]'],
             ],
         ];
 
         // Kerangka slot kosong per tipe: baris kosong tetap disediakan agar guru tinggal mengetik di tempatnya.
         $kosong = [
-            'PG' => ['[SOAL]', 'TIPE: PG', 'TEKS:', '[OPSI]', '[OPSI]', '[OPSI]', '[OPSI]', '[/SOAL]'],
-            'PG_KOMPLEKS' => ['[SOAL]', 'TIPE: PG_KOMPLEKS', 'TEKS:', '[OPSI]', '[OPSI]', '[OPSI]', '[OPSI]', '[OPSI]', '[/SOAL]'],
-            'BENAR_SALAH' => ['[SOAL]', 'TIPE: BENAR_SALAH', 'TEKS:', '', '', '', '[/SOAL]'],
-            'MENJODOHKAN' => ['[SOAL]', 'TIPE: MENJODOHKAN', 'TEKS:', 'KIRI:', '', '', '', 'KANAN:', '', '', '', 'KUNCI:', '[/SOAL]'],
-            'ESSAY' => ['[SOAL]', 'TIPE: ESSAY', 'TEKS:', 'KUNCI:', 'RUBRIK:', '[/SOAL]'],
+            'PG' => [['[SOAL]'], ['TIPE', 'A', '', 'PG'], ['TEKS'], ['OPSI'], ['OPSI'], ['OPSI'], ['OPSI'], ['[/SOAL]']],
+            'PG_KOMPLEKS' => [['[SOAL]'], ['TIPE', 'B', '', 'PG_KOMPLEKS'], ['TEKS'], ['OPSI'], ['OPSI'], ['OPSI'], ['OPSI'], ['OPSI'], ['[/SOAL]']],
+            'BENAR_SALAH' => [['[SOAL]'], ['TIPE', 'C', '', 'BENAR_SALAH'], ['TEKS'], ['OPSI'], ['OPSI'], ['OPSI'], ['[/SOAL]']],
+            'MENJODOHKAN' => [['[SOAL]'], ['TIPE', 'D', '', 'MENJODOHKAN'], ['TEKS'], ['KIRI 1'], ['KIRI 2'], ['KIRI 3'], ['KANAN a'], ['KANAN b'], ['KANAN c'], ['KANAN d'], ['KUNCI'], ['[/SOAL]']],
+            'ESSAY' => [['[SOAL]'], ['TIPE', 'E', '', 'ESSAY'], ['TEKS'], ['KUNCI'], ['RUBRIK'], ['[/SOAL]']],
         ];
 
         $nomor = 0;
@@ -140,10 +138,10 @@ class WordSoalService
      */
     private const KOLOM_KISI = [
         ['No', 500],
-        ['Elemen', 1300],
-        ['Tujuan Pembelajaran', 2100],
+        ['Elemen', 1200],
+        ['Tujuan Pembelajaran', 2000],
         ['Indikator Soal', 2100],
-        ['Level Kognitif', 800],
+        ['Level Kognitif', 1000],
         ['Soal', 7000],
         ['Catatan Pemeriksa', 1500],
     ];
@@ -153,6 +151,13 @@ class WordSoalService
      *
      * @var array<string, int>
      */
+    /**
+     * Kode huruf tipe soal pada template: A = PG, B = PG kompleks, C = benar/salah, D = menjodohkan, E = essay.
+     *
+     * @var array<string, string>
+     */
+    private const TIPE_HURUF = ['A' => 'pg', 'B' => 'pg_kompleks', 'C' => 'benar_salah', 'D' => 'menjodohkan', 'E' => 'essay'];
+
     private const JUMLAH_SLOT = ['PG' => 15, 'PG_KOMPLEKS' => 10, 'BENAR_SALAH' => 5, 'MENJODOHKAN' => 3, 'ESSAY' => 2];
 
     /**
@@ -192,6 +197,11 @@ class WordSoalService
         $section->addTextBreak(3);
     }
 
+    /** Penanda sementara batas baris dan sel tabel saat membaca dokumen (diubah lagi sebelum diurai). */
+    private const BATAS_BARIS = "\x1E";
+
+    private const BATAS_SEL = "\x1F";
+
     private const GAYA_TABEL = ['borderSize' => 6, 'borderColor' => '64748B', 'cellMargin' => 60];
 
     /**
@@ -214,17 +224,39 @@ class WordSoalService
     }
 
     /**
-     * Isi kolom Soal sebagai tabel bersekat: satu baris tabel per baris soal, sehingga penanda tidak
-     * mudah terhapus atau bergeser saat guru mengetik di baris lain.
+     * Isi kolom Soal sebagai tabel bersekat tiga kolom: Tag | Isi soal | 1/0. Tag dipisah dari isi sehingga
+     * guru tidak perlu mengetik penanda, dan penanda tidak mudah terhapus saat mengetik isi soal.
      *
-     * @param  list<string|array<string, mixed>>  $barisSoal
+     * @param  list<list<string|array<string, mixed>>>  $barisSoal  tiap baris: [tag, isi, nilai, label]
      */
     private function isiSelSoalBersekat(Cell $sel, array $barisSoal, int $lebar): void
     {
+        $lebarTag = 1150;
+        $lebarNilai = 1250;
+        $lebarIsi = max(1000, $lebar - $lebarTag - $lebarNilai - 60);
         $dalam = $sel->addTable(['borderSize' => 4, 'borderColor' => '64748B', 'cellMargin' => 40]);
         foreach ($barisSoal as $baris) {
+            $tag = (string) $baris[0];
+            $penanda = str_starts_with($tag, '[');
             $dalam->addRow(320, ['cantSplit' => true]);
-            $this->isiSelSoal($dalam->addCell($lebar), [$baris]);
+
+            $selTag = $dalam->addCell($lebarTag, ['bgColor' => 'F1F5F9', 'valign' => 'center']);
+            $selTag->addText($tag, ['bold' => true, 'size' => 10], ['spaceAfter' => 0]);
+
+            $selIsi = $dalam->addCell($lebarIsi, $penanda ? ['bgColor' => 'F1F5F9'] : []);
+            $isi = $baris[1] ?? '';
+            if ($isi === '' || is_string($isi)) {
+                $selIsi->addText((string) $isi, [], ['spaceAfter' => 0]);
+            } else {
+                $this->isiSelSoal($selIsi, [$isi]);
+            }
+
+            $selNilai = $dalam->addCell($lebarNilai, ['valign' => 'center', 'bgColor' => $penanda ? 'F1F5F9' : 'FFFFFF']);
+            if (isset($baris[3])) {
+                $selNilai->addText((string) $baris[3], ['size' => 7, 'color' => '64748B'], ['alignment' => 'center', 'spaceAfter' => 0]);
+            } else {
+                $selNilai->addText((string) ($baris[2] ?? ''), ['bold' => true], ['alignment' => 'center', 'spaceAfter' => 0]);
+            }
         }
         $sel->addText('', [], ['spaceAfter' => 0]);
     }
@@ -285,6 +317,9 @@ class WordSoalService
 
         foreach ($blokSoal as $idx => $blok) {
             $soalNum = $idx + 1;
+            if (isset($blok['isi'])) {
+                $blok['isi'] = $this->ubahBlokBersekat($blok['isi']);
+            }
             if (isset($blok['isi']) && $this->blokKosong($blok['isi'])) {
                 $jumlahKosong++;
 
@@ -417,6 +452,81 @@ class WordSoalService
     }
 
     /**
+     * Ubah isi blok dari tabel bersekat (kolom Tag | Isi | 1/0) menjadi baris bertanda biasa agar diurai
+     * oleh parser yang sama. Blok yang tidak berbentuk tabel bersekat hanya dikembalikan batasnya menjadi tab/baris baru.
+     */
+    private function ubahBlokBersekat(string $isi): string
+    {
+        $biasa = fn (string $teks): string => str_replace([self::BATAS_SEL, self::BATAS_BARIS], ["\t", "\n"], $teks);
+        if (! str_contains($isi, self::BATAS_BARIS)) {
+            return $biasa($isi);
+        }
+
+        $tipe = null;
+        $teksSudah = false;
+        $sisiTerbuka = [];
+        $jumlahSisi = ['KIRI' => 0, 'KANAN' => 0];
+        $hasil = [];
+
+        foreach (explode(self::BATAS_BARIS, $isi) as $baris) {
+            $sel = array_map('trim', explode(self::BATAS_SEL, $baris));
+            if (count($sel) < 2 || ! preg_match('/^\[?\s*(TIPE|TEKS|OPSI|KIRI|KANAN|KUNCI|RUBRIK)(?:\s*([0-9a-z]{1,2}))?\s*:?\s*\]?$/iu', $this->normalisasiBaris($sel[0]), $cocok)) {
+                $baris = trim($biasa($baris));
+                if ($baris !== '') {
+                    $hasil[] = $baris;
+                }
+
+                continue;
+            }
+
+            $tag = strtoupper($cocok[1]);
+            $konten = $sel[1] ?? '';
+            $nilai = $sel[2] ?? '';
+
+            switch ($tag) {
+                case 'TIPE':
+                    $tipe = self::TIPE_HURUF[strtoupper($konten)] ?? strtolower($konten);
+                    $hasil[] = 'TIPE: '.strtoupper($tipe);
+                    break;
+                case 'TEKS':
+                    if ($konten !== '') {
+                        $hasil[] = $teksSudah ? $konten : 'TEKS: '.$konten;
+                        $teksSudah = true;
+                    } elseif (! $teksSudah) {
+                        $hasil[] = 'TEKS:';
+                        $teksSudah = true;
+                    }
+                    break;
+                case 'OPSI':
+                    if ($konten === '' && ($nilai === '' || $nilai === '0')) {
+                        break;
+                    }
+                    $hasil[] = $tipe === 'benar_salah'
+                        ? $konten.' | '.$nilai
+                        : ($nilai === '1' ? '[OPSI_BENAR] ' : '[OPSI] ').$konten;
+                    break;
+                case 'KIRI':
+                case 'KANAN':
+                    if ($konten === '') {
+                        break;
+                    }
+                    if (! isset($sisiTerbuka[$tag])) {
+                        $sisiTerbuka[$tag] = true;
+                        $hasil[] = $tag.':';
+                    }
+                    $jumlahSisi[$tag]++;
+                    $label = strtolower($cocok[2] ?? '') !== '' ? strtolower($cocok[2]) : ($tag === 'KIRI' ? (string) $jumlahSisi[$tag] : chr(96 + $jumlahSisi[$tag]));
+                    $hasil[] = $label.'. '.$konten;
+                    break;
+                default:
+                    $hasil[] = $tag.': '.$konten;
+            }
+        }
+
+        return implode("\n", $hasil);
+    }
+
+    /**
      * Slot template yang belum diisi (hanya kerangka penanda tanpa isi) dilewati, bukan dianggap soal salah.
      */
     private function blokKosong(string $isi): bool
@@ -476,24 +586,22 @@ class WordSoalService
     public function exportToWord(iterable $soalList): string
     {
         $phpWord = new PhpWord;
-        $section = $phpWord->addSection();
-        $section->addText('BANK SOAL CBT', ['bold' => true, 'size' => 16, 'color' => '1E40AF']);
-        $section->addText('Hanya teks pada kolom Soal (yang diapit tag soal) yang dibaca sistem saat dokumen ini diimpor kembali. Kolom Catatan Pemeriksa boleh diisi panitia.');
+        $phpWord->setDefaultFontName('Times New Roman');
+        $phpWord->setDefaultFontSize(11);
+        $section = $phpWord->addSection(['orientation' => 'landscape', 'marginLeft' => 720, 'marginRight' => 720, 'marginTop' => 720, 'marginBottom' => 720]);
+        $section->addText('BANK SOAL', ['bold' => true, 'size' => 14], ['alignment' => 'center']);
         $section->addTextBreak();
 
         $tabel = $section->addTable(self::GAYA_TABEL);
         $tabel->addRow(null, ['tblHeader' => true, 'cantSplit' => true]);
-        foreach ([['No', 700], ['Soal', 6500], ['Catatan Pemeriksa', 1800]] as [$judul, $lebar]) {
+        foreach (self::KOLOM_KISI as [$judul, $lebar]) {
             $tabel->addCell($lebar, ['bgColor' => 'E2E8F0', 'valign' => 'center'])->addText($judul, ['bold' => true], ['alignment' => 'center']);
         }
 
         $nomor = 0;
         foreach ($soalList as $soal) {
             $nomor++;
-            $tabel->addRow();
-            $tabel->addCell(700)->addText((string) $nomor, [], ['alignment' => 'center']);
-            $this->isiSelSoal($tabel->addCell(6500), $this->barisSoalUntukEkspor($soal));
-            $tabel->addCell(1800)->addText('');
+            $this->tulisBarisKisi($tabel, [(string) $nomor], $this->barisSoalUntukEkspor($soal), true);
         }
 
         $tempPath = tempnam(sys_get_temp_dir(), 'export_word_').'.docx';
@@ -504,16 +612,16 @@ class WordSoalService
     }
 
     /**
-     * Baris bertanda untuk satu soal (format yang sama dengan template, sehingga dapat diimpor kembali).
+     * Baris soal untuk kolom Soal bersekat (format yang sama dengan template, sehingga dapat diimpor kembali).
      *
-     * @return list<string>
+     * @return list<list<string>> tiap baris: [tag, isi, nilai, label]
      */
     private function barisSoalUntukEkspor(BankSoal $soal): array
     {
-        $baris = ['[SOAL]', 'TIPE: '.strtoupper($soal->tipe)];
-        $teks = preg_split('/\R/u', strip_tags((string) $soal->konten)) ?: [''];
-        foreach ($teks as $i => $potong) {
-            $baris[] = $i === 0 ? 'TEKS: '.$potong : $potong;
+        $huruf = (string) array_search($soal->tipe, self::TIPE_HURUF, true);
+        $baris = [['[SOAL]'], ['TIPE', $huruf, '', strtoupper($soal->tipe)]];
+        foreach (preg_split('/\R/u', strip_tags((string) $soal->konten)) ?: [''] as $potong) {
+            $baris[] = ['TEKS', $potong];
         }
         $opsi = $soal->opsiSoal->sortBy('urutan')->values();
 
@@ -521,51 +629,49 @@ class WordSoalService
             case 'pg':
             case 'pg_kompleks':
                 foreach ($opsi as $item) {
-                    $huruf = chr(64 + (int) $item->urutan);
+                    $label = chr(64 + (int) $item->urutan);
                     $kunci = $soal->kunci;
                     $benar = $soal->tipe === 'pg'
-                        ? strtoupper((string) $kunci) === $huruf
-                        : (is_array($kunci) && in_array($huruf, array_map('strtoupper', $kunci), true));
-                    $baris[] = ($benar ? '[OPSI_BENAR] ' : '[OPSI] ').strip_tags((string) $item->konten);
+                        ? strtoupper((string) $kunci) === $label
+                        : (is_array($kunci) && in_array($label, array_map('strtoupper', $kunci), true));
+                    $baris[] = ['OPSI', strip_tags((string) $item->konten), $benar ? '1' : '0'];
                 }
                 break;
 
             case 'benar_salah':
                 foreach ($opsi as $item) {
-                    $status = is_array($soal->kunci) ? ($soal->kunci[(string) $item->urutan] ?? '') : '';
-                    $baris[] = "{$item->urutan}. ".strip_tags((string) $item->konten)." | {$status}";
+                    $status = is_array($soal->kunci) ? strtoupper((string) ($soal->kunci[(string) $item->urutan] ?? '')) : '';
+                    $baris[] = ['OPSI', strip_tags((string) $item->konten), $status === 'B' ? '1' : ($status === 'S' ? '0' : '')];
                 }
                 break;
 
             case 'menjodohkan':
-                $baris[] = 'KIRI:';
                 foreach ($opsi->where('sisi', 'kiri') as $kiri) {
-                    $baris[] = "{$kiri->urutan}. ".strip_tags((string) $kiri->konten);
+                    $baris[] = ['KIRI '.$kiri->urutan, strip_tags((string) $kiri->konten)];
                 }
-                $baris[] = 'KANAN:';
                 foreach ($opsi->where('sisi', 'kanan')->values() as $i => $kanan) {
-                    $baris[] = chr(97 + $i).'. '.strip_tags((string) $kanan->konten);
+                    $baris[] = ['KANAN '.chr(97 + $i), strip_tags((string) $kanan->konten)];
                 }
                 if (is_array($soal->kunci)) {
                     $pasangan = [];
                     foreach ($soal->kunci as $k => $v) {
                         $pasangan[] = "{$k}-{$v}";
                     }
-                    $baris[] = 'KUNCI: '.implode(', ', $pasangan);
+                    $baris[] = ['KUNCI', implode(', ', $pasangan)];
                 }
                 break;
 
             case 'essay':
                 if ($soal->kunci) {
-                    $baris[] = 'KUNCI: '.(is_string($soal->kunci) ? $soal->kunci : json_encode($soal->kunci));
+                    $baris[] = ['KUNCI', is_string($soal->kunci) ? $soal->kunci : (string) json_encode($soal->kunci)];
                 }
                 if ($soal->rubrik) {
-                    $baris[] = 'RUBRIK: '.$soal->rubrik;
+                    $baris[] = ['RUBRIK', (string) $soal->rubrik];
                 }
                 break;
         }
 
-        $baris[] = '[/SOAL]';
+        $baris[] = ['[/SOAL]'];
 
         return $baris;
     }
@@ -594,7 +700,7 @@ class WordSoalService
 
         foreach ($lines as $line) {
             if (preg_match('/^TIPE:\s*([A-Z_]+)/iu', $line, $m)) {
-                $tipe = strtolower(trim($m[1]));
+                $tipe = self::TIPE_HURUF[strtoupper(trim($m[1]))] ?? strtolower(trim($m[1]));
                 $readingTeks = false;
                 $currentOpsiIdx = null;
 
@@ -1026,7 +1132,7 @@ class WordSoalService
 
         // 3. Konversi paragraf & baris baru. Batas sel tabel menjadi tab dan batas baris tabel menjadi baris baru,
         // sehingga isi sel yang berdampingan (kolom kisi-kisi, kolom Soal, catatan) tidak menempel satu sama lain.
-        $xmlData = str_replace(['</w:p>', '<w:br/>', '<w:cr/>', '</w:tr>', '</w:tc>'], ["\n", "\n", "\n", "\n", "\t"], $xmlData);
+        $xmlData = str_replace(['</w:p>', '<w:br/>', '<w:cr/>', '</w:tr>', '</w:tc>'], ["\n", "\n", "\n", self::BATAS_BARIS."\n", self::BATAS_SEL], $xmlData);
         $text = strip_tags($xmlData, '<img>');
 
         return html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tanggalPendek } from '@/lib/waktu'
 import { computed, onMounted, ref, watch } from 'vue'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
@@ -32,7 +33,7 @@ async function muatSesi() {
     sesiOpsi.value = (res.data.data ?? []).map(
       (s: { id: number; jadwal: string; mapel: string; ruang: string; tanggal: string | null; sesi_ke: number }) => ({
         id: s.id,
-        label: `${s.tanggal ?? ''} ${s.jadwal} - ${s.mapel ?? ''} (${s.ruang ?? 'Ruang'}, sesi ${s.sesi_ke})`.trim()
+        label: `${tanggalPendek(s.tanggal)} ${s.jadwal} - ${s.mapel ?? ''} (${s.ruang ?? 'Ruang'}, sesi ${s.sesi_ke})`.trim()
       })
     )
     if (sesiOpsi.value.length > 0) sesiId.value = sesiOpsi.value[0].id

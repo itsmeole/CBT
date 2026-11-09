@@ -104,11 +104,11 @@ class WordTemplateTest extends TestCase
             $this->assertStringContainsString('>'.$kolom.'<', $xml, "Kolom {$kolom}");
         }
         $this->assertSame(35, substr_count($xml, '>[SOAL]<'), 'PG 15 + PG_KOMPLEKS 10 + BENAR_SALAH 5 + MENJODOHKAN 3 + ESSAY 2.');
-        $this->assertSame(15, substr_count($xml, 'TIPE: PG<'));
-        $this->assertSame(10, substr_count($xml, 'TIPE: PG_KOMPLEKS<'));
-        $this->assertSame(5, substr_count($xml, 'TIPE: BENAR_SALAH<'));
-        $this->assertSame(3, substr_count($xml, 'TIPE: MENJODOHKAN<'));
-        $this->assertSame(2, substr_count($xml, 'TIPE: ESSAY<'));
+        $this->assertSame(35, substr_count($xml, '>TIPE<'), 'Tag berada di kolom sendiri, terpisah dari isi soal.');
+        foreach (['A' => 15, 'B' => 10, 'C' => 5, 'D' => 3, 'E' => 2] as $huruf => $jumlah) {
+            $this->assertSame($jumlah, substr_count($xml, '>'.$huruf.'<'), "Slot tipe {$huruf}");
+        }
+        $this->assertStringNotContainsString('TIPE: ', $xml, 'Tag tidak lagi digabung dengan isi dalam satu sel.');
     }
 
     public function test_template_reads_only_the_five_examples_and_skips_empty_slots(): void
@@ -133,6 +133,15 @@ class WordTemplateTest extends TestCase
         foreach (['Level Kognitif', 'Catatan Pemeriksa', 'Satuan Pendidikan', 'CAPAIAN', 'SMPS 2'] as $admin) {
             $this->assertStringNotContainsString($admin, (string) $semua, "Teks administrasi \"{$admin}\" tidak boleh ikut terbaca.");
         }
+    }
+
+    public function test_type_letter_and_one_zero_options_work_in_flat_format_too(): void
+    {
+        $hasil = $this->preview($this->dokumenKisi([['soal' => ['[SOAL]', 'TIPE: C', 'TEKS: Uji', 'Langit biru. | 1', 'Api dingin. | 0', '[/SOAL]']]]));
+
+        $this->assertSame(0, $hasil['error_count'], $this->pesan($hasil));
+        $this->assertSame('benar_salah', $hasil['items'][0]['tipe']);
+        $this->assertSame(['1' => 'B', '2' => 'S'], $hasil['items'][0]['kunci']);
     }
 
     public function test_template_with_only_empty_slots_reports_that_nothing_was_filled(): void
@@ -250,7 +259,7 @@ class WordTemplateTest extends TestCase
         $this->assertStringContainsString('lalu jelaskan', $hasil['items'][0]['teks']);
     }
 
-    public function test_export_is_one_table_and_round_trips_every_question_type(): void
+    public function test_export_uses_template_layout_and_round_trips_every_question_type(): void
     {
         $guru = Guru::create(['user_id' => User::factory()->role('guru')->create()->id]);
         $mapel = Mapel::create(['kode' => 'IPA', 'nama' => 'IPA']);
@@ -273,7 +282,10 @@ class WordTemplateTest extends TestCase
 
         $service = new WordSoalService;
         $path = $service->exportToWord(BankSoal::with('opsiSoal')->orderBy('id')->get());
-        $this->assertSame(1, substr_count($this->xmlDokumen($path), '<w:tbl>'));
+        $xml = $this->xmlDokumen($path);
+        $this->assertStringContainsString('w:orient="landscape"', $xml);
+        $this->assertSame(5, substr_count($xml, '>[SOAL]<'));
+        $this->assertSame(5, substr_count($xml, '>TIPE<'), 'Ekspor memakai tag di kolom terpisah, sama dengan template.');
 
         $hasil = $service->preview(new UploadedFile($path, 'e.docx', self::MIME, null, true));
         unlink($path);

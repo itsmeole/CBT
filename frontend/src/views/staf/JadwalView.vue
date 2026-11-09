@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { jam, tanggalPendek } from '@/lib/waktu'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { statusPilihan, toggleSemua } from '@/lib/pilihSemua'
@@ -346,7 +347,7 @@ onMounted(() => {
               </div>
               <div class="flex items-center gap-2">
                 <span class="rounded bg-brand-50 px-2 py-1 text-xs font-bold text-brand-700">
-                  Tanggal: {{ jadwal.tanggal }}
+                  Tanggal: {{ tanggalPendek(jadwal.tanggal) }}
                 </span>
                 <button v-if="bolehAtur" @click="bukaPenempatan(jadwal)" class="btn-primary !min-h-0 !py-1 text-xs">
                   <span class="sm:hidden">Penempatan</span><span class="hidden sm:inline">Atur Penempatan Peserta</span>
@@ -369,7 +370,7 @@ onMounted(() => {
                         Sesi {{ sesi.sesi_ke }} - {{ sesi.ruang?.nama }}
                       </p>
                       <p class="text-[11px] text-slate-500">
-                        Waktu: {{ sesi.jam_mulai }} - {{ sesi.jam_akhir }}
+                        Waktu: {{ jam(sesi.jam_mulai) }} - {{ jam(sesi.jam_akhir) }}
                       </p>
                     </div>
 

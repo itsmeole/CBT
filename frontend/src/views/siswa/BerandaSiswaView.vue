@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { jam } from '@/lib/waktu'
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -238,7 +239,7 @@ async function handleConfirmedLogout() {
                       {{ sesi.ruang }}
                     </span>
                     <span v-if="sesi.jam_mulai && sesi.jam_akhir" class="text-slate-400 font-mono">
-                      {{ sesi.jam_mulai }} - {{ sesi.jam_akhir }}
+                      {{ jam(sesi.jam_mulai) }} - {{ jam(sesi.jam_akhir) }}
                     </span>
                   </div>
                 </div>

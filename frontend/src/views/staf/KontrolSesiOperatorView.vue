@@ -94,7 +94,7 @@ const filteredPeserta = computed(() => {
   const q = searchKeyword.value.toLowerCase().trim()
   if (!q) return sesiData.value.peserta_ujian
   return sesiData.value.peserta_ujian.filter((p: any) => {
-    const nama = (p.siswa?.nama || '').toLowerCase()
+    const nama = (p.siswa?.user?.name || p.siswa?.nama || '').toLowerCase()
     const nis = (p.siswa?.nis || '').toLowerCase()
     const kelas = (p.siswa?.kelas?.nama || '').toLowerCase()
     return nama.includes(q) || nis.includes(q) || kelas.includes(q)
@@ -208,7 +208,7 @@ function promptMulaiPesertaIndividu(pesertaId: number) {
 
 function promptResetLoginPeserta(p: any) {
   const userId = p.siswa?.user?.id
-  const namaSiswa = p.siswa?.nama || 'Siswa'
+  const namaSiswa = p.siswa?.user?.name || p.siswa?.nama || 'Siswa'
   if (!userId) {
     errorMessage.value = 'Data akun pengguna siswa tidak ditemukan.'
     return
@@ -227,7 +227,7 @@ function promptResetLoginPeserta(p: any) {
 }
 
 function promptBukaKunciPeserta(p: any) {
-  const namaSiswa = p.siswa?.nama || 'Siswa'
+  const namaSiswa = p.siswa?.user?.name || p.siswa?.nama || 'Siswa'
   openActionModal({
     title: 'Buka Kunci Ujian',
     message: `Buka kunci ujian untuk siswa "${namaSiswa}" agar dapat melanjutkan pengerjaan ujian?`,
@@ -527,7 +527,7 @@ onUnmounted(() => {
                     />
                   </td>
                   <td class="p-3 font-mono font-medium text-slate-900">{{ p.siswa?.nis }}</td>
-                  <td class="p-3 font-medium text-slate-900">{{ p.siswa?.nama }}</td>
+                  <td class="p-3 font-medium text-slate-900">{{ p.siswa?.user?.name || p.siswa?.nama || '-' }}</td>
                   <td class="p-3">{{ p.siswa?.kelas?.nama || '-' }}</td>
                   <td class="p-3">
                     <span

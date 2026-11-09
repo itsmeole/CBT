@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { jam } from '@/lib/waktu'
 import { computed, onMounted, ref } from 'vue'
 import { apiClient } from '@/api/client'
 
@@ -64,7 +65,7 @@ onMounted(muat)
     <div class="card flex max-h-[90vh] w-full max-w-md flex-col bg-white">
       <div class="border-b border-slate-200 p-4">
         <h2 id="judul-pengawas" class="text-base font-bold text-slate-900">Pengawas {{ sesi.ruang }}</h2>
-        <p class="text-xs text-slate-500">{{ judul }} - sesi {{ sesi.sesi_ke }}, {{ sesi.jam_mulai }}-{{ sesi.jam_akhir }}</p>
+        <p class="text-xs text-slate-500">{{ judul }} - sesi {{ sesi.sesi_ke }}, {{ jam(sesi.jam_mulai) }}-{{ jam(sesi.jam_akhir) }}</p>
       </div>
 
       <div class="flex-1 space-y-3 overflow-y-auto p-4">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tanggalPendek } from '@/lib/waktu'
 import { computed, onMounted, ref, watch } from 'vue'
 import { apiClient } from '@/api/client'
 import { ambilHalaman } from '@/lib/paginasi'
@@ -202,7 +203,7 @@ onMounted(muat)
       <div class="flex items-start justify-between border-b border-slate-200 p-4">
         <div>
           <h2 id="judul-penempatan" class="text-lg font-bold text-slate-900">Penempatan Peserta ke Ruang</h2>
-          <p class="text-xs text-slate-500">{{ jadwal.nama }} - {{ jadwal.tanggal }}</p>
+          <p class="text-xs text-slate-500">{{ jadwal.nama }} - {{ tanggalPendek(jadwal.tanggal) }}</p>
         </div>
         <button class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Tutup" @click="emit('close')">✕</button>
       </div>
