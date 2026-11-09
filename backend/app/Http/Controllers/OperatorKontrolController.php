@@ -147,6 +147,9 @@ class OperatorKontrolController extends Controller
     /**
      * Mulai ujian perorangan (untuk siswa terlambat) (Hanya Operator & Superadmin).
      */
+    /** Urutan tipe soal saat siswa mengerjakan ujian. */
+    private const URUTAN_TIPE = ['pg', 'pg_kompleks', 'benar_salah', 'menjodohkan', 'essay'];
+
     public function mulaiPeserta(Request $request, int $pesertaId): JsonResponse
     {
         $this->ensureOperatorOrSuperadmin($request);
@@ -203,8 +206,11 @@ class OperatorKontrolController extends Controller
      */
     private function inisialisasiPengerjaanPeserta(PesertaUjian $peserta, $soalCollection, Carbon $now, Carbon $waktuSelesai): void
     {
-        // Acak urutan soal
-        $shuffledSoal = $soalCollection->shuffle();
+        // Urutan soal: dikelompokkan per tipe (PG, PG kompleks, benar/salah, menjodohkan, essay),
+        // lalu diacak di dalam tiap tipe agar siswa tidak mengerjakan tipe yang bercampur.
+        $shuffledSoal = collect(self::URUTAN_TIPE)
+            ->flatMap(fn (string $tipe) => $soalCollection->where('tipe', $tipe)->shuffle())
+            ->values();
         $urutanSoalIds = $shuffledSoal->pluck('id')->values()->toArray();
 
         // Acak urutan opsi per soal

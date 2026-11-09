@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ConfirmLogoutModal from '@/components/ConfirmLogoutModal.vue'
+import ProfilModal from '@/components/ProfilModal.vue'
 import StafNavList from '@/components/StafNavList.vue'
 import { buatMenu } from '@/lib/navigasi'
 
@@ -16,6 +17,22 @@ const isCollapsed = ref(false)
 
 // Mobile drawer open state
 const mobileOpen = ref(false)
+
+// Edit profil (Guru, Operator, Superadmin)
+const showProfil = ref(false)
+const pesanProfil = ref('')
+let timerPesanProfil: ReturnType<typeof setTimeout> | null = null
+
+function bukaProfil() {
+  mobileOpen.value = false
+  showProfil.value = true
+}
+
+function profilTersimpan() {
+  pesanProfil.value = 'Profil berhasil diperbarui.'
+  if (timerPesanProfil) clearTimeout(timerPesanProfil)
+  timerPesanProfil = setTimeout(() => (pesanProfil.value = ''), 3500)
+}
 
 // Logout confirmation state
 const showLogoutConfirm = ref(false)
@@ -80,17 +97,6 @@ const navItems = computed(() => buatMenu(role.value ?? null))
         <span class="rounded-md bg-brand-50 border border-brand-200 px-2 py-0.5 text-[11px] font-bold capitalize text-brand-700">
           {{ role }}
         </span>
-        <button
-          type="button"
-          @click="requestLogout"
-          class="rounded-xl p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 focus:outline-none transition-colors"
-          title="Keluar Akun"
-        >
-          <!-- Logout SVG -->
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
-          </svg>
-        </button>
       </div>
     </header>
 
@@ -156,8 +162,13 @@ const navItems = computed(() => buatMenu(role.value ?? null))
         <!-- Drawer User Profile Footer -->
         <div class="border-t border-slate-100 p-4">
           <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2.5">
-              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
+            <button
+              type="button"
+              class="-m-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 text-left"
+                aria-label="Edit profil"
+              @click="bukaProfil"
+            >
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
                 {{ (auth.user?.nama || auth.user?.username || 'U').charAt(0).toUpperCase() }}
               </div>
               <div class="overflow-hidden">
@@ -166,7 +177,7 @@ const navItems = computed(() => buatMenu(role.value ?? null))
                   {{ role }}
                 </span>
               </div>
-            </div>
+            </button>
           </div>
           <button
             type="button"
@@ -250,17 +261,22 @@ const navItems = computed(() => buatMenu(role.value ?? null))
       <div class="border-t border-slate-100 p-3">
         <!-- Expanded Profile -->
         <div v-if="!isCollapsed" class="space-y-3">
-          <div class="flex items-center gap-3 px-1">
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left"
+            aria-label="Edit profil"
+            @click="bukaProfil"
+          >
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
               {{ (auth.user?.nama || auth.user?.username || 'U').charAt(0).toUpperCase() }}
             </div>
-            <div class="overflow-hidden">
+            <div class="min-w-0 flex-1 overflow-hidden">
               <p class="text-xs font-semibold text-slate-800 truncate">{{ auth.user?.nama || auth.user?.username }}</p>
               <span class="inline-block rounded bg-brand-100 px-1.5 py-0.2 text-[10px] font-bold capitalize text-brand-700">
                 {{ role }}
               </span>
             </div>
-          </div>
+          </button>
           <button
             type="button"
             @click="requestLogout"
@@ -276,12 +292,15 @@ const navItems = computed(() => buatMenu(role.value ?? null))
 
         <!-- Collapsed Profile -->
         <div v-else class="flex flex-col items-center gap-2">
-          <div
+          <button
+            type="button"
             class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700"
             :title="`${auth.user?.nama || auth.user?.username} (${role})`"
+            aria-label="Edit profil"
+            @click="bukaProfil"
           >
             {{ (auth.user?.nama || auth.user?.username || 'U').charAt(0).toUpperCase() }}
-          </div>
+          </button>
           <button
             type="button"
             @click="requestLogout"
@@ -305,6 +324,15 @@ const navItems = computed(() => buatMenu(role.value ?? null))
         <slot />
       </main>
     </div>
+
+    <ProfilModal v-if="showProfil" @close="showProfil = false" @saved="profilTersimpan" />
+    <p
+      v-if="pesanProfil"
+      class="fixed bottom-4 left-1/2 z-[70] -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg"
+      role="status"
+    >
+      {{ pesanProfil }}
+    </p>
 
     <!-- Confirm Logout Dialog -->
     <ConfirmLogoutModal

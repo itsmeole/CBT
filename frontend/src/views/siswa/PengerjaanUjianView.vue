@@ -3,6 +3,7 @@ import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient } from '@/api/client'
 import { useUjianStore, type PesertaStatus } from '@/stores/ujian'
+import MenjodohkanPasang from '@/components/MenjodohkanPasang.vue'
 import { renderMathInHtml } from '@/lib/katex'
 import { antrekanJawaban, bersihkanSemua } from '@/lib/offlineQueue'
 import { kirimLock, kosongkanAntrean, type HasilSinkron } from '@/lib/syncEngine'
@@ -190,13 +191,10 @@ function setBenarSalah(opsiId: number | string, val: 'BENAR' | 'SALAH') {
   triggerAutosave(id)
 }
 
-function setMenjodohkan(kiriId: number | string, kananId: string) {
+function setPasangan(peta: Record<string, string | number>) {
   if (!currentSoal.value || terkunci.value) return
   const id = currentSoal.value.soalId
-  const next = { ...petaJawaban(id) }
-  if (kananId === '') delete next[String(kiriId)]
-  else next[String(kiriId)] = kananId
-  answers.value[id] = next
+  answers.value[id] = peta
   triggerAutosave(id)
 }
 
@@ -489,28 +487,15 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 4. Menjodohkan (dropdown, bukan drag-and-drop) -->
-        <div v-if="currentSoal.tipe === 'menjodohkan'" class="space-y-3 pt-2">
-          <p class="text-xs font-semibold text-slate-500 italic">Jodohkan item di kolom kiri dengan pilihan yang tepat:</p>
-          <div v-for="(kiri, kIdx) in currentSoal.kiri" :key="kiri.id" class="rounded-xl border border-slate-200 p-3 bg-slate-50 space-y-2">
-            <div class="text-[15px] font-medium text-slate-800">
-              <span class="font-bold text-brand-700 mr-1 shrink-0">{{ kIdx + 1 }}.</span>
-              <span dir="auto" v-html="renderMathInHtml(kiri.konten)"></span>
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-500 mb-1">Pilih Pasangan:</label>
-              <select
-                :value="petaJawaban(currentSoal.soalId)[String(kiri.id)] ?? ''"
-                @change="setMenjodohkan(kiri.id, ($event.target as HTMLSelectElement).value)"
-                class="input text-sm !min-h-touch"
-              >
-                <option value="">-- Pilih Jawaban --</option>
-                <option v-for="(kanan, knIdx) in currentSoal.kanan" :key="kanan.id" :value="kanan.id">
-                  {{ String.fromCharCode(65 + knIdx) }}. {{ kanan.konten.replace(/<[^>]*>/g, '') }}
-                </option>
-              </select>
-            </div>
-          </div>
+        <!-- 4. Menjodohkan: ketuk item kiri lalu pasangannya di kanan -->
+        <div v-if="currentSoal.tipe === 'menjodohkan'" class="pt-2">
+          <MenjodohkanPasang
+            :kiri="currentSoal.kiri ?? []"
+            :kanan="currentSoal.kanan ?? []"
+            :model-value="petaJawaban(currentSoal.soalId)"
+            :nonaktif="terkunci"
+            @update:model-value="setPasangan"
+          />
         </div>
 
         <!-- 5. Essay -->

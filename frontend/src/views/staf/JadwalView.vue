@@ -301,13 +301,13 @@ onMounted(() => {
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button v-if="activeTab === 'paket'" @click="openCreatePaket" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+          <button v-if="bolehAtur && activeTab === 'paket'" @click="openCreatePaket" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             <span class="sm:hidden">Paket baru</span><span class="hidden sm:inline">Buat Paket Soal Baru</span>
           </button>
-          <button v-if="activeTab === 'jadwal'" @click="openCreateJadwal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
+          <button v-if="bolehAtur && activeTab === 'jadwal'" @click="openCreateJadwal" class="btn-primary !min-h-0 !py-2 text-xs flex items-center gap-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
@@ -395,6 +395,7 @@ onMounted(() => {
                       Peserta: <strong>{{ sesi.peserta_ujian_count ?? 0 }}</strong> / {{ sesi.ruang?.kapasitas || 0 }} kursi
                     </span>
                     <button
+                      v-if="bolehAtur"
                       @click="generateToken(sesi.id)"
                       :disabled="generatingTokenId === sesi.id"
                       class="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
@@ -437,6 +438,7 @@ onMounted(() => {
                   {{ paket.items?.length || 0 }} Butir Soal
                 </span>
                 <button
+                  v-if="bolehAtur"
                   type="button"
                   @click="promptDeletePaket(paket.id, paket.nama)"
                   class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
@@ -478,6 +480,7 @@ onMounted(() => {
                 step="0.1"
                 min="0"
                 class="input !min-h-0 !py-1 text-sm w-24 text-right"
+                :disabled="!bolehAtur"
                 required
               />
             </div>
@@ -487,7 +490,7 @@ onMounted(() => {
               <span class="text-base font-extrabold text-brand-700">{{ totalBobot }}</span>
             </div>
 
-            <div class="pt-4">
+            <div v-if="bolehAtur" class="pt-4">
               <button
                 type="submit"
                 class="btn-primary !min-h-0 !py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"

@@ -10,7 +10,7 @@ const PESAN: Record<string, string> = {
   TIME_UP: 'Waktu ujian telah habis.',
   ALREADY_SUBMITTED: 'Ujian sudah dikumpulkan.',
   RATE_LIMITED: 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
-  NETWORK_ERROR: 'Tidak dapat terhubung.  Periksa koneksi internet Anda.',
+  NETWORK_ERROR: 'Tidak dapat terhubung. Periksa koneksi internet Anda.',
   UNKNOWN_ERROR: 'Terjadi kesalahan. Silakan coba lagi.'
 }
 

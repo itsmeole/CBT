@@ -30,6 +30,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::put('profil', [AuthController::class, 'updateProfil'])->middleware(['role:operator,superadmin,guru', 'throttle:10,1']);
         Route::middleware('role:operator,superadmin,guru')->group(function () {
             Route::post('auth/reset-login/{userId}', [PengawasanController::class, 'resetLogin']);
             Route::get('dashboard', [DashboardController::class, 'show']);

@@ -173,6 +173,7 @@ const LABEL_AKSI: Record<string, string> = {
   'auth.login': 'Login',
   'auth.logout': 'Logout',
   'auth.reset_login': 'Reset login siswa',
+  'profil.diperbarui': 'Memperbarui profil akun',
   'ujian.mulai_sesi': 'Memulai sesi ujian',
   'ujian.mulai_peserta': 'Memulai ujian siswa',
   'ujian.lock': 'Siswa terkunci',

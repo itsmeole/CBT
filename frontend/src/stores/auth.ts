@@ -45,6 +45,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setUser(data: AuthUser): void {
+    user.value = data
+  }
+
   function clear(): void {
     user.value = null
     setAuthToken(null)
@@ -53,6 +57,6 @@ export const useAuthStore = defineStore('auth', () => {
   // Jika server menjawab 401 di mana pun, sesi lokal langsung dibersihkan.
   setUnauthenticatedHandler(clear)
 
-  return { user, initialized, isAuthenticated, role, fetchMe, login, logout, clear }
+  return { user, initialized, isAuthenticated, role, fetchMe, login, logout, setUser, clear }
 })
 
