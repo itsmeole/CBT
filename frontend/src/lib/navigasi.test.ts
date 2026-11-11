@@ -12,10 +12,10 @@ describe('navigasi staf', () => {
     expect(jadwal.anak?.map((a) => a.tab)).toEqual(['jadwal', 'paket', 'bobot'])
   })
 
-  it('guru tidak melihat Master Data, Kontrol Sesi, dan Riwayat Aktivitas', () => {
+  it('guru tidak melihat Master Data dan Riwayat Aktivitas, tetapi melihat Kontrol Sesi untuk presensi ruang', () => {
     const nama = buatMenu('guru').map((m) => m.nama)
     expect(nama).not.toContain('Master Data')
-    expect(nama).not.toContain('Kontrol Sesi')
+    expect(nama).toContain('Kontrol Sesi')
     expect(nama).not.toContain('Riwayat Aktivitas')
     expect(nama).toContain('Jadwal & Paket Ujian')
     expect(nama).toContain('Analisis Butir')

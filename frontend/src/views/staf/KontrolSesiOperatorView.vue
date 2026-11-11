@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import StafLayout from '@/components/StafLayout.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { tanggalPendek } from '@/lib/waktu'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -15,6 +16,9 @@ const feedbackMessage = ref('')
 const errorMessage = ref('')
 
 const jadwalList = ref<any[]>([])
+// Guru hanya mengelola kehadiran di ruang yang ia awasi; memulai ujian dan reset massal tetap operator/superadmin.
+const isGuru = computed(() => auth.role === 'guru')
+const sesiGuru = ref<{ id: number; jadwal: string; mapel: string | null; ruang: string | null; tanggal: string | null; sesi_ke: number }[]>([])
 const selectedSesiId = ref<number | null>(null)
 const sesiData = ref<any>(null)
 const showMulaiModal = ref(false)
@@ -22,6 +26,8 @@ const searchKeyword = ref('')
 
 // Presensi Model
 const presensiState = ref<Record<number, boolean>>({})
+// Nilai presensi terakhir dari server; selisihnya dengan presensiState = centang yang belum disimpan.
+const presensiServer = ref<Record<number, boolean>>({})
 
 // Guard: allow guru, operator, and superadmin
 if (auth.role !== 'superadmin' && auth.role !== 'operator' && auth.role !== 'guru') {
@@ -31,15 +37,25 @@ if (auth.role !== 'superadmin' && auth.role !== 'operator' && auth.role !== 'gur
 async function fetchJadwalList() {
   loading.value = true
   try {
-    const res = await apiClient.get('/jadwal')
-    jadwalList.value = res.data.data || []
+    if (isGuru.value) {
+      const res = await apiClient.get('/pengawasan/sesi')
+      sesiGuru.value = res.data.data || []
+      if (!selectedSesiId.value) {
+        // Utamakan sesi hari ini; bila tidak ada, sesi terbaru.
+        const hariIni = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+        selectedSesiId.value = (sesiGuru.value.find((s) => s.tanggal === hariIni) ?? sesiGuru.value[0])?.id ?? null
+      }
+    } else {
+      const res = await apiClient.get('/jadwal')
+      jadwalList.value = res.data.data || []
 
-    // Find first available sesi
-    if (!selectedSesiId.value) {
-      for (const j of jadwalList.value) {
-        if (j.sesi_ruang && j.sesi_ruang.length > 0) {
-          selectedSesiId.value = j.sesi_ruang[0].id
-          break
+      // Find first available sesi
+      if (!selectedSesiId.value) {
+        for (const j of jadwalList.value) {
+          if (j.sesi_ruang && j.sesi_ruang.length > 0) {
+            selectedSesiId.value = j.sesi_ruang[0].id
+            break
+          }
         }
       }
     }
@@ -61,13 +77,16 @@ async function fetchSesiDetail() {
     const res = await apiClient.get(`/sesi-ruang/${selectedSesiId.value}/peserta`)
     sesiData.value = res.data.data
 
-    // Populate presensiState
+    // Populate presensiState. Centang yang sudah diubah tetapi belum disimpan dipertahankan saat data
+    // disegarkan otomatis (tiap 10 detik); hanya baris yang belum disentuh yang mengikuti server.
+    const dariServer: Record<number, boolean> = {}
     const map: Record<number, boolean> = {}
-    if (sesiData.value?.peserta_ujian) {
-      sesiData.value.peserta_ujian.forEach((p: any) => {
-        map[p.id] = !!p.hadir
-      })
+    for (const p of sesiData.value?.peserta_ujian ?? []) {
+      dariServer[p.id] = !!p.hadir
+      const belumDisimpan = p.id in presensiState.value && p.id in presensiServer.value && presensiState.value[p.id] !== presensiServer.value[p.id]
+      map[p.id] = belumDisimpan ? presensiState.value[p.id] : dariServer[p.id]
     }
+    presensiServer.value = dariServer
     presensiState.value = map
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal memuat peserta sesi ruang.'
@@ -76,8 +95,21 @@ async function fetchSesiDetail() {
   }
 }
 
+/** Pindah ke sesi lain: centang dari sesi sebelumnya tidak ikut terbawa. */
+function gantiSesi() {
+  presensiState.value = {}
+  presensiServer.value = {}
+  void fetchSesiDetail()
+}
+
 const allSessions = computed(() => {
   const list: { id: number; label: string }[] = []
+  if (isGuru.value) {
+    return sesiGuru.value.map((s) => ({
+      id: s.id,
+      label: `${tanggalPendek(s.tanggal)} ${s.jadwal} - ${s.mapel ?? ''} (${s.ruang ?? 'Ruang'}, sesi ${s.sesi_ke})`.trim()
+    }))
+  }
   jadwalList.value.forEach(j => {
     (j.sesi_ruang || []).forEach((s: any) => {
       list.push({
@@ -339,7 +371,7 @@ onUnmounted(() => {
             <span>Kontrol Sesi Ujian</span>
           </h1>
           <p class="text-sm text-slate-500">
-            Monitoring peserta realtime, reset sesi login siswa, buka kunci, dan mulai ujian serentak.
+            {{ isGuru ? 'Verifikasi kehadiran siswa di ruang yang Anda awasi.' : 'Monitoring peserta realtime, reset sesi login siswa, buka kunci, dan mulai ujian serentak.' }}
           </p>
         </div>
 
@@ -352,6 +384,7 @@ onUnmounted(() => {
             <span class="hidden sm:inline">{{ loading ? 'Menyegarkan...' : 'Segarkan' }}</span>
           </button>
           <button
+            v-if="!isGuru"
             @click="promptResetSemuaLoginSesi"
             :disabled="!selectedSesiId || actionLoading"
             class="btn-secondary !min-h-0 !py-2 text-xs border-amber-300 text-amber-700 bg-amber-50/50 hover:bg-amber-100 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -363,6 +396,7 @@ onUnmounted(() => {
             <span class="sm:hidden">Reset login</span><span class="hidden sm:inline">Reset Semua Login</span>
           </button>
           <button
+            v-if="!isGuru"
             @click="showMulaiModal = true"
             :disabled="!selectedSesiId || actionLoading"
             class="btn-primary !min-h-0 !py-2 text-xs bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
@@ -403,7 +437,7 @@ onUnmounted(() => {
               <select
                 id="select-sesi-ruang"
                 v-model="selectedSesiId"
-                @change="fetchSesiDetail"
+                @change="gantiSesi"
                 :disabled="loading || allSessions.length === 0"
                 class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 shadow-2xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-slate-50 disabled:text-slate-400 cursor-pointer"
               >
@@ -502,37 +536,43 @@ onUnmounted(() => {
 
         <!-- Attendance & Participants Table -->
         <div class="mt-5">
-          <div class="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div class="flex items-center gap-3">
-              <h3 class="text-sm font-bold text-slate-800">Daftar Peserta & Presensi</h3>
-              <input
-                v-model="searchKeyword"
-                type="text"
-                placeholder="Cari nama atau NIS siswa..."
-                class="input !min-h-0 !py-1 text-xs w-56"
-              />
-            </div>
-            <div class="flex items-center gap-2">
-            <button
-              v-if="statusCounts.menunggu > 0"
-              type="button"
-              @click="hadirkanYangDiRuangTunggu"
-              class="btn-secondary !min-h-0 !py-2 text-xs"
-              title="Centang Hadir untuk semua siswa yang sudah di ruang tunggu"
-            >
-              <span class="sm:hidden">Hadirkan semua</span><span class="hidden sm:inline">Hadirkan semua di ruang tunggu</span>
-            </button>
-            <button
-              @click="saveKehadiran"
-              :disabled="actionLoading"
-              class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <span v-if="actionLoading" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
-              </svg>
-              <span>{{ actionLoading ? 'Menyimpan Presensi...' : 'Simpan Status Presensi' }}</span>
-            </button>
+          <!-- Mobile: judul di atas; pencarian sejajar dengan tombol (ikon saja) di bawahnya. -->
+          <div class="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">
+            <h3 class="w-full text-sm font-bold text-slate-800 sm:w-auto">Daftar Peserta & Presensi</h3>
+            <input
+              v-model="searchKeyword"
+              type="text"
+              placeholder="Cari nama atau NIS siswa..."
+              aria-label="Cari siswa"
+              class="input !min-h-0 min-w-0 flex-1 !py-1.5 text-xs sm:w-56 sm:flex-none"
+            />
+            <div class="flex items-center gap-2 sm:ml-auto">
+              <button
+                v-if="statusCounts.menunggu > 0"
+                type="button"
+                @click="hadirkanYangDiRuangTunggu"
+                class="btn-secondary !min-h-0 !px-2.5 !py-2 text-xs"
+                title="Centang Hadir untuk semua siswa yang sudah di ruang tunggu"
+                aria-label="Hadirkan semua di ruang tunggu"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 sm:hidden" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <span class="hidden sm:inline">Hadirkan semua di ruang tunggu</span>
+              </button>
+              <button
+                @click="saveKehadiran"
+                :disabled="actionLoading"
+                class="btn-secondary !min-h-0 !px-2.5 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 sm:!px-4"
+                title="Simpan status presensi"
+                aria-label="Simpan status presensi"
+              >
+                <span v-if="actionLoading" class="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-transparent"></span>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+                </svg>
+                <span class="hidden sm:inline">{{ actionLoading ? 'Menyimpan Presensi...' : 'Simpan Status Presensi' }}</span>
+              </button>
             </div>
           </div>
 
@@ -558,7 +598,7 @@ onUnmounted(() => {
                   <th class="p-3">Nama Siswa</th>
                   <th class="p-3">Kelas</th>
                   <th class="p-3">Status Ujian</th>
-                  <th class="p-3 text-right">Aksi</th>
+                  <th v-if="!isGuru" class="p-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
@@ -586,7 +626,7 @@ onUnmounted(() => {
                       {{ getStatusBadge(p.status).text }}
                     </span>
                   </td>
-                  <td class="p-3 text-right">
+                  <td v-if="!isGuru" class="p-3 text-right">
                     <div class="flex items-center justify-end gap-1.5 flex-wrap">
                       <button
                         v-if="['belum_login', 'menunggu'].includes(p.status)"

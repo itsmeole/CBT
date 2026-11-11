@@ -83,7 +83,8 @@ export function buatMenu(role: Role | null): MenuItem[] {
       visible: operatorAtauSuperadmin || guruAtauSuperadmin,
       anak: TAB_JADWAL
     },
-    { nama: 'Kontrol Sesi', to: '/staf/kontrol-sesi', ikon: 'control', visible: operatorAtauSuperadmin },
+    // Guru melihatnya untuk memverifikasi kehadiran di ruang yang ia awasi.
+    { nama: 'Kontrol Sesi', to: '/staf/kontrol-sesi', ikon: 'control', visible: true },
     { nama: 'Monitoring Pengawas', to: '/staf/monitoring', ikon: 'control', visible: true },
     { nama: 'Koreksi Essay', to: '/staf/koreksi-essay', ikon: 'book', visible: true },
     { nama: 'Rekap Nilai', to: '/staf/nilai', ikon: 'dashboard', visible: true },

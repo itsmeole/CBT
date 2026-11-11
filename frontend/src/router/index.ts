@@ -82,7 +82,7 @@ export const router = createRouter({
       path: '/staf/kontrol-sesi',
       name: 'staf-kontrol-sesi',
       component: () => import('@/views/staf/KontrolSesiOperatorView.vue'),
-      meta: { roles: ['superadmin', 'operator'] }
+      meta: { roles: ['superadmin', 'operator', 'guru'] }
     },
     {
       path: '/staf/monitoring',

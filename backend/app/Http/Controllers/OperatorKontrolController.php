@@ -8,6 +8,7 @@ use App\Models\BankSoal;
 use App\Models\PesertaUjian;
 use App\Models\SesiRuang;
 use App\Services\AuditLogService;
+use App\Services\OtorisasiCbtService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,14 +17,17 @@ use Illuminate\Support\Str;
 
 class OperatorKontrolController extends Controller
 {
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly OtorisasiCbtService $otorisasi,
+    ) {}
 
     /**
      * Ambil data sesi ruang beserta daftar peserta dan statusnya.
      */
     public function getPeserta(Request $request, int $sesiRuangId): JsonResponse
     {
-        $this->ensureOperatorOrSuperadmin($request);
+        $this->ensureBolehKelolaKehadiran($request, $sesiRuangId);
 
         $sesi = SesiRuang::with([
             'ruang',
@@ -37,11 +41,11 @@ class OperatorKontrolController extends Controller
     }
 
     /**
-     * Verifikasi kehadiran peserta ujian (Hanya Operator & Superadmin).
+     * Verifikasi kehadiran peserta ujian: Operator, Superadmin, atau Guru yang ditugaskan mengawasi sesi ini.
      */
     public function setKehadiran(Request $request, int $sesiRuangId): JsonResponse
     {
-        $this->ensureOperatorOrSuperadmin($request);
+        $this->ensureBolehKelolaKehadiran($request, $sesiRuangId);
 
         $validated = $request->validate([
             'kehadiran' => 'required|array',
@@ -274,6 +278,20 @@ class OperatorKontrolController extends Controller
             'urutan_soal' => $urutanSoalIds,
             'urutan_opsi' => $urutanOpsiMap,
         ]);
+    }
+
+    /** Melihat peserta dan memverifikasi kehadiran: operator/superadmin, atau guru yang mengawasi sesi tersebut. */
+    private function ensureBolehKelolaKehadiran(Request $request, int $sesiRuangId): void
+    {
+        if (in_array($request->user()->role, ['operator', 'superadmin'], true)) {
+            return;
+        }
+
+        if (! $this->otorisasi->bolehAwasiSesi($request->user(), $sesiRuangId)) {
+            abort(response()->json([
+                'error' => ['code' => 'FORBIDDEN', 'message' => 'Anda tidak ditugaskan mengawasi sesi ini.'],
+            ], 403));
+        }
     }
 
     private function ensureOperatorOrSuperadmin(Request $request): void

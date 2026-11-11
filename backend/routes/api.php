@@ -54,6 +54,12 @@ Route::prefix('v1')->group(function () {
             Route::put('lock-threshold', [PengawasanController::class, 'updateAmbangKunci']);
         });
 
+        // Verifikasi kehadiran per ruang: Operator/Superadmin, atau Guru yang ditugaskan mengawasi sesi itu.
+        Route::middleware('role:guru,operator,superadmin')->group(function () {
+            Route::get('sesi-ruang/{id}/peserta', [OperatorKontrolController::class, 'getPeserta']);
+            Route::post('sesi-ruang/{id}/kehadiran', [OperatorKontrolController::class, 'setKehadiran']);
+        });
+
         Route::middleware('role:guru,superadmin,operator')->group(function () {
             Route::get('koreksi/essay', [KoreksiEssayController::class, 'index']);
             Route::put('koreksi/essay/{jawabanId}', [KoreksiEssayController::class, 'update']);
@@ -85,8 +91,6 @@ Route::prefix('v1')->group(function () {
             Route::post('sesi-ruang/{id}/pengawas', [JadwalController::class, 'plotPengawas']);
             Route::post('sesi-ruang/{id}/token/generate', [JadwalController::class, 'generateToken']);
 
-            Route::get('sesi-ruang/{id}/peserta', [OperatorKontrolController::class, 'getPeserta']);
-            Route::post('sesi-ruang/{id}/kehadiran', [OperatorKontrolController::class, 'setKehadiran']);
             Route::post('sesi-ruang/{id}/mulai', [OperatorKontrolController::class, 'mulaiSesi']);
             Route::post('peserta/{id}/mulai', [OperatorKontrolController::class, 'mulaiPeserta']);
         });

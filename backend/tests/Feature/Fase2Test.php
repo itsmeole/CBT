@@ -252,6 +252,33 @@ class Fase2Test extends TestCase
             ->assertForbidden();
     }
 
+    public function test_supervising_teacher_can_verify_attendance_in_own_room_only_and_still_cannot_start_the_exam(): void
+    {
+        $fixture = $this->createFixture('menunggu');
+        $fixture['participant']->update(['hadir' => false]);
+        PengawasSesi::create(['sesi_ruang_id' => $fixture['session']->id, 'guru_id' => $fixture['teacher']->id]);
+        $lainUser = User::factory()->role('guru')->create();
+        Guru::create(['user_id' => $lainUser->id]);
+        $url = "/api/v1/sesi-ruang/{$fixture['session']->id}";
+
+        // Guru pengawas melihat peserta dan memverifikasi kehadiran.
+        $this->actingAs($fixture['teacherUser'], 'sanctum')->getJson("{$url}/peserta")->assertOk()->assertJsonCount(1, 'data.peserta_ujian');
+        $this->actingAs($fixture['teacherUser'], 'sanctum')
+            ->postJson("{$url}/kehadiran", ['kehadiran' => [['peserta_id' => $fixture['participant']->id, 'hadir' => true]]])
+            ->assertOk();
+        $this->assertDatabaseHas('peserta_ujian', ['id' => $fixture['participant']->id, 'hadir' => true]);
+
+        // Guru yang tidak mengawasi ruang ini ditolak.
+        $this->actingAs($lainUser, 'sanctum')->getJson("{$url}/peserta")->assertForbidden();
+        $this->actingAs($lainUser, 'sanctum')
+            ->postJson("{$url}/kehadiran", ['kehadiran' => [['peserta_id' => $fixture['participant']->id, 'hadir' => false]]])
+            ->assertForbidden();
+        $this->assertDatabaseHas('peserta_ujian', ['id' => $fixture['participant']->id, 'hadir' => true]);
+
+        // Memulai ujian tetap hanya untuk operator/superadmin.
+        $this->actingAs($fixture['teacherUser'], 'sanctum')->postJson("{$url}/mulai")->assertForbidden();
+    }
+
     public function test_expired_exam_state_submits_and_notifies_student_and_supervisor_channels(): void
     {
         Event::fake();
