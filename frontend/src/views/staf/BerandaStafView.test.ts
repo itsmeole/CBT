@@ -44,10 +44,9 @@ function guru(ubah: Partial<PanelGuru> = {}): PanelGuru {
     koreksi: { total: 5, jumlah_jadwal: 1, per_jadwal: [{ jadwal_id: 3, nama: 'UTS IPA', mapel: 'IPA', tanggal: '2026-11-09', menunggu: 5 }] },
     pengawasan: {
       sesi: [
-        { id: 1, jadwal: 'UTS IPA', mapel: 'IPA', ruang: 'Lab 1', tanggal: TANGGAL, sesi_ke: 1, jam_mulai: '08:00', jam_akhir: '09:30', hari_ini: true, berita_acara: false },
-        { id: 2, jadwal: 'UAS IPA', mapel: 'IPA', ruang: 'Lab 2', tanggal: '2026-11-12', sesi_ke: 1, jam_mulai: '08:00', jam_akhir: '09:30', hari_ini: false, berita_acara: false }
+        { id: 1, jadwal: 'UTS IPA', mapel: 'IPA', ruang: 'Lab 1', tanggal: TANGGAL, sesi_ke: 1, jam_mulai: '08:00', jam_akhir: '09:30', hari_ini: true },
+        { id: 2, jadwal: 'UAS IPA', mapel: 'IPA', ruang: 'Lab 2', tanggal: '2026-11-12', sesi_ke: 1, jam_mulai: '08:00', jam_akhir: '09:30', hari_ini: false }
       ],
-      berita_acara_tertunggak: 1
     },
     jadwal_saya: [
       { jadwal_id: 3, nama: 'UTS IPA', mapel: 'IPA', tanggal: TANGGAL, paket: 'Paket UTS', jumlah_butir: 40 },
@@ -147,7 +146,7 @@ describe('Dashboard operator', () => {
 })
 
 describe('Dashboard guru', () => {
-  it('menampilkan antrean koreksi, tugas pengawasan, dan peringatan berita acara tertunggak', async () => {
+  it('menampilkan antrean koreksi, dan tugas pengawasan', async () => {
     get.mockResolvedValue(respons('guru', { guru: guru() }))
     const wrapper = await pasang('guru')
     const teks = wrapper.text()
@@ -158,9 +157,7 @@ describe('Dashboard guru', () => {
     expect(wrapper.find('a[href="/staf/koreksi-essay"]').exists()).toBe(true)
     expect(teks).toContain('Tugas pengawasan saya')
     expect(teks).toContain('Hari ini')
-    expect(teks).toContain('1 sesi yang sudah lewat belum memiliki berita acara.')
-    // Tautan isi berita acara hanya untuk sesi hari ini yang belum terisi.
-    expect(wrapper.findAll('a').filter((a) => a.text().includes('Isi berita acara'))).toHaveLength(1)
+    expect(teks).not.toContain('berita acara')
     wrapper.unmount()
   })
 
@@ -182,7 +179,7 @@ describe('Dashboard guru', () => {
       respons('guru', {
         guru: guru({
           koreksi: { total: 0, jumlah_jadwal: 0, per_jadwal: [] },
-          pengawasan: { sesi: [], berita_acara_tertunggak: 0 },
+          pengawasan: { sesi: [] },
           jadwal_saya: [],
           hasil_terbaru: []
         })

@@ -81,9 +81,7 @@ export interface PanelGuru {
       jam_mulai: string
       jam_akhir: string
       hari_ini: boolean
-      berita_acara: boolean
     }[]
-    berita_acara_tertunggak: number
   }
   jadwal_saya: { jadwal_id: number; nama: string; mapel: string | null; tanggal: string; paket: string | null; jumlah_butir: number }[]
   hasil_terbaru: { jadwal_id: number; nama: string; mapel: string; tanggal: string; final: number; menunggu: number; rata_rata: number | null }[]
@@ -181,7 +179,6 @@ const LABEL_AKSI: Record<string, string> = {
   'ujian.dikirim_otomatis': 'Ujian dikirim otomatis (waktu habis)',
   'sesi.kehadiran_diperbarui': 'Memperbarui kehadiran',
   'essay.dikoreksi': 'Mengoreksi essay',
-  'berita_acara.disimpan': 'Menyimpan berita acara',
   'laporan_pdf.diminta': 'Meminta dokumen PDF',
   'lock_threshold.updated': 'Mengubah ambang kunci',
   'import.excel.diajukan': 'Mengimpor data Excel',

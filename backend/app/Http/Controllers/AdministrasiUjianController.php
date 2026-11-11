@@ -2,73 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SimpanBeritaAcaraRequest;
-use App\Models\BeritaAcara;
 use App\Models\LogAktivitas;
-use App\Models\SesiRuang;
-use App\Services\AuditLogService;
-use App\Services\OtorisasiCbtService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class AdministrasiUjianController extends Controller
 {
-    public function __construct(
-        private readonly AuditLogService $auditLog,
-        private readonly OtorisasiCbtService $otorisasi,
-    ) {}
-
-    public function beritaAcara(Request $request, int $sesiRuangId): JsonResponse
-    {
-        if (! $this->otorisasi->bolehAwasiSesi($request->user(), $sesiRuangId)) {
-            return $this->error('FORBIDDEN', 'Anda tidak ditugaskan mengawasi sesi ini.', 403);
-        }
-
-        $beritaAcara = BeritaAcara::query()
-            ->with(['pengawas:id,name', 'sesiRuang.ruang', 'sesiRuang.jadwalUjian'])
-            ->where('sesi_ruang_id', $sesiRuangId)
-            ->first();
-
-        return response()->json(['data' => $beritaAcara]);
-    }
-
-    public function simpanBeritaAcara(SimpanBeritaAcaraRequest $request, int $sesiRuangId): JsonResponse
-    {
-        if (! $this->otorisasi->bolehAwasiSesi($request->user(), $sesiRuangId)) {
-            return $this->error('FORBIDDEN', 'Anda tidak ditugaskan mengawasi sesi ini.', 403);
-        }
-
-        $sesi = SesiRuang::query()->withCount([
-            'pesertaUjian as jumlah_hadir' => fn ($query) => $query->where('hadir', true),
-            'pesertaUjian as jumlah_absen' => fn ($query) => $query->where('hadir', false),
-        ])->findOrFail($sesiRuangId);
-
-        $beritaAcara = DB::transaction(function () use ($request, $sesiRuangId, $sesi): BeritaAcara {
-            $beritaAcara = BeritaAcara::query()->updateOrCreate(
-                ['sesi_ruang_id' => $sesiRuangId],
-                [
-                    'pengawas_id' => $request->user()->id,
-                    'isi' => $request->validated('isi'),
-                    'jumlah_hadir' => $sesi->jumlah_hadir,
-                    'jumlah_absen' => $sesi->jumlah_absen,
-                ],
-            );
-            $this->auditLog->record(
-                $request->user(),
-                'berita_acara.disimpan',
-                'sesi_ruang',
-                $sesiRuangId,
-                ['jumlah_hadir' => $sesi->jumlah_hadir, 'jumlah_absen' => $sesi->jumlah_absen],
-                $request,
-            );
-
-            return $beritaAcara;
-        });
-
-        return response()->json(['data' => $beritaAcara], $beritaAcara->wasRecentlyCreated ? 201 : 200);
-    }
-
     public function logAktivitas(Request $request): JsonResponse
     {
         $filters = $request->validate([
@@ -95,10 +34,5 @@ class AdministrasiUjianController extends Controller
             ->paginate($filters['per_page'] ?? 50);
 
         return response()->json($rows);
-    }
-
-    private function error(string $code, string $message, int $status): JsonResponse
-    {
-        return response()->json(['error' => ['code' => $code, 'message' => $message]], $status);
     }
 }

@@ -20,7 +20,7 @@ const keteranganKoreksi = computed(() => {
 
 <template>
   <div class="space-y-4" aria-label="Panel guru">
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
       <DashAngka
         label="Essay menunggu koreksi"
         :nilai="data.koreksi.total"
@@ -34,13 +34,6 @@ const keteranganKoreksi = computed(() => {
         :keterangan="`${data.pengawasan.sesi.length} sesi mendatang`"
         :nada="sesiHariIni > 0 ? 'info' : 'netral'"
         tautan="/staf/monitoring"
-      />
-      <DashAngka
-        label="Berita acara tertunggak"
-        :nilai="data.pengawasan.berita_acara_tertunggak"
-        keterangan="30 hari terakhir"
-        :nada="data.pengawasan.berita_acara_tertunggak > 0 ? 'bahaya' : 'baik'"
-        tautan="/staf/berita-acara"
       />
       <DashAngka label="Ujian mapel saya" :nilai="data.jadwal_saya.length" keterangan="jadwal mendatang" tautan="/staf/jadwal?tab=jadwal" />
     </div>
@@ -102,16 +95,8 @@ const keteranganKoreksi = computed(() => {
                 </p>
                 <p class="text-xs text-slate-500">{{ labelHari(s.tanggal, hariIni) }} - {{ s.ruang }} (sesi {{ s.sesi_ke }})</p>
               </div>
-              <div class="flex items-center gap-2 text-xs">
-                <span v-if="s.berita_acara" class="rounded-full px-2 py-0.5 font-semibold" :class="KELAS_NADA.baik">BA terisi</span>
-                <RouterLink v-else-if="s.hari_ini" to="/staf/berita-acara" class="font-semibold text-brand-600 hover:underline">Isi berita acara →</RouterLink>
-              </div>
             </li>
           </ul>
-          <p v-if="data.pengawasan.berita_acara_tertunggak > 0" class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-            {{ data.pengawasan.berita_acara_tertunggak }} sesi yang sudah lewat belum memiliki berita acara.
-            <RouterLink to="/staf/berita-acara" class="font-bold underline">Lengkapi</RouterLink>
-          </p>
         </DashKartu>
 
         <DashKartu judul="Antrean koreksi essay" :keterangan="keteranganKoreksi" tautan="/staf/koreksi-essay" label-tautan="Mulai koreksi">

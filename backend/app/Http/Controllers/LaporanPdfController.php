@@ -22,18 +22,18 @@ class LaporanPdfController extends Controller
 
     public function store(Request $request, string $jenis): JsonResponse
     {
-        if (! in_array($jenis, ['kartu-peserta', 'daftar-hadir', 'daftar-hadir-semua', 'berita-acara', 'rekap-nilai'], true)) {
+        if (! in_array($jenis, ['daftar-hadir', 'daftar-hadir-semua', 'rekap-nilai'], true)) {
             return $this->error('NOT_FOUND', 'Jenis laporan PDF tidak ditemukan.', 404);
         }
 
         $validated = $request->validate([
             'jadwal_id' => [
-                in_array($jenis, ['kartu-peserta', 'rekap-nilai', 'daftar-hadir-semua'], true) ? 'required' : 'prohibited',
+                in_array($jenis, ['rekap-nilai', 'daftar-hadir-semua'], true) ? 'required' : 'prohibited',
                 'integer',
                 'exists:jadwal_ujian,id',
             ],
             'sesi_ruang_id' => [
-                in_array($jenis, ['daftar-hadir', 'berita-acara'], true) ? 'required' : 'prohibited',
+                $jenis === 'daftar-hadir' ? 'required' : 'prohibited',
                 'integer',
                 'exists:sesi_ruang,id',
             ],
@@ -42,10 +42,6 @@ class LaporanPdfController extends Controller
         $jadwalId = isset($validated['jadwal_id']) ? (int) $validated['jadwal_id'] : null;
         $sesiId = isset($validated['sesi_ruang_id']) ? (int) $validated['sesi_ruang_id'] : null;
         $kelasId = isset($validated['kelas_id']) ? (int) $validated['kelas_id'] : null;
-
-        if ($jenis === 'kartu-peserta' && ! in_array($request->user()->role, ['operator', 'superadmin'], true)) {
-            return $this->error('FORBIDDEN', 'Hanya Operator atau Superadmin yang dapat mencetak kartu peserta.', 403);
-        }
 
         if ($jenis === 'daftar-hadir-semua' && ! in_array($request->user()->role, ['operator', 'superadmin'], true)) {
             return $this->error('FORBIDDEN', 'Hanya Operator atau Superadmin yang dapat mencetak daftar hadir semua ruang.', 403);
@@ -59,7 +55,7 @@ class LaporanPdfController extends Controller
             }
         }
 
-        if (in_array($jenis, ['daftar-hadir', 'berita-acara'], true)
+        if ($jenis === 'daftar-hadir'
             && ! $this->otorisasi->bolehAwasiSesi($request->user(), $sesiId)) {
             return $this->error('FORBIDDEN', 'Anda tidak ditugaskan mengawasi sesi ini.', 403);
         }

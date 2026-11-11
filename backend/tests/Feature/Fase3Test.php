@@ -14,7 +14,6 @@ use App\Models\Mapel;
 use App\Models\Nilai;
 use App\Models\PaketSoal;
 use App\Models\PaketSoalItem;
-use App\Models\PengawasSesi;
 use App\Models\PesertaUjian;
 use App\Models\Ruang;
 use App\Models\SesiRuang;
@@ -28,51 +27,6 @@ use Tests\TestCase;
 class Fase3Test extends TestCase
 {
     use RefreshDatabase;
-
-    public function test_supervisor_can_save_auditable_minutes_with_attendance_counts_calculated_by_server(): void
-    {
-        $fixture = $this->createFixture();
-        $supervisor = User::factory()->role('guru')->create();
-        $supervisorGuru = Guru::create(['user_id' => $supervisor->id]);
-        PengawasSesi::create([
-            'sesi_ruang_id' => $fixture['session']->id,
-            'guru_id' => $supervisorGuru->id,
-        ]);
-        $absentUser = User::factory()->role('siswa')->create();
-        $absentStudent = Siswa::create([
-            'user_id' => $absentUser->id,
-            'nis' => '20261002',
-            'kelas_id' => $fixture['class']->id,
-        ]);
-        PesertaUjian::create([
-            'siswa_id' => $absentStudent->id,
-            'sesi_ruang_id' => $fixture['session']->id,
-            'status' => 'belum_login',
-            'hadir' => false,
-        ]);
-
-        $this->actingAs($supervisor, 'sanctum')
-            ->postJson("/api/v1/sesi-ruang/{$fixture['session']->id}/berita-acara", [
-                'isi' => 'Ujian berlangsung tertib.',
-                'jumlah_hadir' => 999,
-                'jumlah_absen' => 0,
-            ])
-            ->assertCreated()
-            ->assertJsonPath('data.jumlah_hadir', 1)
-            ->assertJsonPath('data.jumlah_absen', 1);
-
-        $this->assertDatabaseHas('berita_acara', [
-            'sesi_ruang_id' => $fixture['session']->id,
-            'pengawas_id' => $supervisor->id,
-            'jumlah_hadir' => 1,
-            'jumlah_absen' => 1,
-        ]);
-        $this->assertDatabaseHas('log_aktivitas', [
-            'user_id' => $supervisor->id,
-            'aksi' => 'berita_acara.disimpan',
-            'target_id' => $fixture['session']->id,
-        ]);
-    }
 
     public function test_audit_log_is_read_only_and_superadmin_can_filter_records(): void
     {
@@ -201,14 +155,14 @@ class Fase3Test extends TestCase
         $operator = User::factory()->role('operator')->create();
 
         $response = $this->actingAs($operator, 'sanctum')
-            ->postJson('/api/v1/laporan-pdf/kartu-peserta', ['jadwal_id' => $fixture['schedule']->id])
+            ->postJson('/api/v1/laporan-pdf/rekap-nilai', ['jadwal_id' => $fixture['schedule']->id])
             ->assertStatus(202);
 
         $reportId = $response->json('data.id');
         $this->assertDatabaseHas('laporan_pdf', [
             'id' => $reportId,
             'diminta_oleh' => $operator->id,
-            'jenis' => 'kartu-peserta',
+            'jenis' => 'rekap-nilai',
             'status' => 'completed',
         ]);
         $storedPath = LaporanPdf::findOrFail($reportId)->file_path;
@@ -223,6 +177,12 @@ class Fase3Test extends TestCase
             ->get("/api/v1/laporan-pdf/{$reportId}")
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+
+        foreach (['kartu-peserta', 'berita-acara'] as $jenisDihapus) {
+            $this->actingAs($operator, 'sanctum')
+                ->postJson("/api/v1/laporan-pdf/{$jenisDihapus}", ['jadwal_id' => $fixture['schedule']->id])
+                ->assertNotFound();
+        }
     }
 
     private function createFixture(): array

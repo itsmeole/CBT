@@ -9,7 +9,7 @@ const Kosong = { render: () => null }
 async function pasang(path: string, collapsed = false, role: 'operator' | 'guru' = 'operator') {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: ['/staf', '/staf/master', '/staf/jadwal', '/staf/bank-soal', '/staf/kontrol-sesi', '/staf/monitoring', '/staf/koreksi-essay', '/staf/nilai', '/staf/analisis-butir', '/staf/berita-acara', '/staf/cetak', '/staf/audit-log'].map(
+    routes: ['/staf', '/staf/master', '/staf/jadwal', '/staf/bank-soal', '/staf/kontrol-sesi', '/staf/monitoring', '/staf/koreksi-essay', '/staf/nilai', '/staf/analisis-butir', '/staf/cetak', '/staf/audit-log'].map(
       (p) => ({ path: p, component: Kosong })
     )
   })

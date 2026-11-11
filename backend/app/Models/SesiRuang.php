@@ -57,9 +57,4 @@ class SesiRuang extends Model
     {
         return $this->hasMany(PesertaUjian::class);
     }
-
-    public function beritaAcara()
-    {
-        return $this->hasOne(BeritaAcara::class);
-    }
 }

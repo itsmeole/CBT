@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\BankSoal;
-use App\Models\BeritaAcara;
 use App\Models\Guru;
 use App\Models\GuruMapel;
 use App\Models\JadwalUjian;
@@ -257,23 +256,18 @@ class DashboardTest extends TestCase
         $hariIni = $this->sesi($this->jadwal($this->hariIni, null, 'Hari Ini'));
         $lusa = $this->sesi($this->jadwal($besok, null, 'Besok'));
         $orangLain = $this->sesi($this->jadwal($this->hariIni, null, 'Milik Orang Lain'));
-        $lalu = $this->sesi($this->jadwal($kemarin, null, 'Kemarin Tanpa BA'));
-        $laluBa = $this->sesi($this->jadwal($kemarin, null, 'Kemarin Dengan BA'));
+        $lalu = $this->sesi($this->jadwal($kemarin, null, 'Kemarin'));
         $lainGuru = Guru::create(['user_id' => User::factory()->role('guru')->create()->id]);
-        foreach ([$hariIni, $lusa, $lalu, $laluBa] as $s) {
+        foreach ([$hariIni, $lusa, $lalu] as $s) {
             PengawasSesi::create(['sesi_ruang_id' => $s->id, 'guru_id' => $this->guru->id]);
         }
         PengawasSesi::create(['sesi_ruang_id' => $orangLain->id, 'guru_id' => $lainGuru->id]);
-        BeritaAcara::query()->forceCreate(['sesi_ruang_id' => $hariIni->id, 'pengawas_id' => $this->guruUser->id, 'isi' => 'tertib', 'jumlah_hadir' => 0, 'jumlah_absen' => 0]);
-        BeritaAcara::query()->forceCreate(['sesi_ruang_id' => $laluBa->id, 'pengawas_id' => $this->guruUser->id, 'isi' => 'tertib', 'jumlah_hadir' => 0, 'jumlah_absen' => 0]);
 
         $pengawasan = $this->actingAs($this->guruUser, 'sanctum')->getJson('/api/v1/dashboard')->json('data.guru.pengawasan');
 
         $this->assertSame(['Hari Ini', 'Besok'], array_column($pengawasan['sesi'], 'jadwal'));
         $this->assertTrue($pengawasan['sesi'][0]['hari_ini']);
-        $this->assertTrue($pengawasan['sesi'][0]['berita_acara']);
-        $this->assertFalse($pengawasan['sesi'][1]['berita_acara']);
-        $this->assertSame(1, $pengawasan['berita_acara_tertunggak']);
+        $this->assertArrayNotHasKey('berita_acara_tertunggak', $pengawasan);
     }
 
     public function test_teacher_upcoming_schedules_and_recent_results_are_scoped_to_own_subjects(): void

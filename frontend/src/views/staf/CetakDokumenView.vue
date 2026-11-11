@@ -27,7 +27,7 @@ const feedback = ref('')
 
 const basis = computed(() => basisLaporan(jenis.value))
 const siap = computed(() => (basis.value === 'jadwal' ? jadwalId.value !== null : sesiId.value !== null))
-const pakaiKelas = computed(() => jenis.value === 'kartu-peserta' || jenis.value === 'rekap-nilai')
+const pakaiKelas = computed(() => jenis.value === 'rekap-nilai')
 
 async function muat() {
   try {
@@ -91,7 +91,7 @@ onMounted(muat)
     <div class="mx-auto max-w-2xl space-y-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Cetak Dokumen</h1>
-        <p class="text-sm text-slate-500">Buat PDF kartu peserta, daftar hadir (per sesi atau semua ruang), berita acara, dan rekap nilai. Dokumen dibuat di latar belakang lalu diunduh otomatis.</p>
+        <p class="text-sm text-slate-500">Buat PDF daftar hadir (per sesi atau semua ruang) dan rekap nilai. Dokumen dibuat di latar belakang lalu diunduh otomatis.</p>
       </div>
 
       <div v-if="errorMessage" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{{ errorMessage }}</div>

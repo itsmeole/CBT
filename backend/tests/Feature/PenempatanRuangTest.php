@@ -292,11 +292,12 @@ class PenempatanRuangTest extends TestCase
         $metode = new ReflectionMethod(GenerateLaporanPdf::class, 'daftarHadir');
         $html = $metode->invoke(new GenerateLaporanPdf($laporan->id), $laporan);
 
-        $this->assertStringContainsString($this->guruUser->name, $html);
-        $this->assertStringContainsString('Matematika (10:00-11:30, R2)', $html, 'Penugasan lain pengawas di hari yang sama harus tampil.');
+        $this->assertStringContainsString($this->guruUser->name, $html, 'Pengawas ruang tercantum.');
         $this->assertStringContainsString('08:00 - 09:30', $html);
         $this->assertStringContainsString('Selasa, 10 November 2026', $html);
-        $this->assertStringContainsString('Hadir: 1', $html);
+        $this->assertStringContainsString('Tanda tangan', $html);
+        $this->assertStringNotContainsString('Tidak hadir', $html, 'Daftar hadir cetak berupa tabel nama kosong untuk ditandatangani, tanpa status kehadiran.');
+        $this->assertStringNotContainsString('Penugasan lain', $html);
     }
 
     public function test_attendance_list_for_all_rooms_contains_every_room_of_the_schedule_and_is_operator_only(): void
@@ -320,8 +321,7 @@ class PenempatanRuangTest extends TestCase
         $this->assertSame(2, substr_count($html, 'Daftar Hadir Peserta Ujian'), 'Satu bagian per ruang.');
         $this->assertStringContainsString('R1', $html);
         $this->assertStringContainsString('R2', $html);
-        $this->assertStringContainsString('Hadir: 1', $html);
-        $this->assertStringContainsString('Tidak hadir: 1', $html);
+        $this->assertStringContainsString('Tanda tangan', $html);
     }
 
     public function test_pdf_jobs_use_the_configured_queue(): void

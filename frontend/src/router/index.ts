@@ -103,12 +103,6 @@ export const router = createRouter({
       meta: { roles: ['superadmin', 'operator', 'guru'] }
     },
     {
-      path: '/staf/berita-acara',
-      name: 'staf-berita-acara',
-      component: () => import('@/views/staf/BeritaAcaraView.vue'),
-      meta: { roles: ['superadmin', 'operator', 'guru'] }
-    },
-    {
       path: '/staf/cetak',
       name: 'staf-cetak',
       component: () => import('@/views/staf/CetakDokumenView.vue'),

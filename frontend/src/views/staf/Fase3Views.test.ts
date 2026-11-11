@@ -27,7 +27,6 @@ vi.mock('@/components/StafLayout.vue', async () => {
 import { useAuthStore } from '@/stores/auth'
 import AnalisisButirView from './AnalisisButirView.vue'
 import AuditLogView from './AuditLogView.vue'
-import BeritaAcaraView from './BeritaAcaraView.vue'
 import CetakDokumenView from './CetakDokumenView.vue'
 
 const sesi = [{ id: 7, jadwal: 'UTS', mapel: 'IPA', ruang: 'Lab 1', tanggal: '2026-11-10', sesi_ke: 1 }]
@@ -45,54 +44,6 @@ beforeEach(() => {
   post.mockReset()
   put.mockReset()
   cetakLaporan.mockReset().mockResolvedValue(undefined)
-})
-
-describe('BeritaAcaraView', () => {
-  it('menyimpan baru dengan POST, lalu memperbarui dengan PUT, dan membuka tombol cetak', async () => {
-    get.mockImplementation((url: string) => {
-      if (url === '/pengawasan/sesi') return Promise.resolve({ data: { data: sesi } })
-      if (url === '/sesi-ruang/7/berita-acara') return Promise.resolve({ data: { data: null } })
-      return Promise.reject(new Error(url))
-    })
-    post.mockResolvedValue({ data: { data: { isi: 'Tertib', jumlah_hadir: 30, jumlah_absen: 2 } } })
-    put.mockResolvedValue({ data: { data: { isi: 'Tertib sekali', jumlah_hadir: 30, jumlah_absen: 2 } } })
-
-    const wrapper = mount(BeritaAcaraView, { global: { plugins: [pinia('guru')] } })
-    await flushPromises()
-
-    const tombol = (teks: string) => wrapper.findAll('button').find((b) => b.text().includes(teks))!
-    expect(tombol('Simpan Berita Acara').attributes('disabled')).toBeDefined()
-    expect(tombol('Cetak PDF').attributes('disabled')).toBeDefined()
-
-    await wrapper.find('textarea').setValue('abc')
-    expect(tombol('Simpan Berita Acara').attributes('disabled')).toBeDefined()
-    await wrapper.find('textarea').setValue('Ujian tertib')
-    await tombol('Simpan Berita Acara').trigger('click')
-    await flushPromises()
-
-    expect(post).toHaveBeenCalledWith('/sesi-ruang/7/berita-acara', { isi: 'Ujian tertib' })
-    expect(wrapper.text()).toContain('30')
-    expect(wrapper.text()).toContain('dihitung otomatis oleh sistem')
-    expect(tombol('Cetak PDF').attributes('disabled')).toBeUndefined()
-
-    await wrapper.find('textarea').setValue('Ujian tertib sekali')
-    await tombol('Perbarui Berita Acara').trigger('click')
-    await flushPromises()
-    expect(put).toHaveBeenCalledWith('/sesi-ruang/7/berita-acara', { isi: 'Ujian tertib sekali' })
-
-    await tombol('Cetak PDF').trigger('click')
-    await flushPromises()
-    expect(cetakLaporan).toHaveBeenCalledWith('berita-acara', { sesi_ruang_id: 7 })
-    wrapper.unmount()
-  })
-
-  it('memberi tahu pengawas yang belum punya sesi', async () => {
-    get.mockResolvedValue({ data: { data: [] } })
-    const wrapper = mount(BeritaAcaraView, { global: { plugins: [pinia('guru')] } })
-    await flushPromises()
-    expect(wrapper.text()).toContain('belum ditugaskan')
-    wrapper.unmount()
-  })
 })
 
 describe('CetakDokumenView', () => {
@@ -124,16 +75,16 @@ describe('CetakDokumenView', () => {
     wrapper.unmount()
   })
 
-  it('operator mencetak kartu peserta per jadwal dengan filter kelas', async () => {
+  it('operator mencetak rekap nilai per jadwal dengan filter kelas', async () => {
     const wrapper = mount(CetakDokumenView, { global: { plugins: [pinia('operator')] } })
     await flushPromises()
-    await wrapper.findAll('select')[0].setValue('kartu-peserta')
+    await wrapper.findAll('select')[0].setValue('rekap-nilai')
     await flushPromises()
     await wrapper.findAll('select')[2].setValue('4')
     await wrapper.findAll('button').find((b) => b.text().includes('Buat & Unduh PDF'))!.trigger('click')
     await flushPromises()
 
-    expect(cetakLaporan.mock.calls[0][0]).toBe('kartu-peserta')
+    expect(cetakLaporan.mock.calls[0][0]).toBe('rekap-nilai')
     expect(cetakLaporan.mock.calls[0][1]).toMatchObject({ jadwal_id: 3, kelas_id: 4 })
     wrapper.unmount()
   })

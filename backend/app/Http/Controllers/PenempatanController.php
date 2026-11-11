@@ -156,8 +156,7 @@ class PenempatanController extends Controller
         $sudahMulai = PesertaUjian::whereIn('sesi_ruang_id', $sesiIds)
             ->where(fn ($q) => $q->where('status', '!=', 'belum_login')->orWhere('hadir', true))
             ->exists();
-        $adaBeritaAcara = SesiRuang::whereIn('id', $sesiIds)->whereHas('beritaAcara')->exists();
-        if ($sudahMulai || $adaBeritaAcara) {
+        if ($sudahMulai) {
             return $this->error('IN_USE', 'Penempatan tidak dapat direset karena ujian sudah berjalan atau kehadiran sudah dicatat.', 422);
         }
 
@@ -172,7 +171,7 @@ class PenempatanController extends Controller
 
     /**
      * Hapus jadwal beserta sesi ruang dan penempatannya. Hanya bila ujian belum berjalan: belum ada
-     * peserta yang hadir atau mulai, dan belum ada berita acara. Paket dan soalnya terbuka kembali.
+     * peserta yang hadir atau mulai. Paket dan soalnya terbuka kembali.
      */
     public function destroyJadwal(Request $request, int $jadwalId): JsonResponse
     {
@@ -182,9 +181,8 @@ class PenempatanController extends Controller
         $sudahBerjalan = PesertaUjian::whereIn('sesi_ruang_id', $sesiIds)
             ->where(fn ($q) => $q->where('status', '!=', 'belum_login')->orWhere('hadir', true))
             ->exists();
-        $adaBeritaAcara = SesiRuang::whereIn('id', $sesiIds)->whereHas('beritaAcara')->exists();
-        if ($sudahBerjalan || $adaBeritaAcara) {
-            return $this->error('IN_USE', 'Jadwal tidak dapat dihapus karena ujian sudah berjalan, kehadiran sudah dicatat, atau berita acara sudah dibuat.', 422);
+        if ($sudahBerjalan) {
+            return $this->error('IN_USE', 'Jadwal tidak dapat dihapus karena ujian sudah berjalan atau kehadiran sudah dicatat.', 422);
         }
 
         DB::transaction(function () use ($jadwal, $sesiIds, $request): void {

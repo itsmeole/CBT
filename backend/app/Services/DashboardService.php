@@ -350,27 +350,18 @@ class DashboardService
     }
 
     /**
-     * @return array{sesi: list<array<string, mixed>>, berita_acara_tertunggak: int}
+     * @return array{sesi: list<array<string, mixed>>}
      */
     private function pengawasan(int $guruId, string $hariIni): array
     {
         $sesi = SesiRuang::query()
             ->with(['jadwalUjian.mapel', 'ruang'])
-            ->withExists('beritaAcara')
             ->whereHas('pengawasSesi', fn ($q) => $q->where('guru_id', $guruId))
             ->whereHas('jadwalUjian', fn ($q) => $q->whereDate('tanggal', '>=', $hariIni))
             ->get()
             ->sortBy(fn (SesiRuang $s): string => $s->jadwalUjian?->tanggal?->toDateString().' '.$s->jam_mulai)
             ->take(8)
             ->values();
-
-        $tertunggak = SesiRuang::query()
-            ->whereHas('pengawasSesi', fn ($q) => $q->where('guru_id', $guruId))
-            ->whereHas('jadwalUjian', fn ($q) => $q
-                ->whereDate('tanggal', '<', $hariIni)
-                ->whereDate('tanggal', '>=', CarbonImmutable::parse($hariIni)->subDays(30)->toDateString()))
-            ->whereDoesntHave('beritaAcara')
-            ->count();
 
         return [
             'sesi' => $sesi->map(fn (SesiRuang $s): array => [
@@ -383,9 +374,7 @@ class DashboardService
                 'jam_mulai' => substr((string) $s->jam_mulai, 0, 5),
                 'jam_akhir' => substr((string) $s->jam_akhir, 0, 5),
                 'hari_ini' => $s->jadwalUjian?->tanggal?->toDateString() === $hariIni,
-                'berita_acara' => (bool) $s->berita_acara_exists,
             ])->all(),
-            'berita_acara_tertunggak' => $tertunggak,
         ];
     }
 

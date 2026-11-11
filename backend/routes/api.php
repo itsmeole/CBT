@@ -37,9 +37,6 @@ Route::prefix('v1')->group(function () {
             Route::get('pengawasan/sesi', [PengawasanController::class, 'daftarSesi']);
             Route::get('sesi-ruang/{id}/monitoring', [PengawasanController::class, 'monitoring']);
             Route::post('peserta/{id}/unlock', [PengawasanController::class, 'unlock']);
-            Route::get('sesi-ruang/{id}/berita-acara', [AdministrasiUjianController::class, 'beritaAcara']);
-            Route::post('sesi-ruang/{id}/berita-acara', [AdministrasiUjianController::class, 'simpanBeritaAcara']);
-            Route::put('sesi-ruang/{id}/berita-acara', [AdministrasiUjianController::class, 'simpanBeritaAcara']);
             Route::post('laporan-pdf/{jenis}', [LaporanPdfController::class, 'store']);
             Route::get('laporan-pdf/{laporanId}', [LaporanPdfController::class, 'show'])->whereNumber('laporanId');
         });

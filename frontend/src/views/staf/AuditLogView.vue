@@ -26,7 +26,6 @@ const AKSI = [
   'ujian.dikirim_otomatis',
   'sesi.kehadiran_diperbarui',
   'essay.dikoreksi',
-  'berita_acara.disimpan',
   'laporan_pdf.diminta',
   'lock_threshold.updated',
   'import.excel.diajukan',
