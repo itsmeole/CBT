@@ -1,11 +1,10 @@
 /**
- * Penyimpanan token sesi SISWA per tab browser (sessionStorage), agar refresh halaman ujian tidak mengeluarkan siswa.
+ * Penyimpanan token sesi per tab browser (sessionStorage), agar refresh halaman tidak mengeluarkan pengguna.
  *
- * Pengecualian yang disengaja dari aturan "token hanya di memori": hanya untuk akun siswa, hanya selama tab terbuka
- * (hilang saat tab ditutup), tidak pernah ke localStorage, dan dihapus saat logout atau sesi berakhir.
- * Akun staf tidak pernah disimpan.
+ * Pengecualian yang disengaja dari aturan "token hanya di memori": hanya selama tab terbuka (hilang saat tab
+ * ditutup), tidak pernah ke localStorage, dan dihapus saat logout atau saat server menyatakan sesi berakhir.
  */
-const KUNCI = 'cbt_sesi_siswa'
+const KUNCI = 'cbt_sesi'
 
 export function simpanTokenTab(token: string): void {
   try {

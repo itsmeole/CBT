@@ -241,7 +241,7 @@ class PengawasanController extends Controller
             // Membuka kunci tetap lewat aksi unlock (alasan wajib dan tercatat).
             $pesertaIds = PesertaUjian::query()
                 ->where('siswa_id', $user->siswa->id)
-                ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
+                ->whereIn('status', ['belum_login', 'menunggu', 'mengerjakan', 'terkunci'])
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
                 ->all();

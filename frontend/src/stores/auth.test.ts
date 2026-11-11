@@ -14,7 +14,7 @@ import { useAuthStore } from './auth'
 const siswa = { id: 1, username: 'abc', nama: 'Siswa', role: 'siswa' }
 const operator = { id: 2, username: 'op', nama: 'Operator', role: 'operator' }
 
-describe('auth store: sesi siswa bertahan saat refresh', () => {
+describe('auth store: sesi bertahan saat refresh', () => {
   beforeEach(() => {
     sessionStorage.clear()
     setActivePinia(createPinia())
@@ -23,7 +23,7 @@ describe('auth store: sesi siswa bertahan saat refresh', () => {
     setAuthToken.mockReset()
   })
 
-  it('login siswa menyimpan token di penyimpanan tab, login staf tidak', async () => {
+  it('login menyimpan token di penyimpanan tab untuk semua peran', async () => {
     post.mockResolvedValueOnce({ data: { token: 'tok-siswa', user: siswa } })
     await useAuthStore().login('abc', 'rahasia')
     expect(bacaTokenTab()).toBe('tok-siswa')
@@ -31,11 +31,11 @@ describe('auth store: sesi siswa bertahan saat refresh', () => {
     setActivePinia(createPinia())
     post.mockResolvedValueOnce({ data: { token: 'tok-staf', user: operator } })
     await useAuthStore().login('op', 'rahasia')
-    expect(bacaTokenTab()).toBeNull()
+    expect(bacaTokenTab()).toBe('tok-staf')
   })
 
   it('setelah refresh, token siswa dipulihkan lalu /me memulihkan pengguna tanpa login ulang', async () => {
-    sessionStorage.setItem('cbt_sesi_siswa', 'tok-siswa')
+    sessionStorage.setItem('cbt_sesi', 'tok-siswa')
     get.mockResolvedValueOnce({ data: { user: siswa } })
 
     const auth = useAuthStore()
@@ -46,14 +46,14 @@ describe('auth store: sesi siswa bertahan saat refresh', () => {
     expect(auth.initialized).toBe(true)
   })
 
-  it('token tersimpan milik akun non-siswa dibuang, dan logout menghapus token tab', async () => {
-    sessionStorage.setItem('cbt_sesi_siswa', 'tok-lain')
+  it('setelah refresh, sesi staf juga pulih, dan logout menghapus token tab', async () => {
+    sessionStorage.setItem('cbt_sesi', 'tok-staf')
     get.mockResolvedValueOnce({ data: { user: operator } })
     const auth = useAuthStore()
     await auth.fetchMe()
-    expect(bacaTokenTab()).toBeNull()
+    expect(setAuthToken).toHaveBeenCalledWith('tok-staf')
+    expect(auth.user?.role).toBe('operator')
 
-    sessionStorage.setItem('cbt_sesi_siswa', 'tok-siswa')
     post.mockResolvedValueOnce({ data: {} })
     await auth.logout()
     expect(bacaTokenTab()).toBeNull()

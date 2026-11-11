@@ -228,6 +228,30 @@ class Fase2Test extends TestCase
         Event::assertDispatched(ForceLogout::class);
     }
 
+    public function test_supervising_teacher_can_reset_login_of_a_student_who_has_not_entered_the_waiting_room_but_not_finished_ones(): void
+    {
+        Event::fake();
+        $fixture = $this->createFixture('belum_login');
+        PengawasSesi::create(['sesi_ruang_id' => $fixture['session']->id, 'guru_id' => $fixture['teacher']->id]);
+        $fixture['studentUser']->createToken('perangkat-lama');
+        $lainUser = User::factory()->role('guru')->create();
+        Guru::create(['user_id' => $lainUser->id]);
+
+        // Guru yang tidak mengawasi sesi ini tetap ditolak.
+        $this->actingAs($lainUser, 'sanctum')->postJson("/api/v1/auth/reset-login/{$fixture['studentUser']->id}")->assertForbidden();
+
+        $this->actingAs($fixture['teacherUser'], 'sanctum')
+            ->postJson("/api/v1/auth/reset-login/{$fixture['studentUser']->id}")
+            ->assertOk();
+        $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $fixture['studentUser']->id]);
+
+        // Siswa yang sudah selesai tidak bisa direset oleh guru.
+        $fixture['participant']->update(['status' => 'selesai']);
+        $this->actingAs($fixture['teacherUser'], 'sanctum')
+            ->postJson("/api/v1/auth/reset-login/{$fixture['studentUser']->id}")
+            ->assertForbidden();
+    }
+
     public function test_expired_exam_state_submits_and_notifies_student_and_supervisor_channels(): void
     {
         Event::fake();

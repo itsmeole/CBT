@@ -88,8 +88,10 @@ class OtorisasiCbtService
             return false;
         }
 
+        // Pengawas boleh mereset login siswa di sesinya selama ujiannya belum selesai (termasuk yang belum masuk
+        // ruang tunggu, mis. akun tertahan setelah refresh atau berpindah perangkat).
         return PesertaUjian::query()
-            ->whereIn('status', ['menunggu', 'mengerjakan', 'terkunci'])
+            ->whereIn('status', ['belum_login', 'menunggu', 'mengerjakan', 'terkunci'])
             ->whereHas('siswa', fn ($query) => $query->where('user_id', $target->id))
             ->whereHas('sesiRuang.pengawasSesi', fn ($query) => $query->where('guru_id', $actor->guru->id))
             ->exists();

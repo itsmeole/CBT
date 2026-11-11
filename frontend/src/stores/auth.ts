@@ -19,13 +19,12 @@ export const useAuthStore = defineStore('auth', () => {
   const role = computed<Role | null>(() => user.value?.role ?? null)
 
   async function fetchMe(): Promise<void> {
-    // Setelah refresh, token siswa dipulihkan dari penyimpanan tab (lihat lib/sesiTab).
+    // Setelah refresh, token dipulihkan dari penyimpanan tab (lihat lib/sesiTab).
     const tersimpan = bacaTokenTab()
     if (tersimpan) setAuthToken(tersimpan)
     try {
       const { data } = await apiClient.get<AuthResponse>('/me')
       user.value = data.user ?? data.data ?? null
-      if (user.value && user.value.role !== 'siswa') hapusTokenTab()
     } catch {
       user.value = null
     } finally {
@@ -39,8 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
       setAuthToken(data.token)
     }
     user.value = data.user ?? data.data ?? null
-    if (data.token && user.value?.role === 'siswa') simpanTokenTab(data.token)
-    else hapusTokenTab()
+    if (data.token) simpanTokenTab(data.token)
     initialized.value = true
   }
 

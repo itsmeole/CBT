@@ -350,7 +350,7 @@ onUnmounted(() => {
           <div class="flex gap-2 pt-1">
             <button v-if="p.status === 'terkunci'" class="btn-primary flex-1 !min-h-touch text-xs" @click="mintaBukaKunci(p)">Buka Kunci</button>
             <button
-              v-if="['menunggu', 'mengerjakan', 'terkunci'].includes(p.status)"
+              v-if="['belum_login', 'menunggu', 'mengerjakan', 'terkunci'].includes(p.status)"
               class="btn-secondary flex-1 !min-h-touch text-xs"
               @click="targetReset = p"
             >
