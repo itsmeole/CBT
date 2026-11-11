@@ -249,17 +249,26 @@ async function submitExam() {
 // ---------- Kunci sesi (FR-FE-50, FR-FE-51, FR-FE-54) ----------
 let sudahFullscreen = false
 
+// Kunci yang sudah diberlakukan di layar tetapi belum dipastikan diterima server. Di iPhone, meninggalkan
+// aplikasi browser bisa menghentikan permintaan kunci; layar tidak boleh terbuka sendiri sebelum server tahu.
+let kunciBelumTerkirim: PemicuLock | null = null
+
 function laporkanPelanggaran(pemicu: PemicuLock) {
   if (ujianStore.status !== 'mengerjakan') return
   // Kunci tampilan seketika; server tetap sumber kebenaran status (dikonfirmasi lewat cek berkala).
   ujianStore.terapkanStateServer({ status: 'terkunci', waktuSelesaiMs: ujianStore.waktuSelesaiMs })
   showSubmitModal.value = false
   showNavDrawer.value = false
-  void kirimLock(pemicu)
+  kunciBelumTerkirim = pemicu
+  void kirimLock(pemicu).then((terkirim) => {
+    if (terkirim && kunciBelumTerkirim === pemicu) kunciBelumTerkirim = null
+  })
 }
 
 function onVisibilityChange() {
   if (document.visibilityState === 'hidden') laporkanPelanggaran('visibilitychange')
+  // Kembali ke halaman: segera pastikan kunci sampai ke server, jangan menunggu siklus berikutnya.
+  else if (kunciBelumTerkirim) void cekStatusBerkala()
 }
 const onPageHide = () => laporkanPelanggaran('pagehide')
 const onBlur = () => laporkanPelanggaran('blur')
@@ -286,6 +295,15 @@ function pulihkanDariKunci() {
 
 async function cekStatusBerkala() {
   const sebelumnya = ujianStore.status
+  if (kunciBelumTerkirim) {
+    // Kunci belum diterima server: kirim ulang dan tetap terkunci, jangan percaya status "mengerjakan" dari server.
+    const pemicu = kunciBelumTerkirim
+    if (await kirimLock(pemicu)) {
+      if (kunciBelumTerkirim === pemicu) kunciBelumTerkirim = null
+    } else {
+      return
+    }
+  }
   try {
     const status = await sinkronStateServer()
     if (status === 'mengerjakan' && sebelumnya === 'terkunci') pulihkanDariKunci()
@@ -328,6 +346,7 @@ onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
   document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener('pagehide', onPageHide)
+  window.addEventListener('pageshow', onVisibilityChange)
   window.addEventListener('blur', onBlur)
   window.addEventListener('offline', onOffline)
   window.addEventListener('online', onOnline)
@@ -346,6 +365,7 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener('pagehide', onPageHide)
+  window.removeEventListener('pageshow', onVisibilityChange)
   window.removeEventListener('blur', onBlur)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('online', onOnline)

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { apiClient, setAuthToken, setUnauthenticatedHandler } from '@/api/client'
+import { bacaTokenTab, hapusTokenTab, simpanTokenTab } from '@/lib/sesiTab'
 import type { AuthUser, Role } from '@/types/auth'
 
 interface AuthResponse {
@@ -18,9 +19,13 @@ export const useAuthStore = defineStore('auth', () => {
   const role = computed<Role | null>(() => user.value?.role ?? null)
 
   async function fetchMe(): Promise<void> {
+    // Setelah refresh, token siswa dipulihkan dari penyimpanan tab (lihat lib/sesiTab).
+    const tersimpan = bacaTokenTab()
+    if (tersimpan) setAuthToken(tersimpan)
     try {
       const { data } = await apiClient.get<AuthResponse>('/me')
       user.value = data.user ?? data.data ?? null
+      if (user.value && user.value.role !== 'siswa') hapusTokenTab()
     } catch {
       user.value = null
     } finally {
@@ -34,6 +39,8 @@ export const useAuthStore = defineStore('auth', () => {
       setAuthToken(data.token)
     }
     user.value = data.user ?? data.data ?? null
+    if (data.token && user.value?.role === 'siswa') simpanTokenTab(data.token)
+    else hapusTokenTab()
     initialized.value = true
   }
 
@@ -52,6 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clear(): void {
     user.value = null
     setAuthToken(null)
+    hapusTokenTab()
   }
 
   // Jika server menjawab 401 di mana pun, sesi lokal langsung dibersihkan.

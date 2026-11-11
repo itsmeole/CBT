@@ -137,4 +137,33 @@ describe('PengerjaanUjianView', () => {
     expect(post.mock.calls[1][0]).toBe('/ujian/lock')
     wrapper.unmount()
   })
+
+  it('kunci yang belum sampai ke server tidak terbuka sendiri saat kembali ke halaman (kasus iPhone)', async () => {
+    // Permintaan kunci hilang saat aplikasi browser ditinggalkan, sehingga server masih menjawab "mengerjakan".
+    let serverTerkunci = false
+    post.mockReset()
+    post.mockRejectedValueOnce(new ApiError('NETWORK_ERROR', 'Tidak ada koneksi', null))
+    post.mockImplementation((url: string) => {
+      if (url === '/ujian/lock') serverTerkunci = true
+      return Promise.resolve({ data: {} })
+    })
+    get.mockImplementation((url: string) =>
+      url === '/ujian/state'
+        ? Promise.resolve({ data: { data: { status: serverTerkunci ? 'terkunci' : 'mengerjakan', waktu_selesai_ms: Date.now() + 3_600_000, jawaban_tersimpan: {} } } })
+        : responsGet(url)
+    )
+    const wrapper = await pasang()
+    setVisibility('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Ujian terkunci, hubungi pengawas')
+
+    // Kembali ke halaman: kunci dikirim ulang (kini berhasil), layar tetap terkunci.
+    setVisibility('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    await vi.waitFor(() => expect(serverTerkunci).toBe(true))
+    expect(wrapper.text()).toContain('Ujian terkunci, hubungi pengawas')
+    wrapper.unmount()
+  })
 })

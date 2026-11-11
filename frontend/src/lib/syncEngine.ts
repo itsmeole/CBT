@@ -13,14 +13,25 @@ export type HasilSinkron = 'ok' | 'offline' | 'terkunci' | 'selesai'
 /** Fetch keepalive agar permintaan tetap terkirim saat halaman disembunyikan/ditutup (FR-FE-51). */
 const KEEPALIVE = { adapter: 'fetch', fetchOptions: { keepalive: true } } as const
 
-/** Kirim sinyal lock seketika; bila gagal karena offline, simpan ke antrean agar dikirim lebih dulu (FR-FE-52). */
-export async function kirimLock(pemicu: PemicuLock): Promise<void> {
+/**
+ * Kirim sinyal lock seketika; bila gagal karena offline, simpan ke antrean agar dikirim lebih dulu (FR-FE-52).
+ * Mengembalikan true bila server sudah mengetahui kunci (atau tidak ada ujian yang perlu dikunci), false bila
+ * belum terkirim sehingga pemanggil harus mencoba lagi dan tetap mengunci layar siswa.
+ */
+export async function kirimLock(pemicu: PemicuLock): Promise<boolean> {
   try {
     await apiClient.post('/ujian/lock', { pemicu }, KEEPALIVE)
+    return true
   } catch (error) {
-    if (error instanceof ApiError && error.isNetworkError) {
-      await antrekanLock({ pemicu, waktuMs: Date.now() })
+    if (error instanceof ApiError) {
+      if (error.isNetworkError) {
+        await antrekanLock({ pemicu, waktuMs: Date.now() })
+        return false
+      }
+      // Penolakan 4xx (mis. ujian sudah selesai): tidak ada yang bisa dikunci, berhenti mencoba.
+      return error.status !== null && error.status < 500
     }
+    return false
   }
 }
 
