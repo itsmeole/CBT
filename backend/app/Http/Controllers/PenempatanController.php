@@ -43,6 +43,7 @@ class PenempatanController extends Controller
                 'ruang_id' => $sesi->ruang_id,
                 'ruang' => $sesi->ruang?->nama,
                 'kapasitas' => $sesi->ruang?->kapasitas,
+                'terisi_lain' => $this->terisiJadwalLain($jadwal, (int) $sesi->ruang_id, substr((string) $sesi->jam_mulai, 0, 5), substr((string) $sesi->jam_akhir, 0, 5)),
                 'sesi_ke' => $sesi->sesi_ke,
                 'jam_mulai' => substr((string) $sesi->jam_mulai, 0, 5),
                 'jam_akhir' => substr((string) $sesi->jam_akhir, 0, 5),
@@ -85,8 +86,11 @@ class PenempatanController extends Controller
         $ruangMap = Ruang::whereIn('id', collect($validated['penempatan'])->pluck('ruang_id'))->get()->keyBy('id');
         foreach ($validated['penempatan'] as $baris) {
             $ruang = $ruangMap[$baris['ruang_id']];
-            if (count($baris['siswa_ids']) > $ruang->kapasitas) {
-                return $this->error('CAPACITY_EXCEEDED', "Ruang {$ruang->nama} berkapasitas {$ruang->kapasitas} tetapi diisi ".count($baris['siswa_ids']).' siswa.', 422);
+            $terisiLain = $this->terisiJadwalLain($jadwal, $ruang->id, $validated['jam_mulai'], $validated['jam_akhir']);
+            if (count($baris['siswa_ids']) + $terisiLain > $ruang->kapasitas) {
+                $info = $terisiLain > 0 ? " (sudah terisi {$terisiLain} siswa dari ujian lain pada jam yang sama)" : '';
+
+                return $this->error('CAPACITY_EXCEEDED', "Ruang {$ruang->nama} berkapasitas {$ruang->kapasitas} tetapi diisi ".(count($baris['siswa_ids']) + $terisiLain)." siswa{$info}.", 422);
             }
         }
 
@@ -95,6 +99,16 @@ class PenempatanController extends Controller
             ->count();
         if ($siswaValid !== $semuaSiswa->count()) {
             return $this->error('VALIDATION_ERROR', 'Semua peserta harus berasal dari tahun ajaran jadwal ujian.', 422);
+        }
+
+        $tingkatMapel = $jadwal->mapel?->tingkat;
+        if ($tingkatMapel) {
+            $salahTingkat = Siswa::whereIn('id', $semuaSiswa)
+                ->whereHas('kelas', fn ($kelas) => $kelas->where('tingkat', '!=', $tingkatMapel))
+                ->count();
+            if ($salahTingkat > 0) {
+                return $this->error('VALIDATION_ERROR', "{$salahTingkat} siswa bukan dari kelas {$tingkatMapel}, sedangkan {$jadwal->mapel->nama} khusus kelas {$tingkatMapel}.", 422);
+            }
         }
 
         $sudahDitempatkan = PesertaUjian::whereIn('siswa_id', $semuaSiswa)
@@ -208,11 +222,28 @@ class PenempatanController extends Controller
             ->count('siswa_id');
     }
 
+    /**
+     * Ruang boleh dipakai bersama beberapa ujian (kelas/mapel berbeda) bila jamnya persis sama.
+     * Bentrok hanya bila jamnya tumpang tindih tetapi tidak sama persis.
+     */
     private function ruangBentrok(JadwalUjian $jadwal, int $ruangId, string $mulai, string $akhir): bool
     {
         return SesiRuang::where('ruang_id', $ruangId)
             ->where(fn ($sesi) => $this->overlap($sesi, $jadwal, $mulai, $akhir))
+            ->where(fn ($sesi) => $sesi->where('jam_mulai', '!=', $mulai.':00')->orWhere('jam_akhir', '!=', $akhir.':00'))
             ->exists();
+    }
+
+    /** Jumlah siswa dari ujian lain yang berbagi ruang dan jam yang sama persis. */
+    private function terisiJadwalLain(JadwalUjian $jadwal, int $ruangId, string $mulai, string $akhir): int
+    {
+        return PesertaUjian::whereHas('sesiRuang', fn ($sesi) => $sesi
+            ->where('ruang_id', $ruangId)
+            ->where('jadwal_ujian_id', '!=', $jadwal->id)
+            ->whereHas('jadwalUjian', fn ($j) => $j->whereDate('tanggal', $jadwal->tanggal))
+            ->where('jam_mulai', $mulai.':00')
+            ->where('jam_akhir', $akhir.':00'))
+            ->count();
     }
 
     private function overlap($query, JadwalUjian $jadwal, string $mulai, string $akhir)

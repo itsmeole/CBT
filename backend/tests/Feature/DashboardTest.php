@@ -129,8 +129,32 @@ class DashboardTest extends TestCase
         $this->assertSame('Asia/Jakarta', $super['zona_waktu']);
     }
 
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+        parent::tearDown();
+    }
+
+    public function test_session_whose_end_time_has_passed_is_not_shown_as_running_even_with_stale_participants(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse($this->hariIni.' 12:30', config('app.timezone_sekolah')));
+        $jadwal = $this->jadwal($this->hariIni, null, 'UTS IPA');
+        $lewat = $this->sesi($jadwal, 'R', 1, '10:00');
+        $lewat->update(['jam_akhir' => '12:00']);
+        $this->peserta($lewat, $this->kelasA, 'mengerjakan', true);
+        $masihJalan = $this->sesi($jadwal, 'R', 2, '12:00');
+        $masihJalan->update(['jam_akhir' => '13:00']);
+        $this->peserta($masihJalan, $this->kelasA, 'mengerjakan', true);
+
+        $data = $this->actingAs($this->operator, 'sanctum')->getJson('/api/v1/dashboard')->json('data.operator');
+
+        $this->assertSame(['selesai', 'berjalan'], array_column($data['hari_ini'], 'status'));
+        $this->assertSame(1, $data['langsung']['sesi_berjalan']);
+    }
+
     public function test_operator_sees_todays_sessions_with_status_counts_and_state(): void
     {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse($this->hariIni.' 10:30', config('app.timezone_sekolah')));
         $jadwal = $this->jadwal($this->hariIni, null, 'UTS IPA');
         $berjalan = $this->sesi($jadwal, 'R', 1, '08:00');
         $this->peserta($berjalan, $this->kelasA, 'mengerjakan', true);

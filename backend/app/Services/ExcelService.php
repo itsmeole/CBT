@@ -39,7 +39,7 @@ class ExcelService
             'guru' => ['username', 'nama', 'password', 'nip'],
             'kelas' => ['nama_kelas', 'tingkat', 'nama_tahun_ajaran', 'semester'],
             'guru_mapel' => ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
-            'mapel' => ['kode', 'nama'],
+            'mapel' => ['kode', 'nama', 'tingkat'],
             'ruang' => ['nama', 'kapasitas'],
             'tahun_ajaran' => ['nama_tahun_ajaran', 'semester', 'aktif'],
             default => [],
@@ -62,7 +62,7 @@ class ExcelService
             'guru' => ['guru_budi', 'Budi Santoso, S.Pd.', 'password123', '198501012010011001'],
             'kelas' => ['7A', '7', '2026/2027', '1'],
             'guru_mapel' => ['guru_budi', 'MTK', '7A', '2026/2027', '1'],
-            'mapel' => ['MTK', 'Matematika'],
+            'mapel' => ['MTK7', 'Matematika Kelas 7', '7'],
             'ruang' => ['Lab Komputer 1', '36'],
             'tahun_ajaran' => ['2026/2027', '1', 'ya'],
         };
@@ -136,7 +136,7 @@ class ExcelService
                     $guruMapel->tahunAjaran?->semester,
                 ])->all(),
             'mapel' => Mapel::query()->orderBy('id')->get()
-                ->map(fn (Mapel $mapel): array => [$mapel->kode, $mapel->nama])->all(),
+                ->map(fn (Mapel $mapel): array => [$mapel->kode, $mapel->nama, $mapel->tingkat])->all(),
             'ruang' => Ruang::query()->orderBy('id')->get()
                 ->map(fn (Ruang $ruang): array => [$ruang->nama, $ruang->kapasitas])->all(),
             'tahun_ajaran' => TahunAjaran::query()->orderBy('id')->get()
@@ -332,7 +332,7 @@ class ExcelService
                         break;
 
                     case 'mapel':
-                        Mapel::updateOrCreate(['kode' => $row['kode']], ['nama' => $row['nama']]);
+                        Mapel::updateOrCreate(['kode' => $row['kode']], ['nama' => $row['nama'], 'tingkat' => ($row['tingkat'] ?? '') !== '' ? (string) $row['tingkat'] : null]);
                         $count++;
                         break;
 
@@ -453,6 +453,9 @@ class ExcelService
                 } elseif (strlen($row['nama']) > 100) {
                     $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama mapel maksimal 100 karakter.'];
                 }
+                if (($row['tingkat'] ?? '') !== '' && ! in_array($row['tingkat'], ['7', '8', '9'], true)) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'tingkat', 'message' => 'Tingkat harus 7, 8, atau 9 (kosongkan bila berlaku untuk semua tingkat).'];
+                }
                 break;
 
             case 'ruang':
@@ -519,7 +522,7 @@ class ExcelService
     private function headersWajib(string $jenis): array
     {
         // Kolom opsional (jk pada siswa) boleh tidak ada pada dokumen lama.
-        return array_values(array_diff($this->kolom($jenis), ['jk']));
+        return array_values(array_diff($this->kolom($jenis), ['jk', 'tingkat']));
     }
 
     private function validateDuplikatBaris(string $jenis, array $row, int $rowNumber, array &$seen): array
@@ -629,7 +632,7 @@ class ExcelService
                 'Kolom password: wajib untuk akun baru. Untuk akun yang sudah ada, kosongkan bila password tidak ingin diubah (password lama tidak dapat diunduh karena disimpan terenkripsi).',
             ],
             'tahun_ajaran' => [...$umum, 'Kolom aktif: ya atau tidak. Hanya satu tahun ajaran yang aktif; mengisi ya menonaktifkan yang lain.'],
-            'mapel' => [...$umum, 'Data dicocokkan berdasarkan kolom kode.'],
+            'mapel' => [...$umum, 'Data dicocokkan berdasarkan kolom kode.', 'Kolom tingkat (7, 8, atau 9) boleh dikosongkan bila mapel berlaku untuk semua tingkat.'],
             'ruang' => [...$umum, 'Data dicocokkan berdasarkan kolom nama.'],
             default => $umum,
         };

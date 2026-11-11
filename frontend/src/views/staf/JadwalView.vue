@@ -233,7 +233,29 @@ async function confirmDeletePaket() {
 }
 
 // Jadwal Ujian Actions
+const gabungan = ref(false)
+const barisGabungan = ref<{ mapel_id: number | null; paket_soal_id: number | null }[]>([])
+
+function paketUntukMapel(mapelId: number | null) {
+  return paketList.value.filter(p => p.mapel_id === mapelId)
+}
+
+function barisGabunganBaru() {
+  const mapelId = mapelList.value[0]?.id || null
+  return { mapel_id: mapelId, paket_soal_id: paketUntukMapel(mapelId)[0]?.id || null }
+}
+
+function tambahBarisGabungan() {
+  barisGabungan.value.push(barisGabunganBaru())
+}
+
+function ubahMapelBaris(baris: { mapel_id: number | null; paket_soal_id: number | null }) {
+  baris.paket_soal_id = paketUntukMapel(baris.mapel_id)[0]?.id || null
+}
+
 function openCreateJadwal() {
+  gabungan.value = false
+  barisGabungan.value = [barisGabunganBaru(), barisGabunganBaru()]
   formJadwal.value = {
     mapel_id: mapelList.value[0]?.id || null,
     paket_soal_id: paketList.value[0]?.id || null,
@@ -254,8 +276,14 @@ async function saveJadwal() {
   isSavingJadwal.value = true
   errorMessage.value = ''
   try {
-    await apiClient.post('/jadwal', formJadwal.value)
-    feedbackMessage.value = 'Jadwal ujian berhasil diterbitkan dengan snapshot bobot.'
+    if (gabungan.value) {
+      const { nama, tanggal, durasi_menit } = formJadwal.value
+      const res = await apiClient.post('/jadwal/gabungan', { nama, tanggal, durasi_menit, butir: barisGabungan.value })
+      feedbackMessage.value = res.data?.message || 'Jadwal ujian gabungan berhasil diterbitkan.'
+    } else {
+      await apiClient.post('/jadwal', formJadwal.value)
+      feedbackMessage.value = 'Jadwal ujian berhasil diterbitkan dengan snapshot bobot.'
+    }
     showCreateJadwalModal.value = false
     await fetchAll()
   } catch (err: any) {
@@ -267,12 +295,12 @@ async function saveJadwal() {
 }
 
 // Sesi Ruang: penempatan peserta & pengawas
-interface JadwalRef { id: number; nama: string; tanggal: string; tahun_ajaran_id: number }
+interface JadwalRef { id: number; nama: string; tanggal: string; tahun_ajaran_id: number; tingkat?: string | null }
 const jadwalPenempatan = ref<JadwalRef | null>(null)
 const sesiPengawas = ref<{ sesi: { id: number; ruang: string; sesi_ke: number; jam_mulai: string; jam_akhir: string; pengawas_ids: number[] }; judul: string } | null>(null)
 
 function bukaPenempatan(jadwal: any) {
-  jadwalPenempatan.value = { id: jadwal.id, nama: jadwal.nama, tanggal: String(jadwal.tanggal).slice(0, 10), tahun_ajaran_id: jadwal.tahun_ajaran_id }
+  jadwalPenempatan.value = { id: jadwal.id, nama: jadwal.nama, tanggal: String(jadwal.tanggal).slice(0, 10), tahun_ajaran_id: jadwal.tahun_ajaran_id, tingkat: jadwal.mapel?.tingkat ?? null }
 }
 
 function bukaPengawas(jadwal: any, sesi: any) {
@@ -647,17 +675,45 @@ onMounted(() => {
         </div>
 
         <form @submit.prevent="saveJadwal" class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-700">Mata Pelajaran</label>
-            <select v-model="formJadwal.mapel_id" required class="input !min-h-0 !py-1.5 text-sm">
-              <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-700">Paket Soal</label>
-            <select v-model="formJadwal.paket_soal_id" required class="input !min-h-0 !py-1.5 text-sm">
-              <option v-for="p in availablePaketForJadwal" :key="p.id" :value="p.id">{{ p.nama }}</option>
-            </select>
+          <label class="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
+            <input v-model="gabungan" type="checkbox" class="mt-0.5" />
+            <span><span class="font-semibold text-slate-800">Ujian gabungan</span> — beberapa mapel/tingkat di jam yang sama, sehingga siswa dari kelas berbeda bisa berada di satu ruang.</span>
+          </label>
+
+          <template v-if="!gabungan">
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Mata Pelajaran</label>
+              <select v-model="formJadwal.mapel_id" required class="input !min-h-0 !py-1.5 text-sm">
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Paket Soal</label>
+              <select v-model="formJadwal.paket_soal_id" required class="input !min-h-0 !py-1.5 text-sm">
+                <option v-for="p in availablePaketForJadwal" :key="p.id" :value="p.id">{{ p.nama }}</option>
+              </select>
+            </div>
+          </template>
+          <div v-else class="space-y-2">
+            <p class="text-xs font-medium text-slate-700">Mapel dan paket soal</p>
+            <div v-for="(baris, i) in barisGabungan" :key="i" class="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+              <select v-model="baris.mapel_id" required class="input !min-h-0 !py-1.5 text-sm" :aria-label="`Mapel ${i + 1}`" @change="ubahMapelBaris(baris)">
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.nama }}</option>
+              </select>
+              <select v-model="baris.paket_soal_id" required class="input !min-h-0 !py-1.5 text-sm" :aria-label="`Paket ${i + 1}`">
+                <option v-for="p in paketUntukMapel(baris.mapel_id)" :key="p.id" :value="p.id">{{ p.nama }}</option>
+              </select>
+              <button
+                type="button"
+                class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                :disabled="barisGabungan.length <= 2"
+                :aria-label="`Hapus baris ${i + 1}`"
+                @click="barisGabungan.splice(i, 1)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <button type="button" class="text-xs font-medium text-brand-600 hover:underline" @click="tambahBarisGabungan">+ Tambah mapel</button>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-700">Nama Ujian</label>

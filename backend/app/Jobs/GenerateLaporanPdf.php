@@ -84,7 +84,17 @@ class GenerateLaporanPdf implements ShouldQueue
             return $this->document('Daftar Hadir', '<h1>Daftar Hadir Peserta Ujian</h1><p>Belum ada ruang/sesi dan penempatan peserta untuk jadwal ini.</p>');
         }
 
-        $bagian = $sesiList->map(fn (SesiRuang $sesi): string => '<section class="ruang">'.$this->isiDaftarHadir($sesi).'</section>')->all();
+        // Ruang yang dipakai bersama beberapa ujian pada jam yang sama hanya dicetak sekali.
+        $sudah = [];
+        $bagian = [];
+        foreach ($sesiList as $sesi) {
+            $kunci = $sesi->ruang_id.'|'.$sesi->jam_mulai.'|'.$sesi->jam_akhir;
+            if (isset($sudah[$kunci])) {
+                continue;
+            }
+            $sudah[$kunci] = true;
+            $bagian[] = '<section class="ruang">'.$this->isiDaftarHadir($sesi).'</section>';
+        }
 
         return $this->document('Daftar Hadir - '.$jadwal->nama, implode('', $bagian));
     }
@@ -112,21 +122,42 @@ class GenerateLaporanPdf implements ShouldQueue
         $waktu = substr((string) $sesi->jam_mulai, 0, 5).' - '.substr((string) $sesi->jam_akhir, 0, 5);
         $pengawas = $sesi->pengawasSesi->map(fn ($p) => $p->guru?->user?->name)->filter()->implode(', ');
 
-        $peserta = $sesi->pesertaUjian->sortBy(fn (PesertaUjian $item): string => ($item->siswa?->kelas?->nama ?? '').'|'.($item->siswa?->user?->name ?? ''))->values();
+        // Ujian lain yang berbagi ruang dan jam yang sama (kelas/mapel berbeda) digabung dalam satu lembar.
+        $serumpun = SesiRuang::query()
+            ->with($this->relasiDaftarHadir())
+            ->where('ruang_id', $sesi->ruang_id)
+            ->where('jam_mulai', $sesi->jam_mulai)
+            ->where('jam_akhir', $sesi->jam_akhir)
+            ->whereHas('jadwalUjian', fn ($j) => $j->whereDate('tanggal', $jadwal?->tanggal))
+            ->orderBy('id')
+            ->get();
+        if ($serumpun->isEmpty()) {
+            $serumpun = collect([$sesi]);
+        }
+        $gabungan = $serumpun->count() > 1;
+        $pengawas = $serumpun->flatMap(fn (SesiRuang $s) => $s->pengawasSesi->map(fn ($p) => $p->guru?->user?->name))->filter()->unique()->implode(', ');
+
+        $baris = $serumpun->flatMap(fn (SesiRuang $s) => $s->pesertaUjian->map(fn (PesertaUjian $item): array => ['peserta' => $item, 'mapel' => $s->jadwalUjian?->mapel?->nama]));
+        $baris = $baris->sortBy(fn (array $b): string => ($b['peserta']->siswa?->kelas?->nama ?? '').'|'.($b['peserta']->siswa?->user?->name ?? ''))->values();
 
         $rows = '';
-        foreach ($peserta as $index => $item) {
-            $rows .= '<tr><td>'.($index + 1).'</td><td>'.$this->escape($item->siswa?->nis).'</td><td>'.$this->escape($item->siswa?->user?->name).'</td><td>'.$this->escape($item->siswa?->kelas?->nama).'</td><td class="ttd"></td></tr>';
+        foreach ($baris as $index => $b) {
+            $item = $b['peserta'];
+            $rows .= '<tr><td>'.($index + 1).'</td><td>'.$this->escape($item->siswa?->nis).'</td><td>'.$this->escape($item->siswa?->user?->name).'</td><td>'.$this->escape($item->siswa?->kelas?->nama).'</td>'
+                .($gabungan ? '<td>'.$this->escape($b['mapel']).'</td>' : '').'<td class="ttd"></td></tr>';
         }
         if ($rows === '') {
-            $rows = '<tr><td colspan="5">Belum ada siswa yang ditempatkan di ruang ini.</td></tr>';
+            $rows = '<tr><td colspan="'.($gabungan ? 6 : 5).'">Belum ada siswa yang ditempatkan di ruang ini.</td></tr>';
         }
+        $namaUjian = $gabungan
+            ? $serumpun->map(fn (SesiRuang $s): string => ($s->jadwalUjian?->mapel?->nama ?? '-'))->unique()->implode(', ')
+            : ($jadwal?->nama.' - '.$jadwal?->mapel?->nama);
 
         return '<h1>Daftar Hadir Peserta Ujian</h1>'
-            .'<table class="info"><tr><td>Ujian</td><td>'.$this->escape($jadwal?->nama).' - '.$this->escape($jadwal?->mapel?->nama).'</td><td>Ruang</td><td>'.$this->escape($sesi->ruang?->nama).'</td></tr>'
+            .'<table class="info"><tr><td>Ujian</td><td>'.$this->escape($namaUjian).'</td><td>Ruang</td><td>'.$this->escape($sesi->ruang?->nama).'</td></tr>'
             .'<tr><td>Hari / tanggal</td><td>'.$this->escape($tanggal).'</td><td>Waktu</td><td>'.$this->escape($waktu).'</td></tr>'
             .'<tr><td>Pengawas</td><td colspan="3">'.$this->escape($pengawas !== '' ? $pengawas : '-').'</td></tr></table>'
-            .'<table class="daftar"><thead><tr><th class="no">No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th class="ttd">Tanda tangan</th></tr></thead><tbody>'.$rows.'</tbody></table>';
+            .'<table class="daftar"><thead><tr><th class="no">No</th><th>NIS</th><th>Nama</th><th>Kelas</th>'.($gabungan ? '<th>Mapel</th>' : '').'<th class="ttd">Tanda tangan</th></tr></thead><tbody>'.$rows.'</tbody></table>';
     }
 
     private function rekapNilai(LaporanPdf $laporan): string

@@ -15,6 +15,7 @@ class Mapel extends Model
     protected $fillable = [
         'kode',
         'nama',
+        'tingkat',
     ];
 
     public function guruMapel()
@@ -42,4 +43,3 @@ class Mapel extends Model
         return $this->hasMany(JadwalUjian::class);
     }
 }
-

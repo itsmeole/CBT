@@ -186,18 +186,8 @@ class JadwalController extends Controller
 
         $mapelId = (int) $validated['mapel_id'];
         $paket = PaketSoal::with('items.bankSoal')->findOrFail((int) $validated['paket_soal_id']);
-        $items = $paket->items;
-
-        if ((int) $paket->mapel_id !== $mapelId || $items->isEmpty()) {
-            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal harus berisi soal dan berasal dari mapel yang dipilih.']], 422);
-        }
-
-        if ($items->contains(fn (PaketSoalItem $item): bool => $item->bankSoal === null)) {
-            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal yang sudah tidak tersedia.']], 422);
-        }
-
-        if ($items->contains(fn (PaketSoalItem $item): bool => (int) ($item->bankSoal?->mapel_id ?? 0) !== $mapelId)) {
-            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Paket soal memuat soal dari mapel lain.']], 422);
+        if ($pesan = $this->pesanPaketTidakValid($mapelId, $paket)) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => $pesan]], 422);
         }
 
         $taId = $validated['tahun_ajaran_id'] ?? TahunAjaran::where('aktif', true)->value('id');
@@ -205,27 +195,91 @@ class JadwalController extends Controller
             return response()->json(['error' => ['code' => 'NO_ACTIVE_ACADEMIC_YEAR', 'message' => 'Tidak ada tahun ajaran yang aktif.']], 422);
         }
 
-        // FR-BE-42: Snapshot bobot saat jadwal dibuat!
-        $bobotMap = BobotTipe::all()->pluck('bobot', 'tipe')->toArray();
-        $soalSnapshot = $items->map(fn (PaketSoalItem $item): int => (int) $item->bank_soal_id)->all();
-
-        $jadwal = JadwalUjian::create([
-            'mapel_id' => $validated['mapel_id'],
-            'paket_soal_id' => $validated['paket_soal_id'],
-            'tahun_ajaran_id' => $taId,
-            'nama' => $validated['nama'],
-            'tanggal' => $validated['tanggal'],
-            'durasi_menit' => $validated['durasi_menit'],
-            'bobot_snapshot' => $bobotMap,
-            'bobot_mode' => 'total_tipe',
-            'soal_snapshot' => $soalSnapshot,
-            'status' => 'aktif',
-        ]);
+        $jadwal = $this->simpanJadwal($validated, (int) $taId, $paket);
 
         return response()->json([
             'data' => $jadwal->load(['mapel', 'paketSoal', 'tahunAjaran']),
             'message' => 'Jadwal ujian berhasil dibuat.',
         ], 201);
+    }
+
+    /**
+     * Ujian gabungan: beberapa jadwal (mapel/tingkat berbeda) dibuat sekaligus dengan nama, tanggal, dan durasi yang sama,
+     * sehingga dapat ditempatkan di ruang yang sama pada jam yang sama.
+     */
+    public function storeJadwalGabungan(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tahun_ajaran_id' => 'nullable|exists:tahun_ajaran,id',
+            'nama' => 'required|string|max:100',
+            'tanggal' => 'required|date',
+            'durasi_menit' => 'required|integer|min:1',
+            'butir' => 'required|array|min:2|max:12',
+            'butir.*.mapel_id' => 'required|exists:mapel,id',
+            'butir.*.paket_soal_id' => 'required|exists:paket_soal,id',
+        ]);
+
+        $mapelIds = collect($validated['butir'])->pluck('mapel_id');
+        if ($mapelIds->count() !== $mapelIds->unique()->count()) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Satu mapel tidak boleh dipilih dua kali dalam ujian gabungan.']], 422);
+        }
+
+        $taId = $validated['tahun_ajaran_id'] ?? TahunAjaran::where('aktif', true)->value('id');
+        if (! $taId) {
+            return response()->json(['error' => ['code' => 'NO_ACTIVE_ACADEMIC_YEAR', 'message' => 'Tidak ada tahun ajaran yang aktif.']], 422);
+        }
+
+        $pakets = [];
+        foreach ($validated['butir'] as $butir) {
+            $paket = PaketSoal::with(['items.bankSoal', 'mapel'])->findOrFail((int) $butir['paket_soal_id']);
+            if ($pesan = $this->pesanPaketTidakValid((int) $butir['mapel_id'], $paket)) {
+                return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => ($paket->mapel?->nama ?? 'Mapel').': '.$pesan]], 422);
+            }
+            $pakets[] = [$butir, $paket];
+        }
+
+        $jadwalList = DB::transaction(fn () => collect($pakets)->map(fn (array $p) => $this->simpanJadwal(
+            ['mapel_id' => $p[0]['mapel_id'], 'paket_soal_id' => $p[0]['paket_soal_id'], 'nama' => $validated['nama'], 'tanggal' => $validated['tanggal'], 'durasi_menit' => $validated['durasi_menit']],
+            (int) $taId,
+            $p[1],
+        )->load(['mapel', 'paketSoal', 'tahunAjaran']))->values());
+
+        return response()->json(['data' => $jadwalList, 'message' => $jadwalList->count().' jadwal ujian berhasil dibuat.'], 201);
+    }
+
+    private function pesanPaketTidakValid(int $mapelId, PaketSoal $paket): ?string
+    {
+        $items = $paket->items;
+
+        if ((int) $paket->mapel_id !== $mapelId || $items->isEmpty()) {
+            return 'Paket soal harus berisi soal dan berasal dari mapel yang dipilih.';
+        }
+        if ($items->contains(fn (PaketSoalItem $item): bool => $item->bankSoal === null)) {
+            return 'Paket soal memuat soal yang sudah tidak tersedia.';
+        }
+        if ($items->contains(fn (PaketSoalItem $item): bool => (int) ($item->bankSoal?->mapel_id ?? 0) !== $mapelId)) {
+            return 'Paket soal memuat soal dari mapel lain.';
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function simpanJadwal(array $data, int $taId, PaketSoal $paket): JadwalUjian
+    {
+        // FR-BE-42: Snapshot bobot saat jadwal dibuat!
+        return JadwalUjian::create([
+            'mapel_id' => $data['mapel_id'],
+            'paket_soal_id' => $data['paket_soal_id'],
+            'tahun_ajaran_id' => $taId,
+            'nama' => $data['nama'],
+            'tanggal' => $data['tanggal'],
+            'durasi_menit' => $data['durasi_menit'],
+            'bobot_snapshot' => BobotTipe::all()->pluck('bobot', 'tipe')->toArray(),
+            'bobot_mode' => 'total_tipe',
+            'soal_snapshot' => $paket->items->map(fn (PaketSoalItem $item): int => (int) $item->bank_soal_id)->all(),
+            'status' => 'aktif',
+        ]);
     }
 
     // ==========================================

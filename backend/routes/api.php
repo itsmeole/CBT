@@ -83,6 +83,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:operator,superadmin')->group(function () {
             Route::put('bobot-tipe', [JadwalController::class, 'updateBobotTipe']);
             Route::post('jadwal', [JadwalController::class, 'storeJadwal']);
+            Route::post('jadwal/gabungan', [JadwalController::class, 'storeJadwalGabungan']);
             Route::post('sesi-ruang', [JadwalController::class, 'storeSesiRuang']);
             Route::get('jadwal/{id}/penempatan', [PenempatanController::class, 'show']);
             Route::post('jadwal/{id}/penempatan', [PenempatanController::class, 'store']);
@@ -131,6 +132,7 @@ Route::prefix('v1')->group(function () {
             // Guru Mapel
             Route::get('guru-mapel', [MasterDataController::class, 'getGuruMapel']);
             Route::post('guru-mapel', [MasterDataController::class, 'storeGuruMapel']);
+            Route::put('guru-mapel/{id}', [MasterDataController::class, 'updateGuruMapel']);
             Route::delete('guru-mapel/{id}', [MasterDataController::class, 'destroyGuruMapel']);
 
             // Ruang

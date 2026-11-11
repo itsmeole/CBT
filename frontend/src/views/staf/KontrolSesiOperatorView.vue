@@ -121,6 +121,27 @@ const allSessions = computed(() => {
   return list
 })
 
+/** Sesi ujian lain yang berbagi ruang dan jam yang sama persis (ruang campur kelas/mapel). */
+const sesiSerumpun = computed(() => {
+  if (isGuru.value || !selectedSesiId.value) return []
+  for (const j of jadwalList.value) {
+    const sesi = (j.sesi_ruang || []).find((x: any) => x.id === selectedSesiId.value)
+    if (!sesi) continue
+    const tanggal = String(j.tanggal).slice(0, 10)
+    return jadwalList.value.flatMap((lain: any) =>
+      (lain.sesi_ruang || [])
+        .filter((x: any) => x.id !== sesi.id && x.ruang_id === sesi.ruang_id && x.jam_mulai === sesi.jam_mulai && x.jam_akhir === sesi.jam_akhir && String(lain.tanggal).slice(0, 10) === tanggal)
+        .map((x: any) => ({ id: x.id, label: lain.mapel?.nama || lain.nama }))
+    )
+  }
+  return []
+})
+
+function bukaSesiSerumpun(id: number) {
+  selectedSesiId.value = id
+  gantiSesi()
+}
+
 const filteredPeserta = computed(() => {
   if (!sesiData.value?.peserta_ujian) return []
   const q = searchKeyword.value.toLowerCase().trim()
@@ -471,6 +492,17 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
+      </div>
+
+      <div v-if="sesiSerumpun.length > 0" class="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50/60 px-3.5 py-2.5 text-xs text-slate-700">
+        <span class="font-semibold">Ruang ini dipakai bersama ujian lain:</span>
+        <button
+          v-for="x in sesiSerumpun"
+          :key="x.id"
+          type="button"
+          class="rounded-lg border border-brand-300 bg-white px-2.5 py-1 font-medium text-brand-700 hover:bg-brand-50 cursor-pointer"
+          @click="bukaSesiSerumpun(x.id)"
+        >{{ x.label }}</button>
       </div>
 
       <!-- Empty State if No Sessions Exist -->

@@ -18,7 +18,7 @@ import {
  * acak otomatis atau atur sendiri per siswa. Hasil penempatan menjadi dasar daftar hadir per ruang.
  */
 const props = defineProps<{
-  jadwal: { id: number; nama: string; tanggal: string; tahun_ajaran_id: number }
+  jadwal: { id: number; nama: string; tanggal: string; tahun_ajaran_id: number; tingkat?: string | null }
 }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'saved'): void }>()
 
@@ -26,6 +26,7 @@ interface KelasItem {
   id: number
   nama: string
   tahun_ajaran_id: number
+  tingkat?: string | number | null
 }
 interface SiswaItem {
   id: number
@@ -73,7 +74,8 @@ const konfirmasiReset = ref(false)
 const pesanError = ref('')
 const pesanInfo = ref('')
 
-const kelasTahunIni = computed(() => kelasList.value.filter((k) => k.tahun_ajaran_id === props.jadwal.tahun_ajaran_id))
+// Mapel khusus satu tingkat hanya menawarkan kelas di tingkat itu.
+const kelasTahunIni = computed(() => kelasList.value.filter((k) => k.tahun_ajaran_id === props.jadwal.tahun_ajaran_id && (!props.jadwal.tingkat || String(k.tingkat) === String(props.jadwal.tingkat))))
 const statusKelas = computed(() => statusPilihan(kelasTahunIni.value.map((k) => k.id), kelasDipilih.value))
 const statusRuang = computed(() => statusPilihan(ruangList.value.map((r) => r.id), ruangDipilih.value))
 function pilihSemuaKelas() {

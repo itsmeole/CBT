@@ -324,16 +324,128 @@ class PenempatanRuangTest extends TestCase
         $this->assertStringContainsString('Tanda tangan', $html);
     }
 
-    public function test_pdf_jobs_use_the_configured_queue(): void
+    public function test_different_exams_can_share_a_room_at_the_exact_same_time_within_the_combined_capacity(): void
+    {
+        $siswa = $this->buatSiswa(4);
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 3]);
+        $lain = $this->buatJadwal(Mapel::create(['kode' => 'MTK', 'nama' => 'Matematika']), '2026-11-10');
+        $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/jadwal/{$this->jadwal->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => array_slice($siswa, 0, 2)]]))
+            ->assertCreated();
+
+        $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/jadwal/{$lain->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => array_slice($siswa, 2, 2)]]))
+            ->assertStatus(422)->assertJsonPath('error.code', 'CAPACITY_EXCEEDED');
+
+        $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/jadwal/{$lain->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => [$siswa[2]]]]))
+            ->assertCreated();
+
+        $this->actingAs($this->operator, 'sanctum')->getJson("/api/v1/jadwal/{$lain->id}/penempatan")
+            ->assertJsonPath('data.sesi.0.terisi_lain', 2);
+    }
+
+    public function test_attendance_sheet_of_a_shared_room_lists_every_exam_once_with_a_subject_column(): void
+    {
+        $siswa = $this->buatSiswa(2);
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $lain = $this->buatJadwal(Mapel::create(['kode' => 'MTK', 'nama' => 'Matematika']), '2026-11-10');
+        foreach ([[$this->jadwal, $siswa[0]], [$lain, $siswa[1]]] as [$jadwal, $id]) {
+            $this->actingAs($this->operator, 'sanctum')
+                ->postJson("/api/v1/jadwal/{$jadwal->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => [$id]]]))->assertCreated();
+        }
+        $laporan = LaporanPdf::create(['jenis' => 'daftar-hadir-semua', 'jadwal_ujian_id' => $this->jadwal->id, 'diminta_oleh' => $this->operator->id, 'status' => 'pending']);
+
+        $metode = new ReflectionMethod(GenerateLaporanPdf::class, 'daftarHadirSemuaRuang');
+        $html = $metode->invoke(new GenerateLaporanPdf($laporan->id), $laporan);
+
+        $this->assertSame(1, substr_count($html, 'Daftar Hadir Peserta Ujian'));
+        $this->assertStringContainsString('<th>Mapel</th>', $html);
+        $this->assertStringContainsString('Matematika', $html);
+        $this->assertSame(2, substr_count($html, '<td class="ttd"></td>'));
+    }
+
+    public function test_combined_exam_creates_one_schedule_per_subject_in_a_single_request(): void
+    {
+        $lain = $this->buatJadwal(Mapel::create(['kode' => 'MTK', 'nama' => 'Matematika']), '2026-11-10');
+        $baris = [
+            ['mapel_id' => $this->mapel->id, 'paket_soal_id' => $this->jadwal->paket_soal_id],
+            ['mapel_id' => $lain->mapel_id, 'paket_soal_id' => $lain->paket_soal_id],
+        ];
+        $jumlahAwal = JadwalUjian::count();
+
+        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/jadwal/gabungan', [
+            'nama' => 'UTS', 'tanggal' => '2026-11-20', 'durasi_menit' => 60, 'butir' => $baris,
+        ])->assertCreated()->assertJsonCount(2, 'data');
+        $this->assertSame($jumlahAwal + 2, JadwalUjian::count());
+
+        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/jadwal/gabungan', [
+            'nama' => 'UTS', 'tanggal' => '2026-11-20', 'durasi_menit' => 60,
+            'butir' => [$baris[0], ['mapel_id' => $this->mapel->id, 'paket_soal_id' => $lain->paket_soal_id]],
+        ])->assertStatus(422);
+        $this->assertSame($jumlahAwal + 2, JadwalUjian::count());
+    }
+
+    public function test_editing_a_teacher_removes_unselected_subjects_even_when_assigned_per_class(): void
+    {
+        $mtk = Mapel::create(['kode' => 'MTK', 'nama' => 'Matematika']);
+        GuruMapel::create(['guru_id' => $this->guru->id, 'mapel_id' => $mtk->id, 'kelas_id' => $this->kelas->id, 'tahun_ajaran_id' => $this->tahun->id]);
+
+        $this->actingAs($this->operator, 'sanctum')->putJson("/api/v1/guru/{$this->guru->id}", ['mapel_ids' => [$this->mapel->id]])->assertOk();
+
+        $this->assertSame([$this->mapel->id], GuruMapel::where('guru_id', $this->guru->id)->pluck('mapel_id')->unique()->values()->all());
+
+        $this->actingAs($this->operator, 'sanctum')->putJson("/api/v1/guru/{$this->guru->id}", ['mapel_ids' => []])->assertOk();
+        $this->assertSame(0, GuruMapel::where('guru_id', $this->guru->id)->count());
+    }
+
+    public function test_a_grade_specific_subject_only_accepts_students_from_that_grade(): void
+    {
+        $siswa = $this->buatSiswa(1);
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $mapel8 = Mapel::create(['kode' => 'MTK8', 'nama' => 'Matematika Kelas 8', 'tingkat' => '8']);
+        $jadwal8 = $this->buatJadwal($mapel8, '2026-11-10');
+
+        $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/jadwal/{$jadwal8->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => $siswa]]))
+            ->assertStatus(422)->assertJsonPath('error.code', 'VALIDATION_ERROR');
+    }
+
+    public function test_operator_can_edit_a_teacher_subject_assignment_but_not_into_a_duplicate(): void
+    {
+        $gm = GuruMapel::first();
+        $mapelBaru = Mapel::create(['kode' => 'MTK', 'nama' => 'Matematika']);
+        $lain = GuruMapel::create(['guru_id' => $this->guru->id, 'mapel_id' => $mapelBaru->id, 'kelas_id' => $this->kelas->id, 'tahun_ajaran_id' => $this->tahun->id]);
+        $data = ['guru_id' => $this->guru->id, 'mapel_id' => $mapelBaru->id, 'kelas_id' => $this->kelas->id, 'tahun_ajaran_id' => $this->tahun->id];
+
+        $this->actingAs($this->operator, 'sanctum')->putJson("/api/v1/guru-mapel/{$gm->id}", $data)->assertStatus(422);
+
+        $kelasB = Kelas::create(['nama' => '7B', 'tingkat' => '7', 'tahun_ajaran_id' => $this->tahun->id]);
+        $this->actingAs($this->operator, 'sanctum')->putJson("/api/v1/guru-mapel/{$gm->id}", [...$data, 'kelas_id' => $kelasB->id])->assertOk();
+
+        $this->assertSame($kelasB->id, $gm->fresh()->kelas_id);
+        $this->assertSame($this->kelas->id, $lain->fresh()->kelas_id);
+    }
+
+    public function test_grade_recap_uses_the_configured_queue(): void
     {
         Queue::fake();
         config(['cbt.queue_laporan' => 'default']);
+
+        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/rekap-nilai', ['jadwal_id' => $this->jadwal->id])->assertStatus(202);
+
+        Queue::assertPushedOn('default', GenerateLaporanPdf::class);
+    }
+
+    public function test_attendance_list_is_generated_immediately_without_a_worker(): void
+    {
         $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
         $sesi = SesiRuang::create(['jadwal_ujian_id' => $this->jadwal->id, 'ruang_id' => $ruang->id, 'sesi_ke' => 1, 'jam_mulai' => '08:00', 'jam_akhir' => '09:30']);
 
-        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/daftar-hadir', ['sesi_ruang_id' => $sesi->id])->assertStatus(202);
+        $id = $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/daftar-hadir', ['sesi_ruang_id' => $sesi->id])
+            ->assertStatus(202)->json('data.id');
 
-        Queue::assertPushedOn('default', GenerateLaporanPdf::class);
+        $this->actingAs($this->operator, 'sanctum')->get("/api/v1/laporan-pdf/{$id}")->assertOk();
     }
 
     public function test_schedule_and_placement_show_the_active_token_not_a_stale_one_after_regeneration(): void

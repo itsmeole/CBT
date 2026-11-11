@@ -5,7 +5,7 @@
 .DESCRIPTION
   - Mendeteksi IP Wi-Fi/LAN laptop ini (atau pakai -Ip).
   - Menulis frontend\.env.local agar frontend memakai IP tersebut.
-  - Membuka 4 jendela: server API, antrean, Reverb (realtime), dan frontend (Vite).
+  - Membuka 5 jendela: server API, antrean, penjadwal (menyelesaikan ujian yang waktunya habis), Reverb (realtime), dan frontend (Vite).
   - Membuat aturan Windows Firewall bila dijalankan sebagai Administrator.
 
 .EXAMPLE
@@ -83,7 +83,7 @@ if ($HanyaCek) {
     Write-Host '[HanyaCek] Tidak ada yang dijalankan. Rencana:'
     Write-Host "  - tulis $envLocal (API dan Reverb -> $Ip)"
     Write-Host "  - firewall port $portFrontend,$portApi,$portReverb (aturan '$aturan')"
-    Write-Host '  - jendela: php artisan serve, queue:work, reverb:start, npm run dev --host'
+    Write-Host '  - jendela: php artisan serve, queue:work, schedule:work, reverb:start, npm run dev --host'
     return
 }
 
@@ -131,6 +131,7 @@ function Start-Jendela([string]$judul, [string]$folder, [string]$perintah) {
 $proses = @()
 $proses += Start-Jendela 'CBT API' $backend "& '$php' artisan serve --host=0.0.0.0 --port=$portApi"
 $proses += Start-Jendela 'CBT Antrean' $backend "& '$php' artisan queue:work --queue=default,reports"
+$proses += Start-Jendela 'CBT Penjadwal' $backend "& '$php' artisan schedule:work"
 $proses += Start-Jendela 'CBT Reverb' $backend "& '$php' artisan reverb:start --host=0.0.0.0 --port=$portReverb"
 if ($Cepat) {
     $proses += Start-Jendela 'CBT Frontend' $frontend "npm run build; if (`$?) { npm run preview -- --host --port $portFrontend --strictPort }"

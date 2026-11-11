@@ -364,14 +364,12 @@ class MasterDataController extends Controller
             $guru->update(['nip' => $validated['nip'] ?? $guru->nip]);
 
             if (array_key_exists('mapel_ids', $validated)) {
-                // Hapus asosiasi mapel umum (yang belum terkait kelas spesifik)
-                GuruMapel::where('guru_id', $guru->id)->whereNull('kelas_id')->delete();
-                if (! empty($validated['mapel_ids'])) {
-                    foreach ($validated['mapel_ids'] as $mId) {
-                        GuruMapel::firstOrCreate([
-                            'guru_id' => $guru->id,
-                            'mapel_id' => (int) $mId,
-                        ]);
+                // Mapel yang tidak lagi dipilih dilepas dari guru, termasuk pengampuan per kelas.
+                $dipilih = array_map('intval', $validated['mapel_ids'] ?? []);
+                GuruMapel::where('guru_id', $guru->id)->whereNotIn('mapel_id', $dipilih)->delete();
+                foreach ($dipilih as $mId) {
+                    if (! GuruMapel::where('guru_id', $guru->id)->where('mapel_id', $mId)->exists()) {
+                        GuruMapel::create(['guru_id' => $guru->id, 'mapel_id' => $mId]);
                     }
                 }
             }
@@ -416,6 +414,7 @@ class MasterDataController extends Controller
         $validated = $request->validate([
             'kode' => 'required|string|max:30|unique:mapel,kode',
             'nama' => 'required|string|max:100',
+            'tingkat' => 'nullable|in:7,8,9',
         ]);
 
         $mapel = Mapel::create($validated);
@@ -429,6 +428,7 @@ class MasterDataController extends Controller
         $validated = $request->validate([
             'kode' => 'sometimes|required|string|max:30|unique:mapel,kode,'.$mapel->id,
             'nama' => 'sometimes|required|string|max:100',
+            'tingkat' => 'nullable|in:7,8,9',
         ]);
 
         $mapel->update($validated);
@@ -463,12 +463,55 @@ class MasterDataController extends Controller
             'tahun_ajaran_id' => 'required|exists:tahun_ajaran,id',
         ]);
 
+        if ($pesan = $this->pesanTingkatTidakCocok((int) $validated['mapel_id'], (int) $validated['kelas_id'])) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => $pesan]], 422);
+        }
+
         $gm = GuruMapel::updateOrCreate($validated, $validated);
 
         return response()->json([
             'data' => $gm->load(['guru.user', 'mapel', 'kelas', 'tahunAjaran']),
             'message' => 'Pengampu mapel berhasil diatur.',
         ], 201);
+    }
+
+    /** Mapel yang khusus satu tingkat hanya boleh diampu pada kelas dengan tingkat yang sama. */
+    private function pesanTingkatTidakCocok(int $mapelId, int $kelasId): ?string
+    {
+        $mapel = Mapel::find($mapelId);
+        $kelas = Kelas::find($kelasId);
+        if ($mapel?->tingkat && $kelas && (string) $kelas->tingkat !== (string) $mapel->tingkat) {
+            return "{$mapel->nama} khusus kelas {$mapel->tingkat}, sedangkan kelas {$kelas->nama} berada di tingkat {$kelas->tingkat}.";
+        }
+
+        return null;
+    }
+
+    public function updateGuruMapel(Request $request, int $id): JsonResponse
+    {
+        $gm = GuruMapel::findOrFail($id);
+        $validated = $request->validate([
+            'guru_id' => 'required|exists:guru,id',
+            'mapel_id' => 'required|exists:mapel,id',
+            'kelas_id' => 'required|exists:kelas,id',
+            'tahun_ajaran_id' => 'required|exists:tahun_ajaran,id',
+        ]);
+
+        if ($pesan = $this->pesanTingkatTidakCocok((int) $validated['mapel_id'], (int) $validated['kelas_id'])) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => $pesan]], 422);
+        }
+
+        $kembar = GuruMapel::where($validated)->where('id', '!=', $gm->id)->exists();
+        if ($kembar) {
+            return response()->json(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Pengampu mapel dengan guru, mapel, kelas, dan tahun ajaran yang sama sudah ada.']], 422);
+        }
+
+        $gm->update($validated);
+
+        return response()->json([
+            'data' => $gm->load(['guru.user', 'mapel', 'kelas', 'tahunAjaran']),
+            'message' => 'Pengampu mapel berhasil diperbarui.',
+        ]);
     }
 
     public function destroyGuruMapel(int $id): JsonResponse

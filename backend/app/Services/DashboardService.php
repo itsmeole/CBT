@@ -92,9 +92,7 @@ class DashboardService
     private function ringkasSesi(SesiRuang $sesi): array
     {
         $total = (int) $sesi->total;
-        $status = ($sesi->mengerjakan + $sesi->terkunci) > 0
-            ? 'berjalan'
-            : ($total > 0 && (int) $sesi->selesai === $total ? 'selesai' : 'belum_mulai');
+        $status = $this->statusSesi($sesi);
 
         return [
             'id' => $sesi->id,
@@ -119,6 +117,25 @@ class DashboardService
     }
 
     /**
+     * Status sesi menurut waktu dan peserta. Setelah jam akhir lewat, sesi dianggap selesai walau ada peserta
+     * yang statusnya belum diperbarui (penyelesaian otomatis dilakukan scheduler).
+     */
+    private function statusSesi(SesiRuang $sesi): string
+    {
+        $akhir = CarbonImmutable::parse($this->sekarang()->toDateString().' '.$sesi->jam_akhir, config('app.timezone_sekolah'));
+        if ($this->sekarang()->greaterThanOrEqualTo($akhir)) {
+            return 'selesai';
+        }
+
+        $total = (int) $sesi->total;
+        if (($sesi->mengerjakan + $sesi->terkunci) > 0) {
+            return 'berjalan';
+        }
+
+        return $total > 0 && (int) $sesi->selesai === $total ? 'selesai' : 'belum_mulai';
+    }
+
+    /**
      * @param  Collection<int, SesiRuang>  $sesi
      * @return array<string, int>
      */
@@ -126,7 +143,7 @@ class DashboardService
     {
         return [
             'sesi_hari_ini' => $sesi->count(),
-            'sesi_berjalan' => $sesi->filter(fn (SesiRuang $s): bool => ($s->mengerjakan + $s->terkunci) > 0)->count(),
+            'sesi_berjalan' => $sesi->filter(fn (SesiRuang $s): bool => $this->statusSesi($s) === 'berjalan')->count(),
             'peserta' => (int) $sesi->sum('total'),
             'menunggu' => (int) $sesi->sum('menunggu'),
             'mengerjakan' => (int) $sesi->sum('mengerjakan'),

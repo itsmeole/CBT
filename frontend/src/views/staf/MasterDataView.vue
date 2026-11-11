@@ -170,6 +170,22 @@ const filteredKelas = computed(() => {
   return kelasList.value.filter(k => k.nama?.toLowerCase().includes(q))
 })
 
+/** Mapel khusus satu tingkat hanya menawarkan kelas di tingkat itu. */
+const kelasUntukPengampu = computed(() => {
+  const tingkat = mapelList.value.find(m => m.id === formData.value.mapel_id)?.tingkat
+  return tingkat ? kelasList.value.filter(k => String(k.tingkat) === String(tingkat)) : kelasList.value
+})
+
+watch(
+  () => [formData.value.mapel_id, activeTab.value],
+  () => {
+    if (activeTab.value !== 'guru_mapel') return
+    if (!kelasUntukPengampu.value.some(k => k.id === formData.value.kelas_id)) {
+      formData.value.kelas_id = kelasUntukPengampu.value[0]?.id || ''
+    }
+  }
+)
+
 const filteredMapel = computed(() => {
   const q = searchQuery.value.toLowerCase()
   return mapelList.value.filter(m => m.nama?.toLowerCase().includes(q) || m.kode?.toLowerCase().includes(q))
@@ -214,7 +230,7 @@ function openCreateModal() {
       tahun_ajaran_id: tahunAjaranList.value[0]?.id || ''
     }
   } else if (activeTab.value === 'mapel') {
-    formData.value = { kode: '', nama: '' }
+    formData.value = { kode: '', nama: '', tingkat: '' }
   } else if (activeTab.value === 'ruang') {
     formData.value = { kode: '', nama: '', kapasitas: 36 }
   } else if (activeTab.value === 'tahun_ajaran') {
@@ -254,6 +270,13 @@ function openEditModal(item: any) {
       password: '',
       mapel_ids: (item.mapel || []).map((m: any) => m.id),
       role: item.user?.role || 'guru'
+    }
+  } else if (activeTab.value === 'guru_mapel') {
+    formData.value = {
+      guru_id: item.guru_id,
+      mapel_id: item.mapel_id,
+      kelas_id: item.kelas_id,
+      tahun_ajaran_id: item.tahun_ajaran_id
     }
   } else {
     formData.value = { ...item }
@@ -620,6 +643,17 @@ const currentListCount = computed(() => {
                   <div class="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
+                      @click="openEditModal(item)"
+                      class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      title="Ubah Data"
+                      aria-label="Ubah Data"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
                       @click="promptDeleteEntity(item.id, `${item.guru?.user?.name} - ${item.mapel?.nama} (${item.kelas?.nama})`)"
                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Hapus Data"
@@ -835,6 +869,7 @@ const currentListCount = computed(() => {
               <tr>
                 <th class="p-3">Kode</th>
                 <th class="p-3">Nama Mata Pelajaran</th>
+                <th class="p-3">Tingkat</th>
                 <th v-if="isOperatorOrSuperadmin" class="p-3 text-right">Aksi</th>
               </tr>
             </thead>
@@ -842,6 +877,7 @@ const currentListCount = computed(() => {
               <tr v-for="item in filteredMapel" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-mono font-medium text-slate-900">{{ item.kode }}</td>
                 <td class="p-3 font-medium text-slate-900">{{ item.nama }}</td>
+                <td class="p-3">{{ item.tingkat ? `Kelas ${item.tingkat}` : 'Semua' }}</td>
                 <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
                   <div class="flex items-center justify-end gap-1.5">
                     <button
@@ -869,7 +905,7 @@ const currentListCount = computed(() => {
                   </div>
                 </td>
               </tr>
-              <TabelMemuat v-if="loading && filteredMapel.length === 0" :kolom="3" />
+              <TabelMemuat v-if="loading && filteredMapel.length === 0" :kolom="4" />
               <tr v-if="!loading && filteredMapel.length === 0">
                 <td class="p-6 text-center text-slate-400">Belum ada data mata pelajaran.</td>
               </tr>
@@ -1118,7 +1154,16 @@ const currentListCount = computed(() => {
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-700">Nama Mata Pelajaran</label>
-              <input v-model="formData.nama" placeholder="Contoh: Matematika Wajib" required class="input !min-h-0 !py-1.5 text-sm" />
+              <input v-model="formData.nama" placeholder="Contoh: Matematika Kelas 7" required class="input !min-h-0 !py-1.5 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700">Tingkat</label>
+              <select v-model="formData.tingkat" class="input !min-h-0 !py-1.5 text-sm">
+                <option value="">Semua tingkat</option>
+                <option value="7">Kelas 7</option>
+                <option value="8">Kelas 8</option>
+                <option value="9">Kelas 9</option>
+              </select>
             </div>
           </template>
 
@@ -1155,7 +1200,7 @@ const currentListCount = computed(() => {
             <div>
               <label class="block text-xs font-medium text-slate-700">Kelas *</label>
               <select v-model="formData.kelas_id" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="k in kelasList" :key="k.id" :value="k.id">{{ k.nama }}</option>
+                <option v-for="k in kelasUntukPengampu" :key="k.id" :value="k.id">{{ k.nama }}</option>
               </select>
             </div>
             <div>

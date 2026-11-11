@@ -80,7 +80,13 @@ class LaporanPdfController extends Controller
 
             return $laporan;
         });
-        GenerateLaporanPdf::dispatch($laporan->id)->onQueue((string) config('cbt.queue_laporan', 'reports'));
+        // Daftar hadir dicetak sesekali (oleh satu pengguna, sebelum ujian) dan ringan: langsung dibuat tanpa menunggu worker.
+        // Rekap nilai bisa besar, jadi tetap lewat antrean.
+        if (str_starts_with($jenis, 'daftar-hadir')) {
+            GenerateLaporanPdf::dispatchSync($laporan->id);
+        } else {
+            GenerateLaporanPdf::dispatch($laporan->id)->onQueue((string) config('cbt.queue_laporan', 'reports'));
+        }
 
         return response()->json(['data' => $laporan->fresh()], 202);
     }
