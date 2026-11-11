@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { tanggalPendek } from '@/lib/waktu'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { apiClient } from '@/api/client'
 import { ambilHalaman } from '@/lib/paginasi'
 import {
   acakPenempatan,
   ringkasPerRuang,
+  salinPenempatan,
   susunPayloadPenempatan,
   validasiPenempatan,
   type PetaPenempatan
@@ -47,6 +48,11 @@ const siswaList = ref<SiswaItem[]>([])
 const ruangList = ref<RuangItem[]>([])
 const sudahDitempatkan = ref<Set<number>>(new Set())
 const jumlahSesiAda = ref(0)
+
+// Ikuti penempatan jadwal lain (acak sekali, mapel berikutnya mengikuti).
+const jadwalSumber = ref<{ id: number; label: string }[]>([])
+const sumberId = ref<number | ''>('')
+const menyalin = ref(false)
 
 const sesiKe = ref(1)
 const jamMulai = ref('08:00')
@@ -95,12 +101,24 @@ const jamValid = computed(() => jamMulai.value !== '' && jamAkhir.value > jamMul
 async function muat() {
   loading.value = true
   try {
-    const [kelas, siswa, ruang, ada] = await Promise.all([
+    const [kelas, siswa, ruang, ada, semuaJadwal] = await Promise.all([
       apiClient.get('/kelas'),
       apiClient.get('/siswa'),
       apiClient.get('/ruang'),
-      apiClient.get(`/jadwal/${props.jadwal.id}/penempatan`)
+      apiClient.get(`/jadwal/${props.jadwal.id}/penempatan`),
+      apiClient.get('/jadwal')
     ])
+    jadwalSumber.value = ((semuaJadwal.data.data ?? []) as {
+      id: number
+      nama: string
+      tanggal: string
+      tahun_ajaran_id: number
+      mapel?: { nama: string }
+      sesi_ruang?: unknown[]
+    }[])
+      .filter((j) => j.id !== props.jadwal.id && j.tahun_ajaran_id === props.jadwal.tahun_ajaran_id && (j.sesi_ruang?.length ?? 0) > 0)
+      .sort((a, b) => String(b.tanggal).localeCompare(String(a.tanggal)))
+      .map((j) => ({ id: j.id, label: `${j.nama}${j.mapel ? ` - ${j.mapel.nama}` : ''} (${tanggalPendek(j.tanggal)})` }))
     kelasList.value = kelas.data.data ?? []
     siswaList.value = siswa.data.data ?? []
     ruangList.value = ruang.data.data ?? []
@@ -138,6 +156,40 @@ function acak() {
   }
   peta.value = hasil.peta
   pesanInfo.value = 'Penempatan diacak. Anda masih bisa mengubah ruang tiap siswa sebelum menyimpan.'
+}
+
+/** Salin susunan ruang dari jadwal lain: kelas dan ruang ikut dipilih, siswa tetap di ruang yang sama. */
+async function ikutiSumber() {
+  if (sumberId.value === '') return
+  menyalin.value = true
+  pesanError.value = ''
+  pesanInfo.value = ''
+  try {
+    const res = await apiClient.get(`/jadwal/${sumberId.value}/penempatan`)
+    const sesi: { ruang_id: number; peserta: { siswa_id: number }[] }[] = res.data.data.sesi ?? []
+    const sumber: PetaPenempatan = {}
+    for (const s of sesi) for (const p of s.peserta) sumber[p.siswa_id] = s.ruang_id
+
+    const idKelasTahunIni = new Set(kelasTahunIni.value.map((k) => k.id))
+    kelasDipilih.value = [...new Set(siswaList.value.filter((s) => s.id in sumber && idKelasTahunIni.has(s.kelas_id)).map((s) => s.kelas_id))]
+    ruangDipilih.value = [...new Set(sesi.map((s) => s.ruang_id))].filter((id) => ruangList.value.some((r) => r.id === id))
+    if (kelasDipilih.value.length === 0 || ruangDipilih.value.length === 0) {
+      pesanError.value = 'Penempatan jadwal tersebut tidak dapat dipakai (kelas atau ruangnya tidak ditemukan).'
+      return
+    }
+
+    await nextTick() // biarkan daftar siswa dan penempatan menyesuaikan pilihan kelas/ruang baru
+    const hasil = salinPenempatan(sumber, kandidatIds.value, ruangTerpilih.value)
+    peta.value = hasil.peta
+    const catatan = [`Penempatan mengikuti jadwal terpilih untuk ${Object.keys(hasil.peta).length - hasil.tambahan} siswa.`]
+    if (hasil.tambahan > 0) catatan.push(`${hasil.tambahan} siswa yang belum ada di sana diisikan ke ruang yang masih kosong.`)
+    if (hasil.tanpaRuang > 0) catatan.push(`${hasil.tanpaRuang} siswa belum mendapat ruang (kursi habis): tambah ruang atau atur manual.`)
+    pesanInfo.value = catatan.join(' ')
+  } catch (err) {
+    pesanError.value = err instanceof Error ? err.message : 'Gagal mengambil penempatan jadwal tersebut.'
+  } finally {
+    menyalin.value = false
+  }
 }
 
 function ubahRuang(siswaId: number, nilai: string) {
@@ -242,6 +294,19 @@ onMounted(muat)
           </label>
         </section>
 
+        <section v-if="jadwalSumber.length > 0" class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end" aria-label="Ikuti penempatan jadwal lain">
+          <label class="min-w-0 flex-1 text-xs font-semibold text-slate-600">
+            Ikuti penempatan jadwal lain
+            <select v-model="sumberId" class="input mt-1 !min-h-0 !py-2 text-sm" aria-label="Pilih jadwal sumber penempatan">
+              <option value="">Pilih jadwal...</option>
+              <option v-for="j in jadwalSumber" :key="j.id" :value="j.id">{{ j.label }}</option>
+            </select>
+          </label>
+          <button type="button" class="btn-secondary !min-h-0 !py-2 text-xs" :disabled="sumberId === '' || menyalin" @click="ikutiSumber">
+            {{ menyalin ? 'Menyalin...' : 'Terapkan' }}
+          </button>
+        </section>
+
         <div class="grid gap-4 md:grid-cols-2">
           <section aria-label="Pilih kelas">
             <h3 class="mb-1 text-xs font-bold text-slate-500">1. Kelas peserta</h3>
@@ -270,7 +335,12 @@ onMounted(muat)
           <div class="flex flex-wrap items-center justify-between gap-2">
             <h3 class="text-xs font-bold text-slate-500">3. Penempatan ({{ kandidat.length }} siswa, {{ totalKursi }} kursi)</h3>
             <div class="flex flex-wrap gap-2">
-              <button class="btn-primary !min-h-0 !py-1.5 text-xs" :disabled="kandidat.length === 0 || ruangTerpilih.length === 0" @click="acak">🎲 Acak Penempatan</button>
+              <button class="btn-primary !min-h-0 !py-1.5 text-xs gap-1.5" :disabled="kandidat.length === 0 || ruangTerpilih.length === 0" @click="acak">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                </svg>
+                <span>Acak Penempatan</span>
+              </button>
               <button class="btn-secondary !min-h-0 !py-1.5 text-xs" :disabled="Object.keys(peta).length === 0" @click="kosongkan">Kosongkan</button>
             </div>
           </div>

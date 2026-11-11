@@ -105,3 +105,55 @@ export function susunPayloadPenempatan(peta: PetaPenempatan, ruang: readonly Rua
     }))
     .filter((baris) => baris.siswa_ids.length > 0)
 }
+
+export interface HasilSalin {
+  peta: PetaPenempatan
+  /** Siswa yang tidak ada di penempatan sumber lalu diisikan ke ruang yang masih punya kursi. */
+  tambahan: number
+  /** Siswa yang tidak mendapat ruang karena kursi habis. */
+  tanpaRuang: number
+}
+
+/**
+ * Ikuti penempatan jadwal lain: siswa tetap di ruang yang sama selama ruang itu dipilih dan masih ada kursinya.
+ * Siswa yang belum ada di sumber (mis. siswa baru) diisikan ke ruang dengan sisa kursi terbanyak.
+ */
+export function salinPenempatan(sumber: PetaPenempatan, siswaIds: readonly number[], ruang: readonly RuangKapasitas[]): HasilSalin {
+  const kapasitas = new Map<number, number>(ruang.map((r) => [r.id, r.kapasitas]))
+  const terisi = new Map<number, number>(ruang.map((r) => [r.id, 0]))
+  const peta: PetaPenempatan = {}
+  const belum: number[] = []
+
+  for (const id of siswaIds) {
+    const asal = sumber[id]
+    if (asal !== undefined && kapasitas.has(asal) && (terisi.get(asal) ?? 0) < (kapasitas.get(asal) ?? 0)) {
+      peta[id] = asal
+      terisi.set(asal, (terisi.get(asal) ?? 0) + 1)
+    } else {
+      belum.push(id)
+    }
+  }
+
+  let tambahan = 0
+  let tanpaRuang = 0
+  for (const id of belum) {
+    let terbaik: number | null = null
+    let sisaTerbaik = 0
+    for (const r of ruang) {
+      const sisa = r.kapasitas - (terisi.get(r.id) ?? 0)
+      if (sisa > sisaTerbaik) {
+        sisaTerbaik = sisa
+        terbaik = r.id
+      }
+    }
+    if (terbaik === null) {
+      tanpaRuang++
+      continue
+    }
+    peta[id] = terbaik
+    terisi.set(terbaik, (terisi.get(terbaik) ?? 0) + 1)
+    tambahan++
+  }
+
+  return { peta, tambahan, tanpaRuang }
+}

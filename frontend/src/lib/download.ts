@@ -8,7 +8,18 @@ export async function downloadFileFromApi(endpoint: string, defaultFilename: str
   const response = await apiClient.get(endpoint, {
     responseType: 'blob'
   })
+  unduhDariRespons(response, defaultFilename)
+}
 
+/** Seperti downloadFileFromApi, tetapi lewat POST (mis. unduhan yang meminta konfirmasi password). */
+export async function unduhFileDenganPost(endpoint: string, data: unknown, defaultFilename: string): Promise<void> {
+  const response = await apiClient.post(endpoint, data, {
+    responseType: 'blob'
+  })
+  unduhDariRespons(response, defaultFilename)
+}
+
+function unduhDariRespons(response: { data: BlobPart; headers?: Record<string, unknown> }, defaultFilename: string): void {
   let filename = defaultFilename
   const disposition = response.headers?.['content-disposition'] as string | undefined
   if (disposition && typeof disposition === 'string') {

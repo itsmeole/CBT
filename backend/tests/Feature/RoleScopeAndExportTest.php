@@ -90,12 +90,12 @@ class RoleScopeAndExportTest extends TestCase
         $this->teachingFixture();
 
         $this->actingAs($superadmin, 'sanctum')
-            ->get('/api/v1/export/excel/guru_mapel')
+            ->post('/api/v1/export/excel/guru_mapel', ['password' => 'password'])
             ->assertOk()
-            ->assertDownload('export_guru_mapel.xlsx');
+            ->assertDownload('data_guru_mapel.xlsx');
 
         $this->actingAs($superadmin, 'sanctum')
-            ->getJson('/api/v1/export/excel/soal')
+            ->postJson('/api/v1/export/excel/soal', ['password' => 'password'])
             ->assertStatus(400)
             ->assertJsonPath('error.code', 'BAD_REQUEST');
     }
@@ -118,7 +118,7 @@ class RoleScopeAndExportTest extends TestCase
             ->assertDownload('paket_soal_'.$ownPackage->id.'.docx');
     }
 
-    public function test_excel_export_does_not_include_account_passwords(): void
+    public function test_excel_export_never_includes_password_values(): void
     {
         $fixture = $this->teachingFixture();
         $filePath = app(ExcelService::class)->export('guru');
@@ -128,9 +128,11 @@ class RoleScopeAndExportTest extends TestCase
             unlink($filePath);
         }
 
-        $this->assertSame(['username', 'nama', 'nip'], $contents[0]);
+        // Kolom password ada (agar sama dengan template impor) tetapi selalu kosong: hash tidak pernah diekspor.
+        $this->assertSame(['username', 'nama', 'password', 'nip'], $contents[0]);
         $this->assertSame($fixture['user']->username, $contents[1][0]);
-        $this->assertNotContains('password', $contents[0]);
+        $this->assertSame('', (string) $contents[1][2]);
+        $this->assertStringNotContainsString('$2y$', json_encode($contents) ?: '');
     }
 
     public function test_schedule_rejects_package_with_soft_deleted_question(): void

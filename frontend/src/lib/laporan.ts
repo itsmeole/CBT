@@ -2,23 +2,24 @@ import { apiClient, ApiError } from '@/api/client'
 import type { Role } from '@/types/auth'
 import { unduhBlob } from './download'
 
-export type JenisLaporan = 'kartu-peserta' | 'daftar-hadir' | 'berita-acara' | 'rekap-nilai'
+export type JenisLaporan = 'kartu-peserta' | 'daftar-hadir' | 'daftar-hadir-semua' | 'berita-acara' | 'rekap-nilai'
 
 export const LABEL_LAPORAN: Record<JenisLaporan, string> = {
   'kartu-peserta': 'Kartu Peserta Ujian',
   'daftar-hadir': 'Daftar Hadir',
+  'daftar-hadir-semua': 'Daftar Hadir Semua Ruang',
   'berita-acara': 'Berita Acara',
   'rekap-nilai': 'Rekap Nilai'
 }
 
 /** Jenis yang diminta per jadwal ujian atau per sesi ruang (selaras validasi BE). */
 export function basisLaporan(jenis: JenisLaporan): 'jadwal' | 'sesi' {
-  return jenis === 'kartu-peserta' || jenis === 'rekap-nilai' ? 'jadwal' : 'sesi'
+  return jenis === 'kartu-peserta' || jenis === 'rekap-nilai' || jenis === 'daftar-hadir-semua' ? 'jadwal' : 'sesi'
 }
 
 /** Kartu peserta hanya Operator/Superadmin; scope sisanya ditegakkan server (pengawas/guru pengampu). */
 export function jenisUntukRole(role: Role | null): JenisLaporan[] {
-  if (role === 'operator' || role === 'superadmin') return ['kartu-peserta', 'daftar-hadir', 'berita-acara', 'rekap-nilai']
+  if (role === 'operator' || role === 'superadmin') return ['kartu-peserta', 'daftar-hadir', 'daftar-hadir-semua', 'berita-acara', 'rekap-nilai']
   if (role === 'guru') return ['daftar-hadir', 'berita-acara', 'rekap-nilai']
   return []
 }

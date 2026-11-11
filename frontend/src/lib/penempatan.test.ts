@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acakPenempatan, kocok, ringkasPerRuang, susunPayloadPenempatan, validasiPenempatan } from './penempatan'
+import { acakPenempatan, kocok, ringkasPerRuang, salinPenempatan, susunPayloadPenempatan, validasiPenempatan } from './penempatan'
 
 const ruang = [
   { id: 1, nama: 'R1', kapasitas: 4 },
@@ -71,5 +71,39 @@ describe('penempatan ruang', () => {
       { ruang_id: 1, siswa_ids: [10, 11] },
       { ruang_id: 3, siswa_ids: [12] }
     ])
+  })
+})
+
+describe('salinPenempatan', () => {
+  const ruang = [
+    { id: 1, kapasitas: 2 },
+    { id: 2, kapasitas: 2 }
+  ]
+
+  it('menjaga siswa tetap di ruang yang sama dengan jadwal sumber', () => {
+    const hasil = salinPenempatan({ 10: 1, 11: 2, 12: 1 }, [10, 11, 12], ruang)
+    expect(hasil.peta).toEqual({ 10: 1, 11: 2, 12: 1 })
+    expect(hasil.tambahan).toBe(0)
+    expect(hasil.tanpaRuang).toBe(0)
+  })
+
+  it('siswa yang belum ada di sumber masuk ke ruang dengan sisa kursi terbanyak', () => {
+    const hasil = salinPenempatan({ 10: 1 }, [10, 20, 21], ruang)
+    expect(hasil.peta[10]).toBe(1)
+    expect(hasil.peta[20]).toBe(2)
+    expect(hasil.tambahan).toBe(2)
+    expect(Object.values(hasil.peta).filter((r) => r === 1).length).toBeLessThanOrEqual(2)
+  })
+
+  it('tidak melebihi kapasitas dan melaporkan siswa tanpa ruang', () => {
+    const hasil = salinPenempatan({}, [1, 2, 3, 4, 5], ruang)
+    expect(Object.keys(hasil.peta)).toHaveLength(4)
+    expect(hasil.tanpaRuang).toBe(1)
+  })
+
+  it('mengabaikan ruang sumber yang tidak dipilih', () => {
+    const hasil = salinPenempatan({ 10: 99 }, [10], ruang)
+    expect([1, 2]).toContain(hasil.peta[10])
+    expect(hasil.tambahan).toBe(1)
   })
 })

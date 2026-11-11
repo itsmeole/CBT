@@ -9,6 +9,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -18,6 +19,16 @@ class ExcelController extends Controller
         private readonly ExcelService $excelService,
         private readonly AuditLogService $auditLog,
     ) {}
+
+    /** Tahun ajaran hanya boleh diubah Superadmin (sama seperti pengelolaan manual di Master Data). */
+    private function tolakBilaTidakBerhak(Request $request, string $jenis): ?JsonResponse
+    {
+        if ($jenis === 'tahun_ajaran' && $request->user()->role !== 'superadmin') {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Hanya Superadmin yang dapat mengimpor tahun ajaran.']], 403);
+        }
+
+        return null;
+    }
 
     public function template(string $jenis): BinaryFileResponse|JsonResponse
     {
@@ -32,6 +43,9 @@ class ExcelController extends Controller
 
     public function preview(Request $request, string $jenis): JsonResponse
     {
+        if ($ditolak = $this->tolakBilaTidakBerhak($request, $jenis)) {
+            return $ditolak;
+        }
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls|max:10240',
         ]);
@@ -54,8 +68,11 @@ class ExcelController extends Controller
             'items' => 'required|array|min:1',
         ]);
 
-        if (! in_array($jenis, ['siswa', 'guru', 'kelas', 'guru_mapel'], true)) {
+        if (! in_array($jenis, ExcelService::JENIS, true)) {
             return response()->json(['error' => ['code' => 'BAD_REQUEST', 'message' => 'Jenis data master tidak valid.']], 400);
+        }
+        if ($ditolak = $this->tolakBilaTidakBerhak($request, $jenis)) {
+            return $ditolak;
         }
 
         // Commit dijalankan di antrean (hash password ratusan siswa terlalu lama untuk satu request HTTP).
@@ -91,12 +108,27 @@ class ExcelController extends Controller
         return response()->json(['data' => $status]);
     }
 
+    /**
+     * Unduh data master sebagai Excel dengan kolom yang sama seperti template impor. Pengguna wajib
+     * memasukkan ulang password akunnya; password akun siswa/guru tidak ikut diekspor (tersimpan sebagai hash).
+     */
     public function export(Request $request, string $jenis): BinaryFileResponse|JsonResponse
     {
-        if (! in_array($jenis, ['siswa', 'guru', 'kelas', 'guru_mapel'], true)) {
+        if (! in_array($jenis, ExcelService::JENIS, true)) {
             return response()->json([
                 'error' => ['code' => 'BAD_REQUEST', 'message' => 'Jenis data master tidak valid untuk diekspor.'],
             ], 400);
+        }
+
+        $request->validate(['password' => ['required', 'string', 'max:255']], ['password.required' => 'Password wajib diisi.']);
+        if (! Hash::check((string) $request->input('password'), $request->user()->password)) {
+            $this->auditLog->record($request->user(), 'master_data.export_ditolak', $jenis, null, [], $request);
+
+            return response()->json(['error' => [
+                'code' => 'VALIDATION_ERROR',
+                'message' => 'Password salah.',
+                'details' => ['password' => ['Password salah.']],
+            ]], 422);
         }
 
         $filePath = $this->excelService->export($jenis);
@@ -109,6 +141,6 @@ class ExcelController extends Controller
             $request,
         );
 
-        return response()->download($filePath, 'export_'.$jenis.'.xlsx')->deleteFileAfterSend(true);
+        return response()->download($filePath, 'data_'.$jenis.'.xlsx')->deleteFileAfterSend(true);
     }
 }

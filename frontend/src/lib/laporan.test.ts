@@ -18,6 +18,7 @@ describe('laporan', () => {
   it('menentukan basis jadwal/sesi dan hanya mengirim parameter yang relevan', () => {
     expect(basisLaporan('kartu-peserta')).toBe('jadwal')
     expect(basisLaporan('berita-acara')).toBe('sesi')
+    expect(basisLaporan('daftar-hadir-semua')).toBe('jadwal')
     expect(susunBodyLaporan('rekap-nilai', { jadwal_id: 1, sesi_ruang_id: 9, kelas_id: 4 })).toEqual({ jadwal_id: 1, kelas_id: 4 })
     expect(susunBodyLaporan('daftar-hadir', { jadwal_id: 1, sesi_ruang_id: 9 })).toEqual({ sesi_ruang_id: 9 })
   })
@@ -25,6 +26,8 @@ describe('laporan', () => {
   it('kartu peserta tidak ditawarkan untuk guru', () => {
     expect(jenisUntukRole('guru')).not.toContain('kartu-peserta')
     expect(jenisUntukRole('operator')).toContain('kartu-peserta')
+    expect(jenisUntukRole('operator')).toContain('daftar-hadir-semua')
+    expect(jenisUntukRole('guru')).not.toContain('daftar-hadir-semua')
     expect(jenisUntukRole('siswa')).toEqual([])
   })
 

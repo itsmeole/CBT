@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { jam } from '@/lib/waktu'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { apiClient } from '@/api/client'
@@ -48,8 +48,26 @@ async function fetchSesiTersedia() {
   }
 }
 
+/** Daftar sesi bergantung pada jam sesi: segarkan berkala (tanpa kedip) agar sesi muncul saat waktunya tiba. */
+async function segarkanSenyap() {
+  if (document.visibilityState !== 'visible' || selectedSesi.value) return
+  try {
+    const res = await apiClient.get('/ujian/sesi')
+    sesiList.value = res.data.data || []
+  } catch {
+    /* pertahankan daftar yang ada */
+  }
+}
+
+let timerSegarkan: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
   fetchSesiTersedia()
+  timerSegarkan = setInterval(segarkanSenyap, 30_000)
+})
+
+onUnmounted(() => {
+  if (timerSegarkan) clearInterval(timerSegarkan)
 })
 
 function selectSesi(sesi: SesiItem) {

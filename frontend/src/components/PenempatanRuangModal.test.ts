@@ -21,8 +21,30 @@ const siswa = (id: number, kelasId: number, nama: string) => ({
   user: { name: nama }
 })
 
-function mockData(sesiAda: unknown[] = []) {
+const jadwalLain = {
+  id: 5,
+  nama: 'UTS Matematika',
+  tanggal: '2026-11-09',
+  tahun_ajaran_id: 1,
+  mapel: { nama: 'Matematika' },
+  sesi_ruang: [{ id: 1 }, { id: 2 }]
+}
+
+function mockData(sesiAda: unknown[] = [], daftarJadwal: unknown[] = []) {
   get.mockImplementation((url: string) => {
+    if (url === '/jadwal') return Promise.resolve({ data: { data: daftarJadwal } })
+    if (url === '/jadwal/5/penempatan') {
+      return Promise.resolve({
+        data: {
+          data: {
+            sesi: [
+              { ruang_id: 10, peserta: [{ siswa_id: 1 }, { siswa_id: 2 }] },
+              { ruang_id: 11, peserta: [{ siswa_id: 3 }, { siswa_id: 4 }, { siswa_id: 5 }] }
+            ]
+          }
+        }
+      })
+    }
     if (url === '/kelas') {
       return Promise.resolve({ data: { data: [{ id: 1, nama: '7A', tahun_ajaran_id: 1 }, { id: 2, nama: '7B', tahun_ajaran_id: 1 }, { id: 3, nama: '9Z', tahun_ajaran_id: 2 }] } })
     }
@@ -189,6 +211,32 @@ describe('PengawasSesiModal', () => {
     await flushPromises()
     expect(wrapper.find('[role="alert"]').text()).toContain('bertabrakan')
     expect(wrapper.emitted('saved')).toBeFalsy()
+    wrapper.unmount()
+  })
+
+  it('mengikuti penempatan jadwal lain: kelas dan ruang terpilih, siswa tetap di ruang yang sama, siswa baru diisikan', async () => {
+    mockData([], [jadwalLain, { ...jadwalLain, id: 6, sesi_ruang: [] }, { ...jadwalLain, id: 7, tahun_ajaran_id: 2 }, { ...jadwal, id: 9, sesi_ruang: [{ id: 3 }] }])
+    const wrapper = mount(PenempatanRuangModal, { props: { jadwal } })
+    await flushPromises()
+
+    const opsi = wrapper.findAll('select[aria-label="Pilih jadwal sumber penempatan"] option').map((o) => o.text())
+    expect(opsi).toHaveLength(2) // placeholder + 1 jadwal (tanpa sesi, tahun lain, atau jadwal ini sendiri)
+    expect(opsi[1]).toContain('UTS Matematika - Matematika')
+
+    await wrapper.find('select[aria-label="Pilih jadwal sumber penempatan"]').setValue(5)
+    await tombol(wrapper, 'Terapkan').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Penempatan mengikuti jadwal terpilih untuk 5 siswa')
+    expect(wrapper.text()).toContain('1 siswa yang belum ada di sana')
+
+    await tombol(wrapper, 'Simpan Penempatan').trigger('click')
+    await flushPromises()
+    const body = post.mock.calls[0][1] as { penempatan: { ruang_id: number; siswa_ids: number[] }[] }
+    const peta = Object.fromEntries(body.penempatan.flatMap((p) => p.siswa_ids.map((id) => [id, p.ruang_id])))
+    expect([peta[1], peta[2]]).toEqual([10, 10])
+    expect([peta[3], peta[4], peta[5]]).toEqual([11, 11, 11])
+    expect(Object.keys(peta)).toHaveLength(6)
     wrapper.unmount()
   })
 })

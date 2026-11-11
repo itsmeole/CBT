@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ICBT - Coming soon</title>
+    <meta name="description" content="ICBT, sistem ujian digital untuk sekolah. Coming soon." />
+    <meta name="theme-color" content="#2338a6" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <style>
+      @font-face {
+        font-family: 'Geist';
+        src: url('fonts/geist-latin-wght-normal.woff2') format('woff2');
+        font-weight: 100 900;
+        font-display: swap;
+      }
+
+      :root {
+        --brand-100: #e0e7ff;
+        --brand-200: #c3cffb;
+        --brand-700: #2338a6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-feature-settings: 'cv11', 'ss01';
+        color: #fff;
+        background-color: var(--brand-700);
+        /* Lapisan biru tua agar teks putih tetap kontras di atas pola latar. */
+        background-image: linear-gradient(180deg, rgb(29 46 130 / 0.55), rgb(35 56 166 / 0.82)), url('login_bg.svg');
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        -webkit-font-smoothing: antialiased;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      .halaman {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 100dvh;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 20px 22px;
+      }
+
+      .merek {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 17px;
+        letter-spacing: -0.01em;
+      }
+
+      .merek img {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        object-fit: contain;
+      }
+
+      main {
+        position: relative;
+        display: grid;
+        align-content: center;
+        padding: 24px 0;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(4rem, 21vw, 12.5rem);
+        font-weight: 800;
+        line-height: 0.86;
+        letter-spacing: -0.055em;
+        position: relative;
+        z-index: 1;
+      }
+
+      h1 span {
+        display: block;
+      }
+
+      /* "soon" hanya garis tepi: kontras dengan "Coming" yang solid. */
+      h1 .garis {
+        color: transparent;
+        -webkit-text-stroke: clamp(2px, 0.45vw, 5px) #fff;
+        padding-left: 0.06em;
+      }
+
+      .sub {
+        margin: clamp(18px, 3vw, 30px) 0 0;
+        font-size: clamp(1.05rem, 3.2vw, 1.5rem);
+        font-weight: 500;
+        color: var(--brand-100);
+        letter-spacing: -0.01em;
+        position: relative;
+        z-index: 1;
+      }
+
+      #hitung {
+        display: none;
+        gap: 10px;
+        margin: 26px 0 0;
+        padding: 0;
+        list-style: none;
+        position: relative;
+        z-index: 1;
+      }
+
+      #hitung.tampil {
+        display: flex;
+      }
+
+      #hitung li {
+        min-width: 68px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgb(255 255 255 / 0.14);
+        text-align: center;
+      }
+
+      #hitung b {
+        display: block;
+        font-size: 1.7rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+
+      #hitung span {
+        font-size: 11px;
+        color: var(--brand-200);
+      }
+
+      /* Ilustrasi menumpuk di sudut kanan bawah, di belakang teks. */
+      .ilustrasi {
+        position: absolute;
+        right: -6%;
+        bottom: -2%;
+        width: min(58vw, 430px);
+        height: auto;
+        opacity: 0.95;
+        filter: drop-shadow(0 28px 34px rgb(15 26 61 / 0.4));
+        user-select: none;
+        pointer-events: none;
+      }
+
+      footer {
+        font-size: 12px;
+        color: var(--brand-200);
+      }
+
+      @media (min-width: 880px) {
+        .halaman {
+          padding: 32px 48px;
+        }
+
+        .ilustrasi {
+          right: 0;
+          bottom: auto;
+          top: 50%;
+          width: min(40vw, 520px);
+          transform: translateY(-50%);
+          opacity: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        h1 span,
+        .sub,
+        .ilustrasi {
+          animation: muncul 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        h1 span:nth-child(2) {
+          animation-delay: 0.12s;
+        }
+
+        .sub {
+          animation-delay: 0.26s;
+        }
+
+        .ilustrasi {
+          animation-name: muncul-ilustrasi;
+          animation-delay: 0.2s;
+        }
+      }
+
+      @keyframes muncul {
+        from {
+          opacity: 0;
+          transform: translateY(24px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @keyframes muncul-ilustrasi {
+        from {
+          opacity: 0;
+          translate: 0 24px;
+        }
+        to {
+          opacity: 1;
+          translate: 0 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="halaman">
+      <header class="merek">
+        <img src="logo.webp" alt="" width="40" height="40" />
+        <span>ICBT</span>
+      </header>
+
+      <main>
+        <h1>
+          <span>Coming</span>
+          <span class="garis">soon</span>
+        </h1>
+        <p class="sub">Ujian digital untuk sekolah.</p>
+
+        <!-- Isi TARGET dengan tanggal peluncuran, mis. '2026-12-01T08:00:00+07:00', untuk menampilkan hitung mundur. -->
+        <ul id="hitung" aria-label="Hitung mundur peluncuran"></ul>
+
+        <img class="ilustrasi" src="illustration_books.webp" alt="Topi wisuda di atas tumpukan buku" width="780" />
+      </main>
+
+      <footer>&copy; <span id="tahun">2026</span> ICBT</footer>
+    </div>
+
+    <script>
+      // Tanggal peluncuran (kosongkan untuk menyembunyikan hitung mundur).
+      var TARGET = ''
+
+      document.getElementById('tahun').textContent = new Date().getFullYear()
+
+      var daftar = document.getElementById('hitung')
+      var tujuan = TARGET ? new Date(TARGET).getTime() : NaN
+      var timer
+
+      function dua(n) {
+        return String(n).padStart(2, '0')
+      }
+
+      function perbarui() {
+        var sisa = Math.max(0, tujuan - Date.now())
+        var detik = Math.floor(sisa / 1000)
+        var nilai = [
+          [Math.floor(detik / 86400), 'hari'],
+          [Math.floor((detik % 86400) / 3600), 'jam'],
+          [Math.floor((detik % 3600) / 60), 'menit'],
+          [detik % 60, 'detik']
+        ]
+        daftar.innerHTML = nilai.map(function (x) { return '<li><b>' + dua(x[0]) + '</b><span>' + x[1] + '</span></li>' }).join('')
+        if (sisa === 0) clearInterval(timer)
+      }
+
+      if (!isNaN(tujuan)) {
+        daftar.classList.add('tampil')
+        perbarui()
+        timer = setInterval(perbarui, 1000)
+      }
+    </script>
+  </body>
+</html>

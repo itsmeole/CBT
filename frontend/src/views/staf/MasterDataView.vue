@@ -6,9 +6,10 @@ import { TAB_MASTER, tabValid } from '@/lib/navigasi'
 import { ambilHalaman } from '@/lib/paginasi'
 import StafLayout from '@/components/StafLayout.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
-import { apiClient } from '@/api/client'
+import KonfirmasiPasswordModal from '@/components/KonfirmasiPasswordModal.vue'
+import { ApiError, apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { downloadFileFromApi } from '@/lib/download'
+import { downloadFileFromApi, unduhFileDenganPost } from '@/lib/download'
 
 type TabType = 'siswa' | 'guru' | 'kelas' | 'mapel' | 'ruang' | 'tahun_ajaran' | 'guru_mapel'
 
@@ -344,6 +345,34 @@ async function confirmDeleteEntity() {
   }
 }
 
+// Unduh data master (Excel, kolom sama dengan template impor). Wajib konfirmasi password.
+const showUnduhData = ref(false)
+const unduhDataLoading = ref(false)
+const unduhDataGalat = ref('')
+
+/** Impor Excel tersedia untuk semua jenis; tahun ajaran hanya untuk Superadmin. */
+const bolehImpor = computed(() => (activeTab.value === 'tahun_ajaran' ? isSuperadmin.value : isOperatorOrSuperadmin.value))
+
+function bukaUnduhData() {
+  unduhDataGalat.value = ''
+  showUnduhData.value = true
+}
+
+async function unduhData(password: string) {
+  unduhDataLoading.value = true
+  unduhDataGalat.value = ''
+  const jenis = activeTab.value
+  try {
+    await unduhFileDenganPost(`/export/excel/${jenis}`, { password }, `data_${jenis}.xlsx`)
+    showUnduhData.value = false
+    feedbackMessage.value = 'Data berhasil diunduh. Kolom password dikosongkan karena password tersimpan terenkripsi.'
+  } catch (err) {
+    unduhDataGalat.value = err instanceof ApiError && err.status === 422 ? 'Password salah.' : err instanceof Error ? err.message : 'Gagal mengunduh data.'
+  } finally {
+    unduhDataLoading.value = false
+  }
+}
+
 // Download Excel Template
 async function downloadTemplate(jenis: string) {
   downloadTemplateLoading.value = true
@@ -468,7 +497,7 @@ const currentListCount = computed(() => {
 
         <div class="flex flex-wrap items-center gap-2">
           <button
-            v-if="['siswa', 'guru', 'kelas', 'guru_mapel'].includes(activeTab)"
+            v-if="bolehImpor"
             @click="downloadTemplate(activeTab)"
             :disabled="downloadTemplateLoading"
             class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
@@ -480,6 +509,19 @@ const currentListCount = computed(() => {
             </svg>
             <span class="hidden sm:inline">{{ downloadTemplateLoading ? 'Mengunduh...' : 'Unduh Template' }}</span>
           </button>
+          <button
+            v-if="isOperatorOrSuperadmin"
+            type="button"
+            @click="bukaUnduhData"
+            aria-label="Unduh data"
+            title="Unduh data ke Excel (bisa diedit lalu diimpor kembali)"
+            class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" />
+            </svg>
+            <span class="hidden sm:inline">Unduh Data</span>
+          </button>
           <span v-if="!bolehUbahTab" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -488,7 +530,7 @@ const currentListCount = computed(() => {
             <span>Mode Lihat Saja</span>
           </span>
           <button
-            v-if="['siswa', 'guru', 'kelas', 'guru_mapel'].includes(activeTab) && isOperatorOrSuperadmin"
+            v-if="bolehImpor"
             @click="openImport(activeTab)"
             aria-label="Impor data" title="Impor data dari Excel"
             class="btn-secondary !min-h-0 !py-2 text-xs flex items-center gap-1.5"
@@ -1279,6 +1321,17 @@ const currentListCount = computed(() => {
       confirm-text="Ya, Hapus"
       cancel-text="Batal"
       @confirm="confirmDeleteEntity"
+    />
+
+    <KonfirmasiPasswordModal
+      v-if="showUnduhData"
+      judul="Unduh data"
+      pesan="Data diunduh sebagai Excel dengan kolom yang sama seperti template impor, sehingga dapat diedit lalu diimpor kembali. Masukkan password Anda untuk melanjutkan."
+      tombol="Unduh"
+      :memproses="unduhDataLoading"
+      :galat="unduhDataGalat"
+      @konfirmasi="unduhData"
+      @batal="showUnduhData = false"
     />
   </StafLayout>
 </template>

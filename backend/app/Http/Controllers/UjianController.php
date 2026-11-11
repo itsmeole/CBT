@@ -33,13 +33,16 @@ class UjianController extends Controller
             return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Hanya akun siswa yang dapat mengakses jadwal ujian.']], 403);
         }
 
-        // Ambil sesi berdasarkan peserta_ujian yang terdaftar untuk siswa ini
+        // Hanya sesi tempat siswa ditempatkan operator, dan hanya selama jendela waktunya (tanggal dan jam sesi).
+        $sekarang = Carbon::now('Asia/Jakarta');
         $pesertaList = PesertaUjian::with([
             'sesiRuang.jadwalUjian.mapel',
             'sesiRuang.ruang',
         ])
-        ->where('siswa_id', $siswa->id)
-        ->get();
+            ->where('siswa_id', $siswa->id)
+            ->get()
+            ->filter(fn (PesertaUjian $p): bool => $this->dalamJendelaSesi($p, $sekarang))
+            ->values();
 
         $items = $pesertaList->map(function ($p) {
             $sesi = $p->sesiRuang;
@@ -62,36 +65,30 @@ class UjianController extends Controller
             ];
         });
 
-        // Fallback jika belum di-plot spesifik di peserta_ujian tapi ada jadwal sesi aktif
-        if ($items->isEmpty()) {
-            $today = Carbon::now('Asia/Jakarta')->format('Y-m-d');
-            $sesiUmum = \App\Models\SesiRuang::with(['jadwalUjian.mapel', 'ruang'])
-                ->whereHas('jadwalUjian', fn ($q) => $q->whereDate('tanggal', $today))
-                ->get()
-                ->map(function ($sesi) {
-                    $jadwal = $sesi->jadwalUjian;
+        return response()->json(['data' => $items]);
+    }
 
-                    return [
-                        'peserta_id' => null,
-                        'sesi_ruang_id' => $sesi->id,
-                        'status' => 'belum_login',
-                        'mapel_id' => $jadwal?->mapel_id,
-                        'nama_mapel' => $jadwal?->mapel?->nama ?? 'Ujian CBT',
-                        'kode_mapel' => $jadwal?->mapel?->kode ?? '',
-                        'nama_ujian' => $jadwal?->nama ?? 'Ujian Sekolah',
-                        'tanggal' => $jadwal?->tanggal?->format('Y-m-d'),
-                        'jam_mulai' => $sesi->jam_mulai,
-                        'jam_akhir' => $sesi->jam_akhir,
-                        'durasi_menit' => $jadwal?->durasi_menit ?? 90,
-                        'ruang' => $sesi->ruang?->nama ?? 'Ruang Ujian',
-                        'sesi_ke' => $sesi->sesi_ke,
-                    ];
-                });
-
-            return response()->json(['data' => $sesiUmum]);
+    /**
+     * Sesi dianggap tampil bila hari ini adalah tanggal jadwalnya dan waktu sekarang berada di antara jam mulai
+     * dan jam akhir sesi. Peserta yang sedang mengerjakan (atau terkunci) tetap tampil selama waktunya belum habis.
+     */
+    private function dalamJendelaSesi(PesertaUjian $peserta, Carbon $sekarang): bool
+    {
+        $sesi = $peserta->sesiRuang;
+        $jadwal = $sesi?->jadwalUjian;
+        if (! $sesi || ! $jadwal) {
+            return false;
         }
 
-        return response()->json(['data' => $items]);
+        if (in_array($peserta->status, ['mengerjakan', 'terkunci'], true) && $peserta->waktu_selesai?->isFuture()) {
+            return true;
+        }
+
+        $tanggal = $jadwal->tanggal->format('Y-m-d');
+        $mulai = Carbon::parse($tanggal.' '.$sesi->jam_mulai, 'Asia/Jakarta');
+        $akhir = Carbon::parse($tanggal.' '.$sesi->jam_akhir, 'Asia/Jakarta');
+
+        return $sekarang->greaterThanOrEqualTo($mulai) && $sekarang->lessThan($akhir);
     }
 
     /**
@@ -126,6 +123,11 @@ class UjianController extends Controller
         $jadwal = $sesi->jadwalUjian;
         if ($jadwal->tanggal->format('Y-m-d') !== Carbon::now('Asia/Jakarta')->format('Y-m-d')) {
             return response()->json(['error' => ['code' => 'TOKEN_INVALID', 'message' => 'Jadwal ujian tidak berlaku hari ini.']], 422);
+        }
+
+        $bukaSesi = Carbon::parse($jadwal->tanggal->format('Y-m-d').' '.$sesi->jam_mulai, 'Asia/Jakarta');
+        if (Carbon::now()->lessThan($bukaSesi)) {
+            return response()->json(['error' => ['code' => 'TOKEN_INVALID', 'message' => 'Sesi ujian belum dibuka.']], 422);
         }
 
         $batasSesi = Carbon::parse($jadwal->tanggal->format('Y-m-d').' '.$sesi->jam_akhir, 'Asia/Jakarta');

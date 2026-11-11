@@ -34,6 +34,7 @@ class GenerateLaporanPdf implements ShouldQueue
         $html = match ($laporan->jenis) {
             'kartu-peserta' => $this->kartuPeserta($laporan),
             'daftar-hadir' => $this->daftarHadir($laporan),
+            'daftar-hadir-semua' => $this->daftarHadirSemuaRuang($laporan),
             'berita-acara' => $this->beritaAcara($laporan),
             'rekap-nilai' => $this->rekapNilai($laporan),
             default => throw new \LogicException('Jenis laporan PDF tidak dikenal.'),
@@ -80,14 +81,52 @@ class GenerateLaporanPdf implements ShouldQueue
 
     private function daftarHadir(LaporanPdf $laporan): string
     {
-        $sesi = SesiRuang::query()->with([
+        $sesi = SesiRuang::query()->with($this->relasiDaftarHadir())->findOrFail($laporan->sesi_ruang_id);
+
+        return $this->document('Daftar Hadir', $this->isiDaftarHadir($sesi));
+    }
+
+    /**
+     * Satu PDF berisi daftar hadir setiap ruang pada sebuah jadwal ujian (satu halaman awal per ruang/sesi).
+     */
+    private function daftarHadirSemuaRuang(LaporanPdf $laporan): string
+    {
+        $jadwal = JadwalUjian::query()->findOrFail($laporan->jadwal_ujian_id);
+        $sesiList = SesiRuang::query()
+            ->with($this->relasiDaftarHadir())
+            ->where('jadwal_ujian_id', $jadwal->id)
+            ->orderBy('sesi_ke')
+            ->orderBy('jam_mulai')
+            ->orderBy('id')
+            ->get();
+
+        if ($sesiList->isEmpty()) {
+            return $this->document('Daftar Hadir', '<h1>Daftar Hadir Peserta Ujian</h1><p>Belum ada ruang/sesi dan penempatan peserta untuk jadwal ini.</p>');
+        }
+
+        $bagian = $sesiList->map(fn (SesiRuang $sesi): string => '<section class="ruang">'.$this->isiDaftarHadir($sesi).'</section>')->all();
+
+        return $this->document('Daftar Hadir - '.$jadwal->nama, implode('', $bagian));
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    private function relasiDaftarHadir(): array
+    {
+        return [
             'ruang',
             'jadwalUjian.mapel',
             'pengawasSesi.guru.user',
             'pesertaUjian' => fn ($peserta) => $peserta->orderBy('id'),
             'pesertaUjian.siswa.user',
             'pesertaUjian.siswa.kelas',
-        ])->findOrFail($laporan->sesi_ruang_id);
+        ];
+    }
+
+    /** Isi (judul, info, pengawas, peserta) daftar hadir satu sesi ruang. */
+    private function isiDaftarHadir(SesiRuang $sesi): string
+    {
         $jadwal = $sesi->jadwalUjian;
         $tanggal = $jadwal?->tanggal?->locale('id')->translatedFormat('l, d F Y') ?? '-';
         $waktu = substr((string) $sesi->jam_mulai, 0, 5).' - '.substr((string) $sesi->jam_akhir, 0, 5);
@@ -116,7 +155,7 @@ class GenerateLaporanPdf implements ShouldQueue
             .'<h2>Peserta ('.$peserta->count().' siswa)</h2><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Kehadiran</th><th>Tanda tangan</th></tr></thead><tbody>'.$rows.'</tbody></table>'
             .'<p>Hadir: '.$hadir.' &nbsp;|&nbsp; Tidak hadir: '.($peserta->count() - $hadir).'</p>';
 
-        return $this->document('Daftar Hadir', $body);
+        return $body;
     }
 
     /**
@@ -181,7 +220,7 @@ class GenerateLaporanPdf implements ShouldQueue
 
     private function document(string $title, string $body): string
     {
-        return '<!doctype html><html lang="id"><meta charset="utf-8"><title>'.$this->escape($title).'</title><style>body{font-family:DejaVu Sans,sans-serif;font-size:11px;color:#111}h1,h2{margin-bottom:8px}table{width:100%;border-collapse:collapse;margin-bottom:10px}.info td{border:none;padding:2px 5px}.ttd{width:110px}th,td{border:1px solid #444;padding:5px;text-align:left}.card{border:1px solid #222;padding:16px;margin:0 0 16px;page-break-inside:avoid}.card:not(:last-child){page-break-after:always}</style><body>'.$body.'</body></html>';
+        return '<!doctype html><html lang="id"><meta charset="utf-8"><title>'.$this->escape($title).'</title><style>body{font-family:DejaVu Sans,sans-serif;font-size:11px;color:#111}h1,h2{margin-bottom:8px}table{width:100%;border-collapse:collapse;margin-bottom:10px}.info td{border:none;padding:2px 5px}.ttd{width:110px}th,td{border:1px solid #444;padding:5px;text-align:left}.card{border:1px solid #222;padding:16px;margin:0 0 16px;page-break-inside:avoid}.card:not(:last-child){page-break-after:always}.ruang:not(:last-child){page-break-after:always}</style><body>'.$body.'</body></html>';
     }
 
     private function escape(mixed $value): string

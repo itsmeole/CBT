@@ -6,6 +6,7 @@ use App\Models\Guru;
 use App\Models\GuruMapel;
 use App\Models\Kelas;
 use App\Models\Mapel;
+use App\Models\Ruang;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
@@ -22,6 +23,29 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExcelService
 {
+    /** Jenis data master yang dapat diunduh, diimpor, dan diunduh sebagai template. */
+    public const JENIS = ['siswa', 'guru', 'kelas', 'guru_mapel', 'mapel', 'ruang', 'tahun_ajaran'];
+
+    /**
+     * Kolom dokumen per jenis. Urutan sama untuk template dan hasil unduh data, sehingga hasil unduh
+     * dapat diedit lalu diimpor kembali (baris yang sudah ada diperbarui, bukan digandakan).
+     *
+     * @return list<string>
+     */
+    public function kolom(string $jenis): array
+    {
+        return match ($jenis) {
+            'siswa' => ['username', 'nama', 'password', 'nis', 'nama_kelas', 'nama_tahun_ajaran', 'semester', 'jk'],
+            'guru' => ['username', 'nama', 'password', 'nip'],
+            'kelas' => ['nama_kelas', 'tingkat', 'nama_tahun_ajaran', 'semester'],
+            'guru_mapel' => ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
+            'mapel' => ['kode', 'nama'],
+            'ruang' => ['nama', 'kapasitas'],
+            'tahun_ajaran' => ['nama_tahun_ajaran', 'semester', 'aktif'],
+            default => [],
+        };
+    }
+
     /**
      * Download template Excel resmi.
      */
@@ -32,35 +56,32 @@ class ExcelService
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
-        switch ($jenis) {
-            case 'siswa':
-                $headers = ['username', 'nama', 'password', 'nis', 'nama_kelas', 'nama_tahun_ajaran', 'semester'];
-                $example = ['2026001', 'Ahmad Rizki', 'password123', '2026001', '7A', '2026/2027', '1'];
-                break;
-
-            case 'guru':
-                $headers = ['username', 'nama', 'password', 'nip'];
-                $example = ['guru_budi', 'Budi Santoso, S.Pd.', 'password123', '198501012010011001'];
-                break;
-
-            case 'kelas':
-                $headers = ['nama_kelas', 'tingkat', 'nama_tahun_ajaran', 'semester'];
-                $example = ['7A', '7', '2026/2027', '1'];
-                break;
-
-            case 'guru_mapel':
-                $headers = ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester'];
-                $example = ['guru_budi', 'MTK', '7A', '2026/2027', '1'];
-                break;
-
-            default:
-                throw new Exception('Jenis data master tidak valid.');
-        }
+        $headers = $this->kolom($jenis);
+        $example = match ($jenis) {
+            'siswa' => ['2026001', 'Ahmad Rizki', 'password123', '2026001', '7A', '2026/2027', '1', 'L'],
+            'guru' => ['guru_budi', 'Budi Santoso, S.Pd.', 'password123', '198501012010011001'],
+            'kelas' => ['7A', '7', '2026/2027', '1'],
+            'guru_mapel' => ['guru_budi', 'MTK', '7A', '2026/2027', '1'],
+            'mapel' => ['MTK', 'Matematika'],
+            'ruang' => ['Lab Komputer 1', '36'],
+            'tahun_ajaran' => ['2026/2027', '1', 'ya'],
+        };
 
         $sheet->fromArray([$headers, $example], null, 'A1');
 
         foreach (range('A', $sheet->getHighestColumn()) as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $petunjuk = $this->petunjuk($jenis);
+        if ($petunjuk !== []) {
+            $lembar = $spreadsheet->createSheet();
+            $lembar->setTitle('Petunjuk');
+            foreach ($petunjuk as $i => $baris) {
+                $lembar->setCellValue('A'.($i + 1), $baris);
+            }
+            $lembar->getColumnDimension('A')->setWidth(110);
+            $spreadsheet->setActiveSheetIndex(0);
         }
 
         $tempPath = tempnam(sys_get_temp_dir(), 'tpl_').'.xlsx';
@@ -77,49 +98,49 @@ class ExcelService
     {
         $this->validateJenis($jenis);
 
-        [$headers, $rows] = match ($jenis) {
-            'siswa' => [
-                ['username', 'nama', 'nis', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
-                Siswa::query()->with(['user', 'kelas.tahunAjaran'])->orderBy('id')->get()
-                    ->map(fn (Siswa $siswa): array => [
-                        $siswa->user?->username,
-                        $siswa->user?->name,
-                        $siswa->nis,
-                        $siswa->kelas?->nama,
-                        $siswa->kelas?->tahunAjaran?->nama,
-                        $siswa->kelas?->tahunAjaran?->semester,
-                    ])->all(),
-            ],
-            'guru' => [
-                ['username', 'nama', 'nip'],
-                Guru::query()->with('user')->orderBy('id')->get()
-                    ->map(fn (Guru $guru): array => [
-                        $guru->user?->username,
-                        $guru->user?->name,
-                        $guru->nip,
-                    ])->all(),
-            ],
-            'kelas' => [
-                ['nama_kelas', 'tingkat', 'nama_tahun_ajaran', 'semester'],
-                Kelas::query()->with('tahunAjaran')->orderBy('id')->get()
-                    ->map(fn (Kelas $kelas): array => [
-                        $kelas->nama,
-                        $kelas->tingkat,
-                        $kelas->tahunAjaran?->nama,
-                        $kelas->tahunAjaran?->semester,
-                    ])->all(),
-            ],
-            'guru_mapel' => [
-                ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
-                GuruMapel::query()->with(['guru.user', 'mapel', 'kelas.tahunAjaran'])->orderBy('id')->get()
-                    ->map(fn (GuruMapel $guruMapel): array => [
-                        $guruMapel->guru?->user?->username,
-                        $guruMapel->mapel?->kode,
-                        $guruMapel->kelas?->nama,
-                        $guruMapel->tahunAjaran?->nama,
-                        $guruMapel->tahunAjaran?->semester,
-                    ])->all(),
-            ],
+        $headers = $this->kolom($jenis);
+        // Password tersimpan sebagai hash satu arah sehingga tidak dapat diekspor; kolomnya dikosongkan.
+        // Saat diimpor kembali, password kosong berarti password akun yang sudah ada tidak diubah.
+        $rows = match ($jenis) {
+            'siswa' => Siswa::query()->with(['user', 'kelas.tahunAjaran'])->orderBy('id')->get()
+                ->map(fn (Siswa $siswa): array => [
+                    $siswa->user?->username,
+                    $siswa->user?->name,
+                    '',
+                    $siswa->nis,
+                    $siswa->kelas?->nama,
+                    $siswa->kelas?->tahunAjaran?->nama,
+                    $siswa->kelas?->tahunAjaran?->semester,
+                    $siswa->jk,
+                ])->all(),
+            'guru' => Guru::query()->with('user')->orderBy('id')->get()
+                ->map(fn (Guru $guru): array => [
+                    $guru->user?->username,
+                    $guru->user?->name,
+                    '',
+                    $guru->nip,
+                ])->all(),
+            'kelas' => Kelas::query()->with('tahunAjaran')->orderBy('id')->get()
+                ->map(fn (Kelas $kelas): array => [
+                    $kelas->nama,
+                    $kelas->tingkat,
+                    $kelas->tahunAjaran?->nama,
+                    $kelas->tahunAjaran?->semester,
+                ])->all(),
+            'guru_mapel' => GuruMapel::query()->with(['guru.user', 'mapel', 'kelas.tahunAjaran'])->orderBy('id')->get()
+                ->map(fn (GuruMapel $guruMapel): array => [
+                    $guruMapel->guru?->user?->username,
+                    $guruMapel->mapel?->kode,
+                    $guruMapel->kelas?->nama,
+                    $guruMapel->tahunAjaran?->nama,
+                    $guruMapel->tahunAjaran?->semester,
+                ])->all(),
+            'mapel' => Mapel::query()->orderBy('id')->get()
+                ->map(fn (Mapel $mapel): array => [$mapel->kode, $mapel->nama])->all(),
+            'ruang' => Ruang::query()->orderBy('id')->get()
+                ->map(fn (Ruang $ruang): array => [$ruang->nama, $ruang->kapasitas])->all(),
+            'tahun_ajaran' => TahunAjaran::query()->orderBy('id')->get()
+                ->map(fn (TahunAjaran $ta): array => [$ta->nama, $ta->semester, $ta->aktif ? 'ya' : 'tidak'])->all(),
         };
 
         $spreadsheet = new Spreadsheet;
@@ -253,35 +274,20 @@ class ExcelService
                         if (! $kelas) {
                             throw new Exception("Kelas {$row['nama_kelas']} pada tahun ajaran tersebut tidak ditemukan.");
                         }
-                        $user = User::updateOrCreate(
-                            ['username' => $row['username']],
-                            [
-                                'name' => $row['nama'],
-                                'password' => Hash::make($row['password']),
-                                'role' => 'siswa',
-                                'aktif' => true,
-                            ]
-                        );
-                        Siswa::updateOrCreate(
-                            ['user_id' => $user->id],
-                            ['nis' => $row['nis'], 'kelas_id' => $kelas->id]
-                        );
+                        $user = $this->simpanAkun($row, 'siswa');
+                        $dataSiswa = ['nis' => $row['nis'], 'kelas_id' => $kelas->id];
+                        if (($row['jk'] ?? '') !== '') {
+                            $dataSiswa['jk'] = strtoupper($row['jk']);
+                        }
+                        Siswa::updateOrCreate(['user_id' => $user->id], $dataSiswa);
                         $count++;
                         break;
 
                     case 'guru':
-                        $user = User::updateOrCreate(
-                            ['username' => $row['username']],
-                            [
-                                'name' => $row['nama'],
-                                'password' => Hash::make($row['password']),
-                                'role' => 'guru',
-                                'aktif' => true,
-                            ]
-                        );
+                        $user = $this->simpanAkun($row, 'guru');
                         Guru::updateOrCreate(
                             ['user_id' => $user->id],
-                            ['nip' => $row['nip'] ?: null]
+                            ['nip' => ($row['nip'] ?? '') !== '' ? $row['nip'] : null]
                         );
                         $count++;
                         break;
@@ -324,6 +330,28 @@ class ExcelService
                         ]);
                         $count++;
                         break;
+
+                    case 'mapel':
+                        Mapel::updateOrCreate(['kode' => $row['kode']], ['nama' => $row['nama']]);
+                        $count++;
+                        break;
+
+                    case 'ruang':
+                        Ruang::updateOrCreate(['nama' => $row['nama']], ['kapasitas' => (int) $row['kapasitas']]);
+                        $count++;
+                        break;
+
+                    case 'tahun_ajaran':
+                        $ta = TahunAjaran::firstOrNew(['nama' => $row['nama_tahun_ajaran'], 'semester' => (int) $row['semester']]);
+                        if (($row['aktif'] ?? '') !== '') {
+                            $ta->aktif = $this->boolDariTeks($row['aktif']);
+                        }
+                        $ta->save();
+                        if ($ta->aktif) {
+                            TahunAjaran::where('id', '!=', $ta->id)->update(['aktif' => false]);
+                        }
+                        $count++;
+                        break;
                 }
             }
 
@@ -342,8 +370,9 @@ class ExcelService
                 if (empty($row['nama'])) {
                     $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama siswa wajib diisi.'];
                 }
-                if (strlen($row['password'] ?? '') < 6) {
-                    $errs[] = ['row' => $rowNumber, 'column' => 'password', 'message' => 'Password wajib diisi minimal 6 karakter.'];
+                $errs = array_merge($errs, $this->validasiPassword('siswa', $row, $rowNumber));
+                if (($row['jk'] ?? '') !== '' && ! in_array(strtoupper($row['jk']), ['L', 'P'], true)) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'jk', 'message' => 'Jenis kelamin harus L atau P.'];
                 }
                 if (empty($row['nis'])) {
                     $errs[] = ['row' => $rowNumber, 'column' => 'nis', 'message' => 'NIS wajib diisi.'];
@@ -386,9 +415,7 @@ class ExcelService
                 if (empty($row['nama'])) {
                     $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama guru wajib diisi.'];
                 }
-                if (strlen($row['password'] ?? '') < 6) {
-                    $errs[] = ['row' => $rowNumber, 'column' => 'password', 'message' => 'Password wajib diisi minimal 6 karakter.'];
-                }
+                $errs = array_merge($errs, $this->validasiPassword('guru', $row, $rowNumber));
                 if (! empty($row['username'])) {
                     $user = User::where('username', $row['username'])->first();
                     if ($user && $user->role !== 'guru') {
@@ -412,6 +439,44 @@ class ExcelService
                 }
                 if (! in_array($row['semester'] ?? '', ['1', '2'], true)) {
                     $errs[] = ['row' => $rowNumber, 'column' => 'semester', 'message' => 'Semester harus 1 atau 2.'];
+                }
+                break;
+
+            case 'mapel':
+                if (empty($row['kode'])) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'kode', 'message' => 'Kode mapel wajib diisi.'];
+                } elseif (strlen($row['kode']) > 30 || ! preg_match('/^[A-Za-z0-9._-]+$/', $row['kode'])) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'kode', 'message' => 'Kode mapel maksimal 30 karakter (huruf, angka, titik, garis bawah, strip).'];
+                }
+                if (empty($row['nama'])) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama mapel wajib diisi.'];
+                } elseif (strlen($row['nama']) > 100) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama mapel maksimal 100 karakter.'];
+                }
+                break;
+
+            case 'ruang':
+                if (empty($row['nama'])) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama ruang wajib diisi.'];
+                } elseif (strlen($row['nama']) > 50) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'nama', 'message' => 'Nama ruang maksimal 50 karakter.'];
+                }
+                if (! ctype_digit((string) ($row['kapasitas'] ?? '')) || (int) $row['kapasitas'] < 1 || (int) $row['kapasitas'] > 1000) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'kapasitas', 'message' => 'Kapasitas harus bilangan bulat 1 sampai 1000.'];
+                }
+                break;
+
+            case 'tahun_ajaran':
+                if (empty($row['nama_tahun_ajaran'])) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'nama_tahun_ajaran', 'message' => 'Tahun ajaran wajib diisi.'];
+                } elseif (strlen($row['nama_tahun_ajaran']) > 50) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'nama_tahun_ajaran', 'message' => 'Tahun ajaran maksimal 50 karakter.'];
+                }
+                if (! in_array($row['semester'] ?? '', ['1', '2'], true)) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'semester', 'message' => 'Semester harus 1 atau 2.'];
+                }
+                if (($row['aktif'] ?? '') !== '' && ! in_array(strtolower($row['aktif']), ['ya', 'tidak', '1', '0', 'true', 'false'], true)) {
+                    $errs[] = ['row' => $rowNumber, 'column' => 'aktif', 'message' => 'Kolom aktif harus ya atau tidak.'];
                 }
                 break;
 
@@ -453,13 +518,8 @@ class ExcelService
 
     private function headersWajib(string $jenis): array
     {
-        return match ($jenis) {
-            'siswa' => ['username', 'nama', 'password', 'nis', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
-            'guru' => ['username', 'nama', 'password', 'nip'],
-            'kelas' => ['nama_kelas', 'tingkat', 'nama_tahun_ajaran', 'semester'],
-            'guru_mapel' => ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester'],
-            default => [],
-        };
+        // Kolom opsional (jk pada siswa) boleh tidak ada pada dokumen lama.
+        return array_values(array_diff($this->kolom($jenis), ['jk']));
     }
 
     private function validateDuplikatBaris(string $jenis, array $row, int $rowNumber, array &$seen): array
@@ -469,6 +529,9 @@ class ExcelService
             'guru' => ['username' => ['username'], 'nip' => ['nip']],
             'kelas' => ['kelas' => ['nama_kelas', 'nama_tahun_ajaran', 'semester']],
             'guru_mapel' => ['guru_mapel' => ['username_guru', 'kode_mapel', 'nama_kelas', 'nama_tahun_ajaran', 'semester']],
+            'mapel' => ['kode' => ['kode']],
+            'ruang' => ['nama' => ['nama']],
+            'tahun_ajaran' => ['tahun_ajaran' => ['nama_tahun_ajaran', 'semester']],
             default => [],
         };
         $errors = [];
@@ -494,6 +557,84 @@ class ExcelService
         return $errors;
     }
 
+    /**
+     * Password wajib (minimal 6 karakter) untuk akun baru. Untuk akun yang sudah ada boleh kosong
+     * (password tidak diubah); bila diisi tetap minimal 6 karakter.
+     *
+     * @return list<array{row: int, column: string, message: string}>
+     */
+    private function validasiPassword(string $role, array $row, int $rowNumber): array
+    {
+        $password = (string) ($row['password'] ?? '');
+        $sudahAda = ! empty($row['username']) && User::where('username', $row['username'])->where('role', $role)->exists();
+
+        if ($password === '' && $sudahAda) {
+            return [];
+        }
+        if ($password === '' || strlen($password) < 6) {
+            return [['row' => $rowNumber, 'column' => 'password', 'message' => $sudahAda
+                ? 'Password minimal 6 karakter (kosongkan bila tidak ingin mengubah).'
+                : 'Password wajib diisi minimal 6 karakter untuk akun baru.']];
+        }
+
+        return [];
+    }
+
+    /**
+     * Buat atau perbarui akun berdasarkan username. Password dan status aktif akun yang sudah ada
+     * tidak diubah kecuali password diisi.
+     */
+    private function simpanAkun(array $row, string $role): User
+    {
+        $atribut = ['name' => $row['nama'], 'role' => $role];
+        if (($row['password'] ?? '') !== '') {
+            $atribut['password'] = Hash::make($row['password']);
+        }
+
+        $user = User::where('username', $row['username'])->first();
+        if ($user) {
+            $user->update($atribut);
+
+            return $user;
+        }
+
+        return User::create($atribut + ['username' => $row['username'], 'aktif' => true]);
+    }
+
+    private function boolDariTeks(string $nilai): bool
+    {
+        return in_array(strtolower(trim($nilai)), ['ya', '1', 'true'], true);
+    }
+
+    /**
+     * Catatan singkat pada lembar "Petunjuk" di template.
+     *
+     * @return list<string>
+     */
+    private function petunjuk(string $jenis): array
+    {
+        $umum = [
+            'Isi data mulai baris 2 pada lembar pertama. Baris contoh boleh dihapus.',
+            'Dokumen hasil "Unduh Data" memakai kolom yang sama dengan template ini. Ubah kolom yang perlu lalu impor kembali: baris yang sudah ada akan diperbarui, bukan digandakan.',
+        ];
+
+        return match ($jenis) {
+            'siswa' => [...$umum,
+                'Data dicocokkan berdasarkan kolom username. NIS tidak boleh sama dengan siswa lain.',
+                'Kolom password: wajib untuk akun baru. Untuk akun yang sudah ada, kosongkan bila password tidak ingin diubah (password lama tidak dapat diunduh karena disimpan terenkripsi).',
+                'Kolom jk (L atau P) boleh dikosongkan.',
+            ],
+            'guru' => [...$umum,
+                'Data dicocokkan berdasarkan kolom username.',
+                'Kolom password: wajib untuk akun baru. Untuk akun yang sudah ada, kosongkan bila password tidak ingin diubah (password lama tidak dapat diunduh karena disimpan terenkripsi).',
+            ],
+            'tahun_ajaran' => [...$umum, 'Kolom aktif: ya atau tidak. Hanya satu tahun ajaran yang aktif; mengisi ya menonaktifkan yang lain.'],
+            'mapel' => [...$umum, 'Data dicocokkan berdasarkan kolom kode.'],
+            'ruang' => [...$umum, 'Data dicocokkan berdasarkan kolom nama.'],
+            default => $umum,
+        };
+    }
+
     private function validateJenis(string $jenis): void
     {
         // FR-BE-14: Proteksi ketat! Bank soal dilarang diimpor/diekspor lewat Excel.
@@ -501,7 +642,7 @@ class ExcelService
             throw new Exception('Bank soal tidak boleh diimpor/diekspor lewat Excel. Gunakan format Word (.docx).');
         }
 
-        if (! in_array($jenis, ['siswa', 'guru', 'kelas', 'guru_mapel'])) {
+        if (! in_array($jenis, self::JENIS, true)) {
             throw new Exception("Jenis data master '{$jenis}' tidak didukung.");
         }
     }

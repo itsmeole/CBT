@@ -22,13 +22,13 @@ class LaporanPdfController extends Controller
 
     public function store(Request $request, string $jenis): JsonResponse
     {
-        if (! in_array($jenis, ['kartu-peserta', 'daftar-hadir', 'berita-acara', 'rekap-nilai'], true)) {
+        if (! in_array($jenis, ['kartu-peserta', 'daftar-hadir', 'daftar-hadir-semua', 'berita-acara', 'rekap-nilai'], true)) {
             return $this->error('NOT_FOUND', 'Jenis laporan PDF tidak ditemukan.', 404);
         }
 
         $validated = $request->validate([
             'jadwal_id' => [
-                in_array($jenis, ['kartu-peserta', 'rekap-nilai'], true) ? 'required' : 'prohibited',
+                in_array($jenis, ['kartu-peserta', 'rekap-nilai', 'daftar-hadir-semua'], true) ? 'required' : 'prohibited',
                 'integer',
                 'exists:jadwal_ujian,id',
             ],
@@ -45,6 +45,10 @@ class LaporanPdfController extends Controller
 
         if ($jenis === 'kartu-peserta' && ! in_array($request->user()->role, ['operator', 'superadmin'], true)) {
             return $this->error('FORBIDDEN', 'Hanya Operator atau Superadmin yang dapat mencetak kartu peserta.', 403);
+        }
+
+        if ($jenis === 'daftar-hadir-semua' && ! in_array($request->user()->role, ['operator', 'superadmin'], true)) {
+            return $this->error('FORBIDDEN', 'Hanya Operator atau Superadmin yang dapat mencetak daftar hadir semua ruang.', 403);
         }
 
         if ($jenis === 'rekap-nilai') {
@@ -80,7 +84,7 @@ class LaporanPdfController extends Controller
 
             return $laporan;
         });
-        GenerateLaporanPdf::dispatch($laporan->id)->onQueue('reports');
+        GenerateLaporanPdf::dispatch($laporan->id)->onQueue((string) config('cbt.queue_laporan', 'reports'));
 
         return response()->json(['data' => $laporan->fresh()], 202);
     }

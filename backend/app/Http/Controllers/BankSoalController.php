@@ -379,6 +379,7 @@ class BankSoalController extends Controller
         return DB::table('paket_soal_item')
             ->join('jadwal_ujian', 'jadwal_ujian.paket_soal_id', '=', 'paket_soal_item.paket_soal_id')
             ->where('paket_soal_item.bank_soal_id', $soalId)
+            ->whereNull('jadwal_ujian.deleted_at')
             ->exists();
     }
 

@@ -21,6 +21,7 @@ use App\Models\TahunAjaran;
 use App\Models\TokenUjian;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -113,6 +114,8 @@ class PenempatanRuangTest extends TestCase
             ->getJson("/api/v1/jadwal/{$this->jadwal->id}/penempatan")
             ->assertOk()
             ->assertJsonCount(2, 'data.sesi')
+            ->assertJsonPath('data.sesi.0.ruang_id', $r1->id)
+            ->assertJsonPath('data.sesi.1.ruang_id', $r2->id)
             ->assertJsonCount(3, 'data.sesi.0.peserta');
     }
 
@@ -183,6 +186,43 @@ class PenempatanRuangTest extends TestCase
         $this->actingAs($this->operator, 'sanctum')->deleteJson($url)
             ->assertStatus(422)
             ->assertJsonPath('error.code', 'IN_USE');
+        $this->assertSame(1, PesertaUjian::count());
+    }
+
+    public function test_unstarted_schedule_can_be_deleted_and_frees_its_package_and_questions(): void
+    {
+        $siswa = $this->buatSiswa(2);
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/jadwal/{$this->jadwal->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => $siswa]]))->assertCreated();
+        $paketId = $this->jadwal->paket_soal_id;
+        $soalId = $this->jadwal->soal_snapshot[0];
+
+        $this->actingAs($this->guruUser, 'sanctum')->deleteJson("/api/v1/jadwal/{$this->jadwal->id}")->assertForbidden();
+        $this->actingAs($this->guruUser, 'sanctum')->deleteJson("/api/v1/paket-soal/{$paketId}")->assertStatus(422);
+
+        $this->actingAs($this->operator, 'sanctum')->deleteJson("/api/v1/jadwal/{$this->jadwal->id}")->assertOk();
+
+        $this->assertNull(JadwalUjian::find($this->jadwal->id));
+        $this->assertSame(0, SesiRuang::count());
+        $this->assertSame(0, PesertaUjian::count());
+        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'jadwal.dihapus']);
+
+        $this->actingAs($this->guruUser, 'sanctum')->putJson("/api/v1/bank-soal/{$soalId}", ['konten' => 'diubah'])->assertOk();
+        $this->actingAs($this->guruUser, 'sanctum')->deleteJson("/api/v1/paket-soal/{$paketId}")->assertOk();
+    }
+
+    public function test_schedule_deletion_is_blocked_after_attendance_or_exam_start(): void
+    {
+        $siswa = $this->buatSiswa(1);
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $this->actingAs($this->operator, 'sanctum')
+            ->postJson("/api/v1/jadwal/{$this->jadwal->id}/penempatan", $this->payload([['ruang_id' => $ruang->id, 'siswa_ids' => $siswa]]))->assertCreated();
+        PesertaUjian::query()->update(['hadir' => true]);
+
+        $this->actingAs($this->operator, 'sanctum')->deleteJson("/api/v1/jadwal/{$this->jadwal->id}")
+            ->assertStatus(422)->assertJsonPath('error.code', 'IN_USE');
+        $this->assertNotNull(JadwalUjian::find($this->jadwal->id));
         $this->assertSame(1, PesertaUjian::count());
     }
 
@@ -257,6 +297,43 @@ class PenempatanRuangTest extends TestCase
         $this->assertStringContainsString('08:00 - 09:30', $html);
         $this->assertStringContainsString('Selasa, 10 November 2026', $html);
         $this->assertStringContainsString('Hadir: 1', $html);
+    }
+
+    public function test_attendance_list_for_all_rooms_contains_every_room_of_the_schedule_and_is_operator_only(): void
+    {
+        $ruang1 = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $ruang2 = Ruang::create(['nama' => 'R2', 'kapasitas' => 5]);
+        $sesi1 = SesiRuang::create(['jadwal_ujian_id' => $this->jadwal->id, 'ruang_id' => $ruang1->id, 'sesi_ke' => 1, 'jam_mulai' => '08:00', 'jam_akhir' => '09:30']);
+        $sesi2 = SesiRuang::create(['jadwal_ujian_id' => $this->jadwal->id, 'ruang_id' => $ruang2->id, 'sesi_ke' => 1, 'jam_mulai' => '08:00', 'jam_akhir' => '09:30']);
+        [$a, $b] = $this->buatSiswa(2);
+        PesertaUjian::create(['siswa_id' => $a, 'sesi_ruang_id' => $sesi1->id, 'status' => 'belum_login', 'hadir' => true]);
+        PesertaUjian::create(['siswa_id' => $b, 'sesi_ruang_id' => $sesi2->id, 'status' => 'belum_login', 'hadir' => false]);
+
+        $this->actingAs($this->guruUser, 'sanctum')->postJson('/api/v1/laporan-pdf/daftar-hadir-semua', ['jadwal_id' => $this->jadwal->id])->assertForbidden();
+        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/daftar-hadir-semua', ['sesi_ruang_id' => $sesi1->id])->assertStatus(422);
+        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/daftar-hadir-semua', ['jadwal_id' => $this->jadwal->id])->assertStatus(202);
+
+        $laporan = LaporanPdf::where('jenis', 'daftar-hadir-semua')->firstOrFail();
+        $metode = new ReflectionMethod(GenerateLaporanPdf::class, 'daftarHadirSemuaRuang');
+        $html = $metode->invoke(new GenerateLaporanPdf($laporan->id), $laporan);
+
+        $this->assertSame(2, substr_count($html, 'Daftar Hadir Peserta Ujian'), 'Satu bagian per ruang.');
+        $this->assertStringContainsString('R1', $html);
+        $this->assertStringContainsString('R2', $html);
+        $this->assertStringContainsString('Hadir: 1', $html);
+        $this->assertStringContainsString('Tidak hadir: 1', $html);
+    }
+
+    public function test_pdf_jobs_use_the_configured_queue(): void
+    {
+        Queue::fake();
+        config(['cbt.queue_laporan' => 'default']);
+        $ruang = Ruang::create(['nama' => 'R1', 'kapasitas' => 5]);
+        $sesi = SesiRuang::create(['jadwal_ujian_id' => $this->jadwal->id, 'ruang_id' => $ruang->id, 'sesi_ke' => 1, 'jam_mulai' => '08:00', 'jam_akhir' => '09:30']);
+
+        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/daftar-hadir', ['sesi_ruang_id' => $sesi->id])->assertStatus(202);
+
+        Queue::assertPushedOn('default', GenerateLaporanPdf::class);
     }
 
     public function test_schedule_and_placement_show_the_active_token_not_a_stale_one_after_regeneration(): void

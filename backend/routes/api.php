@@ -84,6 +84,7 @@ Route::prefix('v1')->group(function () {
             Route::get('jadwal/{id}/penempatan', [PenempatanController::class, 'show']);
             Route::post('jadwal/{id}/penempatan', [PenempatanController::class, 'store']);
             Route::delete('jadwal/{id}/penempatan', [PenempatanController::class, 'destroy']);
+            Route::delete('jadwal/{id}', [PenempatanController::class, 'destroyJadwal'])->whereNumber('id');
             Route::post('sesi-ruang/{id}/pengawas', [JadwalController::class, 'plotPengawas']);
             Route::post('sesi-ruang/{id}/token/generate', [JadwalController::class, 'generateToken']);
 
@@ -138,7 +139,7 @@ Route::prefix('v1')->group(function () {
 
             // Impor / Ekspor Excel Master Data
             Route::get('templates/excel/{jenis}', [ExcelController::class, 'template']);
-            Route::get('export/excel/{jenis}', [ExcelController::class, 'export']);
+            Route::post('export/excel/{jenis}', [ExcelController::class, 'export'])->middleware('throttle:10,1');
             Route::post('import/excel/{jenis}/preview', [ExcelController::class, 'preview']);
             Route::post('import/excel/{jenis}/commit', [ExcelController::class, 'commit']);
             Route::get('import/excel/status/{importId}', [ExcelController::class, 'status']);

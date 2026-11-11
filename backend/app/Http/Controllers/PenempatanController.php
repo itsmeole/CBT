@@ -40,6 +40,7 @@ class PenempatanController extends Controller
             'jadwal' => ['id' => $jadwal->id, 'nama' => $jadwal->nama, 'mapel' => $jadwal->mapel?->nama, 'tanggal' => $jadwal->tanggal?->toDateString()],
             'sesi' => $jadwal->sesiRuang->map(fn (SesiRuang $sesi): array => [
                 'id' => $sesi->id,
+                'ruang_id' => $sesi->ruang_id,
                 'ruang' => $sesi->ruang?->nama,
                 'kapasitas' => $sesi->ruang?->kapasitas,
                 'sesi_ke' => $sesi->sesi_ke,
@@ -167,6 +168,33 @@ class PenempatanController extends Controller
         });
 
         return response()->json(['message' => 'Penempatan peserta dan sesi ruang direset.']);
+    }
+
+    /**
+     * Hapus jadwal beserta sesi ruang dan penempatannya. Hanya bila ujian belum berjalan: belum ada
+     * peserta yang hadir atau mulai, dan belum ada berita acara. Paket dan soalnya terbuka kembali.
+     */
+    public function destroyJadwal(Request $request, int $jadwalId): JsonResponse
+    {
+        $jadwal = JadwalUjian::findOrFail($jadwalId);
+        $sesiIds = SesiRuang::where('jadwal_ujian_id', $jadwal->id)->pluck('id');
+
+        $sudahBerjalan = PesertaUjian::whereIn('sesi_ruang_id', $sesiIds)
+            ->where(fn ($q) => $q->where('status', '!=', 'belum_login')->orWhere('hadir', true))
+            ->exists();
+        $adaBeritaAcara = SesiRuang::whereIn('id', $sesiIds)->whereHas('beritaAcara')->exists();
+        if ($sudahBerjalan || $adaBeritaAcara) {
+            return $this->error('IN_USE', 'Jadwal tidak dapat dihapus karena ujian sudah berjalan, kehadiran sudah dicatat, atau berita acara sudah dibuat.', 422);
+        }
+
+        DB::transaction(function () use ($jadwal, $sesiIds, $request): void {
+            PesertaUjian::whereIn('sesi_ruang_id', $sesiIds)->delete();
+            SesiRuang::whereIn('id', $sesiIds)->delete();
+            $jadwal->delete();
+            $this->auditLog->record($request->user(), 'jadwal.dihapus', 'jadwal_ujian', $jadwal->id, ['nama' => $jadwal->nama, 'sesi' => $sesiIds->count()], $request);
+        });
+
+        return response()->json(['message' => 'Jadwal ujian berhasil dihapus.']);
     }
 
     /**
