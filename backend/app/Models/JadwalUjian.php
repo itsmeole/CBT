@@ -20,6 +20,7 @@ class JadwalUjian extends Model
         'tanggal',
         'durasi_menit',
         'bobot_snapshot',
+        'bobot_mode',
         'soal_snapshot',
         'status',
     ];

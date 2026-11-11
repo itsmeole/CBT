@@ -217,6 +217,7 @@ class JadwalController extends Controller
             'tanggal' => $validated['tanggal'],
             'durasi_menit' => $validated['durasi_menit'],
             'bobot_snapshot' => $bobotMap,
+            'bobot_mode' => 'total_tipe',
             'soal_snapshot' => $soalSnapshot,
             'status' => 'aktif',
         ]);

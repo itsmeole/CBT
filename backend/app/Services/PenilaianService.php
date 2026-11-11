@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BankSoal;
+use App\Models\JadwalUjian;
 use App\Models\JawabanSiswa;
 use App\Models\Nilai;
 use App\Models\PesertaUjian;
@@ -74,13 +75,52 @@ class PenilaianService
         }
     }
 
+    /**
+     * Poin maksimal setiap butir soal pada sebuah jadwal.
+     *
+     * Mode `total_tipe`: bobot tipe adalah jatah total tipe itu dan dibagi rata ke semua butir bertipe sama
+     * (sisa pembulatan 0,01 poin dibagikan ke butir berurutan id terkecil), sehingga jumlah seluruhnya tepat
+     * sama dengan jumlah bobot. Mode `per_butir` (jadwal lama): setiap butir bernilai bobot tipenya.
+     *
+     * @param  iterable<BankSoal>  $soalList
+     * @return array<int, string> id soal => poin maksimal (mis. "6.67")
+     */
+    public function bobotPerSoal(JadwalUjian $jadwal, iterable $soalList): array
+    {
+        $bobotSnapshot = $jadwal->bobot_snapshot ?? [];
+        $perTipe = [];
+        foreach ($soalList as $soal) {
+            $perTipe[$soal->tipe][] = (int) $soal->id;
+        }
+
+        $hasil = [];
+        foreach ($perTipe as $tipe => $ids) {
+            sort($ids);
+            $bobot = $this->keSatuanDesimal($bobotSnapshot[$tipe] ?? '1.00');
+            if (($jadwal->bobot_mode ?? 'per_butir') === 'total_tipe') {
+                $jumlah = count($ids);
+                $dasar = intdiv($bobot, $jumlah);
+                $sisa = $bobot % $jumlah;
+                foreach ($ids as $urutan => $id) {
+                    $hasil[$id] = $this->dariSatuanDesimal($dasar + ($urutan < $sisa ? 1 : 0));
+                }
+            } else {
+                foreach ($ids as $id) {
+                    $hasil[$id] = $this->dariSatuanDesimal($bobot);
+                }
+            }
+        }
+
+        return $hasil;
+    }
+
     public function nilaiPeserta(PesertaUjian $peserta): Nilai
     {
         $jadwal = $peserta->sesiRuang->jadwalUjian;
-        $bobotSnapshot = $jadwal->bobot_snapshot ?? [];
         $soalIds = $jadwal->soal_snapshot
             ?? $jadwal->paketSoal->items()->pluck('bank_soal_id')->all();
         $soalList = BankSoal::whereIn('id', $soalIds)->get();
+        $bobotPerSoal = $this->bobotPerSoal($jadwal, $soalList);
         $tipeSoal = ['pg', 'pg_kompleks', 'benar_salah', 'menjodohkan', 'essay'];
         $skorPerTipe = array_fill_keys($tipeSoal, 0);
         $maksimalPerTipe = $skorPerTipe;
@@ -89,7 +129,7 @@ class PenilaianService
 
         foreach ($soalList as $soal) {
             $tipe = $soal->tipe;
-            $bobot = $bobotSnapshot[$tipe] ?? '1.00';
+            $bobot = $bobotPerSoal[$soal->id];
             $bobotSatuan = $this->keSatuanDesimal($bobot);
             $maksimalPerTipe[$tipe] += $bobotSatuan;
             $jawabanRecord = $jawabanMap->get($soal->id);

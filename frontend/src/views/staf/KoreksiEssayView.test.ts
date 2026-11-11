@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
 
 const { get, put } = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }))
 
@@ -14,6 +14,7 @@ vi.mock('@/components/StafLayout.vue', async () => {
   return { default: defineComponent({ render() { return h('div', this.$slots.default?.()) } }) }
 })
 
+import { useAuthStore } from '@/stores/auth'
 import KoreksiEssayView from './KoreksiEssayView.vue'
 
 const antrean = [
@@ -119,6 +120,32 @@ describe('KoreksiEssayView filter', () => {
     await wrapper.findAll('select')[2].setValue('4')
     await flushPromises()
     expect(get).toHaveBeenLastCalledWith('/koreksi/essay', { params: { jadwal_id: 3, kelas_id: 4 } })
+    wrapper.unmount()
+  })
+
+  it('operator hanya melihat jawaban (termasuk yang sudah dikoreksi), tanpa formulir skor', async () => {
+    get.mockImplementation((url: string) => {
+      if (url === '/mapel') return Promise.resolve({ data: { data: [{ id: 1, nama: 'IPA' }] } })
+      if (url === '/kelas') return Promise.resolve({ data: { data: [{ id: 4, nama: 'X-1' }] } })
+      if (url === '/jadwal') return Promise.resolve({ data: { data: [{ id: 3, nama: 'UTS IPA', mapel_id: 1, mapel: { nama: 'IPA' } }] } })
+      if (url === '/koreksi/essay') {
+        return Promise.resolve({ data: { data: [{ ...antrean[0], sudah_dikoreksi: true, skor: '8.50', catatan: 'Bagus' }] } })
+      }
+      return Promise.reject(new Error(`URL tak terduga: ${url}`))
+    })
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useAuthStore().setUser({ id: 1, username: 'op', nama: 'Operator', role: 'operator' })
+    const wrapper = mount(KoreksiEssayView, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    expect(get).toHaveBeenCalledWith('/koreksi/essay', { params: { jadwal_id: 3, termasuk_dikoreksi: 1 } })
+    const teks = wrapper.text()
+    expect(teks).toContain('Proses membuat makanan')
+    expect(teks).toContain('Sudah dikoreksi: skor 8.50 dari 10.00')
+    expect(teks).toContain('Catatan: Bagus')
+    expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(false)
+    expect(wrapper.findAll('button').some((b) => b.text().includes('Simpan Skor'))).toBe(false)
     wrapper.unmount()
   })
 })

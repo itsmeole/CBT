@@ -3,6 +3,7 @@ import { tanggalPendek } from '@/lib/waktu'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { apiClient } from '@/api/client'
 import { ambilHalaman } from '@/lib/paginasi'
+import { statusPilihan, toggleSemua } from '@/lib/pilihSemua'
 import {
   acakPenempatan,
   ringkasPerRuang,
@@ -73,6 +74,14 @@ const pesanError = ref('')
 const pesanInfo = ref('')
 
 const kelasTahunIni = computed(() => kelasList.value.filter((k) => k.tahun_ajaran_id === props.jadwal.tahun_ajaran_id))
+const statusKelas = computed(() => statusPilihan(kelasTahunIni.value.map((k) => k.id), kelasDipilih.value))
+const statusRuang = computed(() => statusPilihan(ruangList.value.map((r) => r.id), ruangDipilih.value))
+function pilihSemuaKelas() {
+  kelasDipilih.value = toggleSemua(kelasTahunIni.value.map((k) => k.id), kelasDipilih.value)
+}
+function pilihSemuaRuang() {
+  ruangDipilih.value = toggleSemua(ruangList.value.map((r) => r.id), ruangDipilih.value)
+}
 const ruangTerpilih = computed(() => ruangList.value.filter((r) => ruangDipilih.value.includes(r.id)))
 const namaSiswa = (s: SiswaItem) => s.nama ?? s.user?.name ?? '-'
 
@@ -310,23 +319,57 @@ onMounted(muat)
         <div class="grid gap-4 md:grid-cols-2">
           <section aria-label="Pilih kelas">
             <h3 class="mb-1 text-xs font-bold text-slate-500">1. Kelas peserta</h3>
-            <div class="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
-              <label v-for="k in kelasTahunIni" :key="k.id" class="flex cursor-pointer items-center gap-2 rounded p-1 text-sm hover:bg-slate-50">
-                <input v-model="kelasDipilih" type="checkbox" :value="k.id" class="h-4 w-4 rounded text-brand-600" />
-                <span>{{ k.nama }}</span>
-                <span class="ml-auto text-xs text-slate-400">{{ siswaList.filter((s) => s.kelas_id === k.id).length }} siswa</span>
+            <div class="overflow-hidden rounded-xl border border-slate-200">
+              <label
+                v-if="kelasTahunIni.length > 0"
+                class="flex cursor-pointer items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded text-brand-600"
+                  aria-label="Pilih semua kelas"
+                  :checked="statusKelas === 'semua'"
+                  :indeterminate.prop="statusKelas === 'sebagian'"
+                  @change="pilihSemuaKelas"
+                />
+                <span>Pilih semua</span>
+                <span class="ml-auto text-xs font-medium tabular-nums text-slate-500">{{ kelasDipilih.length }}/{{ kelasTahunIni.length }} dipilih</span>
               </label>
-              <p v-if="kelasTahunIni.length === 0" class="p-2 text-xs italic text-slate-400">Tidak ada kelas pada tahun ajaran jadwal ini.</p>
+              <div class="max-h-40 space-y-0.5 overflow-y-auto p-1.5">
+                <label v-for="k in kelasTahunIni" :key="k.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                  <input v-model="kelasDipilih" type="checkbox" :value="k.id" class="h-4 w-4 rounded text-brand-600" />
+                  <span>{{ k.nama }}</span>
+                  <span class="ml-auto text-xs text-slate-400">{{ siswaList.filter((s) => s.kelas_id === k.id).length }} siswa</span>
+                </label>
+                <p v-if="kelasTahunIni.length === 0" class="p-2 text-xs italic text-slate-400">Tidak ada kelas pada tahun ajaran jadwal ini.</p>
+              </div>
             </div>
           </section>
           <section aria-label="Pilih ruang">
             <h3 class="mb-1 text-xs font-bold text-slate-500">2. Ruang yang dipakai</h3>
-            <div class="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
-              <label v-for="r in ruangList" :key="r.id" class="flex cursor-pointer items-center gap-2 rounded p-1 text-sm hover:bg-slate-50">
-                <input v-model="ruangDipilih" type="checkbox" :value="r.id" class="h-4 w-4 rounded text-brand-600" />
-                <span>{{ r.nama }}</span>
-                <span class="ml-auto text-xs text-slate-400">kapasitas {{ r.kapasitas }}</span>
+            <div class="overflow-hidden rounded-xl border border-slate-200">
+              <label
+                v-if="ruangList.length > 0"
+                class="flex cursor-pointer items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded text-brand-600"
+                  aria-label="Pilih semua ruang"
+                  :checked="statusRuang === 'semua'"
+                  :indeterminate.prop="statusRuang === 'sebagian'"
+                  @change="pilihSemuaRuang"
+                />
+                <span>Pilih semua</span>
+                <span class="ml-auto text-xs font-medium tabular-nums text-slate-500">{{ ruangDipilih.length }}/{{ ruangList.length }} dipilih</span>
               </label>
+              <div class="max-h-40 space-y-0.5 overflow-y-auto p-1.5">
+                <label v-for="r in ruangList" :key="r.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                  <input v-model="ruangDipilih" type="checkbox" :value="r.id" class="h-4 w-4 rounded text-brand-600" />
+                  <span>{{ r.nama }}</span>
+                  <span class="ml-auto text-xs text-slate-400">kapasitas {{ r.kapasitas }}</span>
+                </label>
+              </div>
             </div>
           </section>
         </div>

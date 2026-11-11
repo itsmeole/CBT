@@ -28,11 +28,16 @@ class KoreksiEssayController extends Controller
         $validated = $request->validate([
             'jadwal_id' => ['required', 'integer', 'exists:jadwal_ujian,id'],
             'kelas_id' => ['nullable', 'integer', 'exists:kelas,id'],
+            'termasuk_dikoreksi' => ['nullable', 'boolean'],
         ]);
         $jadwal = JadwalUjian::findOrFail($validated['jadwal_id']);
         $kelasId = isset($validated['kelas_id']) ? (int) $validated['kelas_id'] : null;
+        $termasukDikoreksi = (bool) ($validated['termasuk_dikoreksi'] ?? false);
 
-        if (! $this->otorisasi->bolehAksesMapelKelas($request->user(), $jadwal, $kelasId)) {
+        // Operator hanya boleh melihat jawaban (tidak menilai); Superadmin boleh melihat dan menilai.
+        $bolehLihat = $request->user()->role === 'operator'
+            || $this->otorisasi->bolehAksesMapelKelas($request->user(), $jadwal, $kelasId);
+        if (! $bolehLihat) {
             return $this->error('FORBIDDEN', 'Anda tidak mengampu mapel atau kelas pada jadwal ini.', 403);
         }
 
@@ -61,13 +66,15 @@ class KoreksiEssayController extends Controller
             $pesertaQuery->whereHas('siswa', fn ($query) => $query->where('kelas_id', $kelasId));
         }
 
+        $bobotPerSoal = $this->penilaian->bobotPerSoal($jadwal, $this->soalJadwal($jadwal)->get());
         $soalMap = $this->soalJadwal($jadwal)->where('tipe', 'essay')->get()->keyBy('id');
         $antrian = [];
         foreach ($pesertaQuery->orderBy('id')->get() as $peserta) {
             $jawabanMap = $peserta->jawaban->keyBy('bank_soal_id');
             foreach ($soalMap as $soalId => $soal) {
                 $jawaban = $jawabanMap->get($soalId);
-                if ($jawaban && $jawaban->dikoreksi_oleh !== null) {
+                $sudahDikoreksi = $jawaban !== null && $jawaban->dikoreksi_oleh !== null;
+                if ($sudahDikoreksi && ! $termasukDikoreksi) {
                     continue;
                 }
 
@@ -84,7 +91,8 @@ class KoreksiEssayController extends Controller
                     'jawaban' => $jawaban?->jawaban,
                     'skor' => $jawaban?->skor ?? '0.00',
                     'catatan' => $jawaban?->catatan_koreksi,
-                    'skor_maksimal' => $jadwal->bobot_snapshot['essay'] ?? '1.00',
+                    'skor_maksimal' => $bobotPerSoal[$soal->id] ?? '1.00',
+                    'sudah_dikoreksi' => $sudahDikoreksi,
                 ];
             }
         }
@@ -108,7 +116,7 @@ class KoreksiEssayController extends Controller
         }
 
         $skor = $request->validated('skor');
-        $maksimal = $jadwal->bobot_snapshot['essay'] ?? '1.00';
+        $maksimal = $this->penilaian->bobotPerSoal($jadwal, $this->soalJadwal($jadwal)->get())[$soal->id] ?? '1.00';
         if ($this->penilaian->nilaiKeSatuanDesimal($skor) > $this->penilaian->nilaiKeSatuanDesimal($maksimal)) {
             return $this->error('VALIDATION_ERROR', 'Skor essay tidak boleh melebihi bobot maksimal soal.', 422);
         }

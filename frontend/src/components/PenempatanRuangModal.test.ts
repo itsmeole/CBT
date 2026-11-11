@@ -239,4 +239,26 @@ describe('PengawasSesiModal', () => {
     expect(Object.keys(peta)).toHaveLength(6)
     wrapper.unmount()
   })
+
+  it('pilih semua pada kelas dan ruang mencentang semuanya, klik lagi mengosongkan', async () => {
+    mockData()
+    const wrapper = mount(PenempatanRuangModal, { props: { jadwal } })
+    await flushPromises()
+
+    const semuaKelas = wrapper.find('input[aria-label="Pilih semua kelas"]')
+    const semuaRuang = wrapper.find('input[aria-label="Pilih semua ruang"]')
+    await semuaKelas.setValue(true)
+    await semuaRuang.setValue(true)
+
+    const centangKelas = wrapper.findAll('section[aria-label="Pilih kelas"] input[type="checkbox"]').filter((i) => i.attributes('aria-label') === undefined)
+    const centangRuang = wrapper.findAll('section[aria-label="Pilih ruang"] input[type="checkbox"]').filter((i) => i.attributes('aria-label') === undefined)
+    expect(centangKelas).toHaveLength(2) // hanya kelas pada tahun ajaran jadwal
+    expect(centangKelas.every((i) => (i.element as HTMLInputElement).checked)).toBe(true)
+    expect(centangRuang).toHaveLength(2)
+    expect(centangRuang.every((i) => (i.element as HTMLInputElement).checked)).toBe(true)
+
+    await semuaKelas.setValue(false)
+    expect(centangKelas.every((i) => !(i.element as HTMLInputElement).checked)).toBe(true)
+    wrapper.unmount()
+  })
 })

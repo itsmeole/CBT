@@ -337,6 +337,37 @@ class Fase2Test extends TestCase
         ]);
     }
 
+    public function test_operator_and_superadmin_can_see_all_essay_answers_but_only_superadmin_and_teacher_can_score(): void
+    {
+        $fixture = $this->createFixture('selesai');
+        $jawaban = JawabanSiswa::create([
+            'peserta_ujian_id' => $fixture['participant']->id,
+            'bank_soal_id' => $fixture['question']->id,
+            'jawaban' => 'Jawaban siswa',
+            'client_seq' => 1,
+        ]);
+        $url = '/api/v1/koreksi/essay?jadwal_id='.$fixture['schedule']->id;
+        $operator = User::factory()->role('operator')->create();
+        $superadmin = User::factory()->role('superadmin')->create();
+
+        $this->actingAs($operator, 'sanctum')->getJson($url)
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.jawaban', 'Jawaban siswa')->assertJsonPath('data.0.sudah_dikoreksi', false);
+        $this->actingAs($operator, 'sanctum')->putJson("/api/v1/koreksi/essay/{$jawaban->id}", ['skor' => '1.00'])->assertForbidden();
+
+        $this->actingAs($fixture['teacherUser'], 'sanctum')
+            ->putJson("/api/v1/koreksi/essay/{$jawaban->id}", ['skor' => '2.00', 'catatan' => 'ok'])->assertOk();
+
+        // Antrean biasa tidak lagi memuatnya; mode lihat semua tetap menampilkan jawaban yang sudah dikoreksi.
+        $this->actingAs($operator, 'sanctum')->getJson($url)->assertOk()->assertJsonCount(0, 'data');
+        foreach ([$operator, $superadmin] as $pengguna) {
+            $this->actingAs($pengguna, 'sanctum')->getJson($url.'&termasuk_dikoreksi=1')
+                ->assertOk()->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.jawaban', 'Jawaban siswa')
+                ->assertJsonPath('data.0.skor', '2.00')
+                ->assertJsonPath('data.0.sudah_dikoreksi', true);
+        }
+    }
+
     public function test_teacher_grade_recap_is_limited_to_taught_classes_and_students_cannot_read_it(): void
     {
         $fixture = $this->createFixture('selesai');

@@ -509,7 +509,7 @@ onMounted(() => {
         <!-- 3. Konfigurasi Bobot Tipe Soal -->
         <div v-if="activeTab === 'bobot'" class="max-w-xl">
           <p class="text-xs text-slate-600 mb-4">
-            Atur bobot standar per tipe soal. Ketika jadwal ujian dibuat, bobot ini akan di-snapshot ke jadwal ujian tersebut.
+            Atur jatah poin untuk setiap tipe soal. Poin tipe itu dibagi rata ke semua soal bertipe sama pada sebuah ujian, sehingga skor maksimal ujian selalu sama dengan jumlah bobot di bawah. Bobot disalin ke jadwal saat jadwal dibuat; jadwal lama tidak berubah.
           </p>
 
           <form @submit.prevent="saveBobot" class="space-y-3">
@@ -520,7 +520,7 @@ onMounted(() => {
             >
               <div>
                 <p class="text-sm font-bold capitalize text-slate-800">{{ tipe.replace('_', ' ') }}</p>
-                <p class="text-xs text-slate-400">Bobot kontribusi nilai</p>
+                <p class="text-xs text-slate-400">Total poin untuk semua soal tipe ini</p>
               </div>
               <input
                 v-model.number="editBobot[tipe]"
@@ -534,9 +534,12 @@ onMounted(() => {
             </div>
 
             <div class="flex items-center justify-between pt-2">
-              <span class="text-sm font-bold text-slate-700">Total Akumulasi Bobot:</span>
+              <span class="text-sm font-bold text-slate-700">Skor maksimal ujian:</span>
               <span class="text-base font-extrabold text-brand-700">{{ totalBobot }}</span>
             </div>
+            <p v-if="Number(totalBobot) !== 100" class="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800">
+              Disarankan berjumlah 100 agar skor langsung sama dengan nilai. Nilai akhir siswa tetap dihitung pada skala 0 sampai 100 berapa pun jumlahnya.
+            </p>
 
             <div v-if="bolehAtur" class="pt-4">
               <button

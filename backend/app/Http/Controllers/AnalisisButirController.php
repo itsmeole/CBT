@@ -33,10 +33,7 @@ class AnalisisButirController extends Controller
         $soalIds = $jadwal->soal_snapshot
             ?? $jadwal->paketSoal->items()->orderBy('urutan')->pluck('bank_soal_id')->all();
         $soalList = BankSoal::query()->whereIn('id', $soalIds)->get()->keyBy('id');
-        $maxScores = [];
-        foreach ($soalList as $soal) {
-            $maxScores[$soal->id] = (float) ($jadwal->bobot_snapshot[$soal->tipe] ?? '1.00');
-        }
+        $maxScores = array_map('floatval', app(PenilaianService::class)->bobotPerSoal($jadwal, $soalList));
         $pesertaQuery = PesertaUjian::query()
             ->with([
                 'siswa.kelas',
