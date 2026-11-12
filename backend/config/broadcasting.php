@@ -43,6 +43,9 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Batas waktu pendek agar server realtime yang mati tidak menahan worker lama.
+                'connect_timeout' => 1,
+                'timeout' => 3,
             ],
         ],
 

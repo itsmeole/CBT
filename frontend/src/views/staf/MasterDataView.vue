@@ -3,7 +3,6 @@ import TabelMemuat from '@/components/TabelMemuat.vue'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { TAB_MASTER, tabValid } from '@/lib/navigasi'
-import { ambilHalaman } from '@/lib/paginasi'
 import StafLayout from '@/components/StafLayout.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import KonfirmasiPasswordModal from '@/components/KonfirmasiPasswordModal.vue'
@@ -81,21 +80,46 @@ async function fetchData() {
     mapelList.value = mplRes.data.data || []
     ruangList.value = rngRes.data.data || []
 
-    if (activeTab.value === 'siswa') {
-      const res = await apiClient.get('/siswa')
-      siswaList.value = res.data.data || []
-    } else if (activeTab.value === 'guru') {
-      const res = await apiClient.get('/guru')
-      guruList.value = res.data.data || []
-    } else if (activeTab.value === 'guru_mapel') {
-      const [gmRes, guruRes] = await Promise.all([apiClient.get('/guru-mapel'), apiClient.get('/guru')])
-      guruMapelList.value = gmRes.data.data || []
-      guruList.value = guruRes.data.data || []
-    }
+    await muatDaftar()
   } catch (err: any) {
     errorMessage.value = err.message || 'Gagal memuat data.'
   } finally {
     loading.value = false
+  }
+}
+
+/** Daftar besar (siswa, guru, pengampu) dimuat per halaman dari server, lengkap dengan pencarian dan filter. */
+const metaHalaman = ref({ page: 1, per_page: UKURAN_HALAMAN, total: 0, last_page: 1 })
+let urutanMuat = 0
+let guruLengkap = false // guruList berisi seluruh guru (untuk formulir pengampu), bukan satu halaman
+
+async function muatDaftar() {
+  const tab = activeTab.value
+  if (tab !== 'siswa' && tab !== 'guru' && tab !== 'guru_mapel') return
+  const urutan = ++urutanMuat
+  const params: Record<string, unknown> = { page: halaman.value, per_page: UKURAN_HALAMAN }
+  if (searchQuery.value.trim() !== '') params.q = searchQuery.value.trim()
+  if (tab === 'siswa' && filterKelasId.value !== '') params.kelas_id = filterKelasId.value
+  const endpoint = tab === 'guru_mapel' ? '/guru-mapel' : `/${tab}`
+  const [res, semuaGuru] = await Promise.all([
+    apiClient.get(endpoint, { params }),
+    // Formulir pengampu memerlukan seluruh guru untuk pilihan.
+    tab === 'guru_mapel' && !guruLengkap ? apiClient.get('/guru') : Promise.resolve(null)
+  ])
+  if (urutan !== urutanMuat) return // permintaan lebih baru sudah menggantikan
+  const data = res.data.data || []
+  if (res.data.meta) metaHalaman.value = res.data.meta
+  if (tab === 'siswa') siswaList.value = data
+  else if (tab === 'guru') {
+    guruList.value = data
+    guruLengkap = false
+  }
+  else {
+    guruMapelList.value = data
+    if (semuaGuru) {
+      guruList.value = semuaGuru.data.data || []
+      guruLengkap = true
+    }
   }
 }
 
@@ -104,46 +128,36 @@ async function handleTabChange(tab: TabType) {
   searchQuery.value = ''
   filterKelasId.value = ''
   halaman.value = 1
-  if (tab === 'guru_mapel') {
-    await fetchData()
-    return
-  }
-  if (tab === 'siswa' && siswaList.value.length === 0) {
-    loading.value = true
-    const res = await apiClient.get('/siswa')
-    siswaList.value = res.data.data || []
-    loading.value = false
-  } else if (tab === 'guru' && guruList.value.length === 0) {
-    loading.value = true
-    const res = await apiClient.get('/guru')
-    guruList.value = res.data.data || []
+
+  loading.value = true
+  try {
+    await muatDaftar()
+  } finally {
     loading.value = false
   }
 }
 
 // Filtered Lists
-const filteredSiswa = computed(() => {
-  const q = searchQuery.value.toLowerCase()
-  return siswaList.value.filter(s => {
-    if (filterKelasId.value !== '' && (s.kelas_id ?? s.kelas?.id) !== filterKelasId.value) return false
-    const nama = (s.nama || s.user?.name || '').toLowerCase()
-    const nis = (s.nis || '').toLowerCase()
-    const username = (s.username || s.user?.username || '').toLowerCase()
-    return nama.includes(q) || nis.includes(q) || username.includes(q)
-  })
-})
+// Pencarian dan filter dilakukan server; yang diterima sudah satu halaman.
+const filteredSiswa = computed(() => siswaList.value)
+const filteredGuruMapel = computed(() => guruMapelList.value)
+const filteredGuru = computed(() => guruList.value)
 
-const filteredGuruMapel = computed(() => {
-  const q = searchQuery.value.toLowerCase()
-  return guruMapelList.value.filter(gm =>
-    (gm.guru?.user?.name || '').toLowerCase().includes(q) || ((gm.mapel?.kode || '') + ' ' + (gm.mapel?.nama || '')).toLowerCase().includes(q) || (gm.kelas?.nama || '').toLowerCase().includes(q)
-  )
-})
-
-// Paginasi sisi klien untuk daftar besar (siswa & guru)
-const halamanSiswa = computed(() => ambilHalaman(filteredSiswa.value, halaman.value, UKURAN_HALAMAN))
-const halamanGuru = computed(() => ambilHalaman(filteredGuru.value, halaman.value, UKURAN_HALAMAN))
-const halamanGuruMapel = computed(() => ambilHalaman(filteredGuruMapel.value, halaman.value, UKURAN_HALAMAN))
+function infoDariServer<T>(item: T[]) {
+  const m = metaHalaman.value
+  const awal = (m.page - 1) * m.per_page
+  return {
+    item,
+    halaman: m.page,
+    totalHalaman: Math.max(1, m.last_page),
+    dari: m.total === 0 ? 0 : awal + 1,
+    sampai: awal + item.length,
+    total: m.total
+  }
+}
+const halamanSiswa = computed(() => infoDariServer(siswaList.value))
+const halamanGuru = computed(() => infoDariServer(guruList.value))
+const halamanGuruMapel = computed(() => infoDariServer(guruMapelList.value))
 const infoHalaman = computed(() => {
   if (activeTab.value === 'siswa') return halamanSiswa.value
   if (activeTab.value === 'guru') return halamanGuru.value
@@ -151,18 +165,25 @@ const infoHalaman = computed(() => {
   return null
 })
 
+// Ganti halaman memuat ulang segera; mengetik di pencarian ditunda sebentar agar tidak membebani server.
+let tundaCari: ReturnType<typeof setTimeout> | undefined
+async function muatUlangDaftar() {
+  loading.value = true
+  try {
+    await muatDaftar()
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Gagal memuat data.'
+  } finally {
+    loading.value = false
+  }
+}
+watch(halaman, () => void muatUlangDaftar())
 watch([searchQuery, filterKelasId], () => {
-  halaman.value = 1
-})
-
-const filteredGuru = computed(() => {
-  const q = searchQuery.value.toLowerCase()
-  return guruList.value.filter(g => {
-    const nama = (g.nama || g.user?.name || '').toLowerCase()
-    const nip = (g.nip || '').toLowerCase()
-    const username = (g.username || g.user?.username || '').toLowerCase()
-    return nama.includes(q) || nip.includes(q) || username.includes(q)
-  })
+  clearTimeout(tundaCari)
+  tundaCari = setTimeout(() => {
+    if (halaman.value !== 1) halaman.value = 1 // memicu muat ulang lewat watch(halaman)
+    else void muatUlangDaftar()
+  }, 300)
 })
 
 const filteredKelas = computed(() => {
@@ -497,13 +518,13 @@ watch(
 
 const currentListCount = computed(() => {
   switch (activeTab.value) {
-    case 'siswa': return filteredSiswa.value.length
-    case 'guru': return filteredGuru.value.length
+    case 'siswa': return metaHalaman.value.total
+    case 'guru': return metaHalaman.value.total
     case 'kelas': return filteredKelas.value.length
     case 'mapel': return filteredMapel.value.length
     case 'ruang': return filteredRuang.value.length
     case 'tahun_ajaran': return filteredTahunAjaran.value.length
-    case 'guru_mapel': return filteredGuruMapel.value.length
+    case 'guru_mapel': return metaHalaman.value.total
     default: return 0
   }
 })

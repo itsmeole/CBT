@@ -398,6 +398,25 @@ class PenempatanRuangTest extends TestCase
         $this->assertSame(0, GuruMapel::where('guru_id', $this->guru->id)->count());
     }
 
+    public function test_master_lists_are_paginated_and_searchable_on_the_server_only_when_requested(): void
+    {
+        $this->buatSiswa(7);
+
+        $semua = $this->actingAs($this->operator, 'sanctum')->getJson('/api/v1/siswa')->assertOk();
+        $this->assertCount(7, $semua->json('data'));
+        $this->assertNull($semua->json('meta'));
+
+        $halaman = $this->actingAs($this->operator, 'sanctum')->getJson('/api/v1/siswa?page=2&per_page=3')->assertOk();
+        $this->assertCount(3, $halaman->json('data'));
+        $this->assertSame(['page' => 2, 'per_page' => 3, 'total' => 7, 'last_page' => 3], $halaman->json('meta'));
+
+        $cari = $this->actingAs($this->operator, 'sanctum')->getJson('/api/v1/siswa?page=1&q=tidak-ada-yang-cocok')->assertOk();
+        $this->assertSame(0, $cari->json('meta.total'));
+
+        $guru = $this->actingAs($this->operator, 'sanctum')->getJson('/api/v1/guru-mapel?page=1&q=IPA')->assertOk();
+        $this->assertSame(1, $guru->json('meta.total'));
+    }
+
     public function test_a_grade_specific_subject_only_accepts_students_from_that_grade(): void
     {
         $siswa = $this->buatSiswa(1);

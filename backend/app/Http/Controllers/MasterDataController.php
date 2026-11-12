@@ -196,9 +196,38 @@ class MasterDataController extends Controller
     // ==========================================
     // SISWA
     // ==========================================
-    public function getSiswa(): JsonResponse
+    /**
+     * Tanpa parameter `page`: seluruh siswa (dipakai penempatan peserta). Dengan `page`: paginasi di server
+     * dengan pencarian `q` (nama, username, NIS) dan filter `kelas_id`.
+     */
+    public function getSiswa(Request $request): JsonResponse
     {
-        return response()->json(['data' => Siswa::with(['user', 'kelas.tahunAjaran'])->get()]);
+        $query = Siswa::with(['user', 'kelas.tahunAjaran']);
+        if (! $request->has('page')) {
+            return response()->json(['data' => $query->get()]);
+        }
+
+        $kelasId = $request->integer('kelas_id');
+        $q = trim((string) $request->query('q', ''));
+        $query->when($kelasId > 0, fn ($builder) => $builder->where('kelas_id', $kelasId))
+            ->when($q !== '', fn ($builder) => $builder->where(fn ($cari) => $cari
+                ->where('nis', 'like', "%{$q}%")
+                ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$q}%")->orWhere('username', 'like', "%{$q}%"))))
+            ->orderBy('kelas_id')->orderBy('id');
+
+        return $this->halaman($query, $request);
+    }
+
+    /** Respons paginasi seragam: data + meta. */
+    private function halaman($query, Request $request): JsonResponse
+    {
+        $perHalaman = max(1, min(100, $request->integer('per_page', 25)));
+        $hasil = $query->paginate($perHalaman, ['*'], 'page', max(1, $request->integer('page', 1)));
+
+        return response()->json([
+            'data' => $hasil->items(),
+            'meta' => ['page' => $hasil->currentPage(), 'per_page' => $hasil->perPage(), 'total' => $hasil->total(), 'last_page' => $hasil->lastPage()],
+        ]);
     }
 
     public function storeSiswa(Request $request): JsonResponse
@@ -282,9 +311,21 @@ class MasterDataController extends Controller
     // ==========================================
     // GURU
     // ==========================================
-    public function getGuru(): JsonResponse
+    /** Tanpa `page`: semua guru (dipakai pilihan pengawas dan pengampu). Dengan `page`: paginasi dan pencarian `q`. */
+    public function getGuru(Request $request): JsonResponse
     {
-        return response()->json(['data' => Guru::with(['user', 'mapel'])->get()]);
+        $query = Guru::with(['user', 'mapel']);
+        if (! $request->has('page')) {
+            return response()->json(['data' => $query->get()]);
+        }
+
+        $q = trim((string) $request->query('q', ''));
+        $query->when($q !== '', fn ($builder) => $builder->where(fn ($cari) => $cari
+            ->where('nip', 'like', "%{$q}%")
+            ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$q}%")->orWhere('username', 'like', "%{$q}%"))))
+            ->orderBy('id');
+
+        return $this->halaman($query, $request);
     }
 
     public function storeGuru(Request $request): JsonResponse
@@ -447,11 +488,22 @@ class MasterDataController extends Controller
     // ==========================================
     // GURU MAPEL
     // ==========================================
-    public function getGuruMapel(): JsonResponse
+    /** Tanpa `page`: semua pengampu. Dengan `page`: paginasi dan pencarian `q` (guru, kode/nama mapel, kelas). */
+    public function getGuruMapel(Request $request): JsonResponse
     {
-        return response()->json([
-            'data' => GuruMapel::with(['guru.user', 'mapel', 'kelas', 'tahunAjaran'])->get(),
-        ]);
+        $query = GuruMapel::with(['guru.user', 'mapel', 'kelas', 'tahunAjaran']);
+        if (! $request->has('page')) {
+            return response()->json(['data' => $query->get()]);
+        }
+
+        $q = trim((string) $request->query('q', ''));
+        $query->when($q !== '', fn ($builder) => $builder->where(fn ($cari) => $cari
+            ->whereHas('guru.user', fn ($user) => $user->where('name', 'like', "%{$q}%"))
+            ->orWhereHas('mapel', fn ($mapel) => $mapel->where('kode', 'like', "%{$q}%")->orWhere('nama', 'like', "%{$q}%"))
+            ->orWhereHas('kelas', fn ($kelas) => $kelas->where('nama', 'like', "%{$q}%"))))
+            ->orderBy('id');
+
+        return $this->halaman($query, $request);
     }
 
     public function storeGuruMapel(Request $request): JsonResponse

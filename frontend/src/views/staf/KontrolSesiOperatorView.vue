@@ -78,7 +78,7 @@ async function fetchSesiDetail() {
     sesiData.value = res.data.data
 
     // Populate presensiState. Centang yang sudah diubah tetapi belum disimpan dipertahankan saat data
-    // disegarkan otomatis (tiap 10 detik); hanya baris yang belum disentuh yang mengikuti server.
+    // disegarkan otomatis (tiap 30 detik); hanya baris yang belum disentuh yang mengikuti server.
     const dariServer: Record<number, boolean> = {}
     const map: Record<number, boolean> = {}
     for (const p of sesiData.value?.peserta_ujian ?? []) {
@@ -364,19 +364,28 @@ function getStatusBadge(status: string) {
 }
 
 let autoRefreshTimer: any = null
+const INTERVAL_SEGAR_MS = 30000
+
+/** Kembali ke tab ini setelah lama berpindah: data langsung disegarkan, tidak menunggu putaran berikutnya. */
+function segarkanSaatKembali() {
+  if (!document.hidden && selectedSesiId.value && !actionLoading.value) void fetchSesiDetail()
+}
 
 onMounted(() => {
   fetchJadwalList()
-  // Polling monitoring every 10 seconds
+  // Penyegaran otomatis tiap 30 detik, dan hanya saat tab ini sedang terlihat (hemat beban server).
   autoRefreshTimer = setInterval(() => {
+    if (document.hidden) return
     if (selectedSesiId.value && !actionLoading.value) {
       fetchSesiDetail()
     }
-  }, 10000)
+  }, INTERVAL_SEGAR_MS)
+  document.addEventListener('visibilitychange', segarkanSaatKembali)
 })
 
 onUnmounted(() => {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer)
+  document.removeEventListener('visibilitychange', segarkanSaatKembali)
 })
 </script>
 

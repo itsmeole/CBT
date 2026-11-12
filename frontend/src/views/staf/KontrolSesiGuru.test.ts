@@ -90,7 +90,7 @@ describe('Kontrol Sesi untuk guru pengawas', () => {
     await kotak()[0].setValue(true)
     expect((kotak()[0].element as HTMLInputElement).checked).toBe(true)
 
-    // Penyegaran (otomatis tiap 10 detik, di sini lewat tombol Segarkan): server masih menjawab hadir = false.
+    // Penyegaran (otomatis tiap 30 detik, di sini lewat tombol Segarkan): server masih menjawab hadir = false.
     await wrapper.find('button[aria-label="Segarkan"]').trigger('click')
     await flushPromises()
     expect((kotak()[0].element as HTMLInputElement).checked).toBe(true)
