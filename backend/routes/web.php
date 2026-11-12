@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
@@ -48,6 +49,41 @@ Route::get('/storage/{path}', function (string $path) {
     StartSession::class,
     ShareErrorsFromSession::class,
 ])->where('path', '.*');
+
+/*
+ * SEMENTARA: jalankan perintah artisan lewat browser karena hosting tidak punya terminal. HAPUS setelah deploy.
+ * Aktif hanya jika CBT_ARTISAN_TOKEN (min. 16 karakter) diisi di .env. Contoh:
+ *   /_artisan/migrate?token=XXX
+ *   /_artisan/seed?token=XXX&class=DataSekolahTestingSeeder   (tanpa class = DatabaseSeeder)
+ * Grup 'web' dilepas agar tetap bisa dipanggil walau APP_KEY belum ada (untuk key-generate).
+ */
+Route::get('/_artisan/{cmd}', function (string $cmd) {
+    $token = (string) config('cbt.artisan_token');
+    abort_if(strlen($token) < 16 || ! hash_equals($token, (string) request('token')), 404);
+
+    $class = (string) request('class', 'DatabaseSeeder');
+    abort_unless(preg_match('/^\w+$/', $class) && class_exists('Database\\Seeders\\'.$class), 422, 'Seeder tidak ditemukan.');
+
+    [$command, $args] = match ($cmd) {
+        'migrate' => ['migrate', ['--force' => true]],
+        'seed' => ['db:seed', ['--class' => 'Database\\Seeders\\'.$class, '--force' => true]],
+        'key-generate' => ['key:generate', ['--force' => true]],
+        'view-clear' => ['view:clear', []],
+        'cache-clear' => ['cache:clear', []],
+        'config-clear' => ['config:clear', []],
+        'storage-link' => ['storage:link', ['--force' => true]],
+        default => abort(404),
+    };
+
+    try {
+        $code = Artisan::call($command, $args);
+        $out = "$ php artisan $command\nexit code: $code\n\n".Artisan::output();
+    } catch (Throwable $e) {
+        $out = "$ php artisan $command\nGAGAL: ".$e->getMessage();
+    }
+
+    return response($out, 200, ['Content-Type' => 'text/plain; charset=utf-8']);
+})->withoutMiddleware('web')->where('cmd', '[a-z-]+');
 
 /*
  * Frontend (SPA) disajikan dari domain yang sama dengan API: halaman apa pun selain API dan berkas statis

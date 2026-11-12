@@ -8,4 +8,7 @@ return [
     // Antrean untuk job PDF. Produksi memakai worker terpisah ('reports'); saat pengembangan lokal cukup
     // satu worker, set CBT_QUEUE_LAPORAN=default agar PDF tidak tersangkut menunggu worker 'reports'.
     'queue_laporan' => env('CBT_QUEUE_LAPORAN', 'reports'),
+
+    // SEMENTARA (hosting tanpa terminal): token untuk rute /_artisan/*. Kosong = rute nonaktif (404).
+    'artisan_token' => env('CBT_ARTISAN_TOKEN'),
 ];
