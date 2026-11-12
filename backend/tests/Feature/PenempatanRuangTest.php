@@ -21,7 +21,6 @@ use App\Models\TahunAjaran;
 use App\Models\TokenUjian;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -427,14 +426,12 @@ class PenempatanRuangTest extends TestCase
         $this->assertSame($this->kelas->id, $lain->fresh()->kelas_id);
     }
 
-    public function test_grade_recap_uses_the_configured_queue(): void
+    public function test_grade_recap_is_generated_immediately_without_a_worker(): void
     {
-        Queue::fake();
-        config(['cbt.queue_laporan' => 'default']);
+        $id = $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/rekap-nilai', ['jadwal_id' => $this->jadwal->id])
+            ->assertStatus(202)->json('data.id');
 
-        $this->actingAs($this->operator, 'sanctum')->postJson('/api/v1/laporan-pdf/rekap-nilai', ['jadwal_id' => $this->jadwal->id])->assertStatus(202);
-
-        Queue::assertPushedOn('default', GenerateLaporanPdf::class);
+        $this->actingAs($this->operator, 'sanctum')->get("/api/v1/laporan-pdf/{$id}")->assertOk();
     }
 
     public function test_attendance_list_is_generated_immediately_without_a_worker(): void
