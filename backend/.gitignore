@@ -26,3 +26,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /public/Data_Siswa_Mapel_Guru.xlsx
+/public/Data_Siswa (1).xlsx
+
+# Hasil build frontend untuk server (dibuat oleh bangun-server.ps1)
+/public/app.html
+/public/assets

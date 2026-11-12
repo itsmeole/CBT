@@ -16,6 +16,7 @@ const emit = defineEmits<{ (e: 'error', pesan: string): void }>()
 interface Opsi {
   id: number
   nama: string
+  kode?: string
 }
 
 const mapelOpsi = ref<Opsi[]>([])
