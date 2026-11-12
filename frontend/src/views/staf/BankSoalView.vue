@@ -571,7 +571,7 @@ onMounted(() => {
             <label class="hidden text-xs font-semibold text-slate-600 sm:block">Mapel:</label>
             <select v-model="selectedMapel" aria-label="Mapel" @change="fetchSoal" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition-colors">
               <option v-for="m in mapelList" :key="m.id" :value="m.id">
-                {{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
+                {{ m.kode }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
               </option>
             </select>
           </div>
@@ -701,7 +701,7 @@ onMounted(() => {
             <div>
               <label class="block text-xs font-medium text-slate-700">Mata Pelajaran</label>
               <select v-model="formMapelId" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}</option>
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}</option>
               </select>
             </div>
             <div>
@@ -892,7 +892,7 @@ onMounted(() => {
             <select v-model="wordImportMapelId" class="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="" disabled>-- Pilih Mata Pelajaran --</option>
               <option v-for="m in mapelList" :key="m.id" :value="m.id">
-                {{ m.kode }} - {{ m.nama }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
+                {{ m.kode }}{{ isGuru && teacherMapelIds.includes(m.id) ? ' (Diampu)' : '' }}
               </option>
             </select>
           </div>

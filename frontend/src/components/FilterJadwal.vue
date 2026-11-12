@@ -51,7 +51,7 @@ onMounted(muat)
         Mata pelajaran
         <select v-model="mapelId" class="input mt-1 !min-h-0 !py-2 text-sm" aria-label="Filter mata pelajaran">
           <option value="">Semua mapel</option>
-          <option v-for="m in mapelOpsi" :key="m.id" :value="m.id">{{ m.nama }}</option>
+          <option v-for="m in mapelOpsi" :key="m.id" :value="m.id">{{ m.kode || m.nama }}</option>
         </select>
       </label>
       <label class="min-w-0 text-xs font-semibold text-slate-600">

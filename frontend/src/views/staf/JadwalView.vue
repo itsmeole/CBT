@@ -599,7 +599,7 @@ onMounted(() => {
           <div>
             <label class="block text-xs font-medium text-slate-700">Mata Pelajaran</label>
             <select v-model="formPaket.mapel_id" @change="onPaketMapelChange" required class="input !min-h-0 !py-1.5 text-sm">
-              <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
+              <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }}</option>
             </select>
           </div>
           <div>
@@ -684,7 +684,7 @@ onMounted(() => {
             <div>
               <label class="block text-xs font-medium text-slate-700">Mata Pelajaran</label>
               <select v-model="formJadwal.mapel_id" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }}</option>
               </select>
             </div>
             <div>
@@ -698,7 +698,7 @@ onMounted(() => {
             <p class="text-xs font-medium text-slate-700">Mapel dan paket soal</p>
             <div v-for="(baris, i) in barisGabungan" :key="i" class="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
               <select v-model="baris.mapel_id" required class="input !min-h-0 !py-1.5 text-sm" :aria-label="`Mapel ${i + 1}`" @change="ubahMapelBaris(baris)">
-                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.nama }}</option>
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }}</option>
               </select>
               <select v-model="baris.paket_soal_id" required class="input !min-h-0 !py-1.5 text-sm" :aria-label="`Paket ${i + 1}`">
                 <option v-for="p in paketUntukMapel(baris.mapel_id)" :key="p.id" :value="p.id">{{ p.nama }}</option>

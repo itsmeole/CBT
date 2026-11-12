@@ -136,7 +136,7 @@ const filteredSiswa = computed(() => {
 const filteredGuruMapel = computed(() => {
   const q = searchQuery.value.toLowerCase()
   return guruMapelList.value.filter(gm =>
-    (gm.guru?.user?.name || '').toLowerCase().includes(q) || (gm.mapel?.nama || '').toLowerCase().includes(q) || (gm.kelas?.nama || '').toLowerCase().includes(q)
+    (gm.guru?.user?.name || '').toLowerCase().includes(q) || ((gm.mapel?.kode || '') + ' ' + (gm.mapel?.nama || '')).toLowerCase().includes(q) || (gm.kelas?.nama || '').toLowerCase().includes(q)
   )
 })
 
@@ -636,7 +636,7 @@ const currentListCount = computed(() => {
             <tbody class="divide-y divide-slate-100">
               <tr v-for="item in halamanGuruMapel.item" :key="item.id" class="hover:bg-slate-50">
                 <td class="p-3 font-medium text-slate-900">{{ item.guru?.user?.name || '-' }}</td>
-                <td class="p-3">{{ item.mapel?.nama || '-' }}</td>
+                <td class="p-3">{{ item.mapel?.kode || '-' }}</td>
                 <td class="p-3">{{ item.kelas?.nama || '-' }}</td>
                 <td class="p-3">{{ item.tahun_ajaran?.nama || item.tahunAjaran?.nama || '-' }}</td>
                 <td v-if="isOperatorOrSuperadmin" class="p-3 text-right">
@@ -761,7 +761,7 @@ const currentListCount = computed(() => {
                       :key="m.id"
                       class="inline-block rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-brand-700"
                     >
-                      {{ m.nama }}
+                      {{ m.kode }}
                     </span>
                     <span v-if="!item.mapel || item.mapel.length === 0" class="text-xs text-slate-400 italic">
                       Belum ada mapel
@@ -1104,7 +1104,7 @@ const currentListCount = computed(() => {
                   />
                   <span class="font-bold text-slate-900 font-mono">{{ m.kode }}</span>
                   <span>-</span>
-                  <span>{{ m.nama }}</span>
+                  <span>{{ m.kode }}</span>
                 </label>
                 <p v-if="mapelList.length === 0" class="text-xs text-slate-400 italic">
                   Belum ada data mata pelajaran.
@@ -1194,7 +1194,7 @@ const currentListCount = computed(() => {
             <div>
               <label class="block text-xs font-medium text-slate-700">Mata Pelajaran *</label>
               <select v-model="formData.mapel_id" required class="input !min-h-0 !py-1.5 text-sm">
-                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }} - {{ m.nama }}</option>
+                <option v-for="m in mapelList" :key="m.id" :value="m.id">{{ m.kode }}</option>
               </select>
             </div>
             <div>
